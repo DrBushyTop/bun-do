@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "local-container-azurite": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://127.0.0.1:15290",
+      "environmentVariables": {
+        "ASPIRE_ENVIRONMENT": "Local",
+        "ASPNETCORE_ENVIRONMENT": "Local",
+        "DOTNET_ENVIRONMENT": "Local",
+        "BunDo__LocalProfile": "container-azurite",
+        "ASPIRE_ALLOW_UNSECURED_TRANSPORT": "true",
+        "ASPIRE_CONTAINER_RUNTIME": "podman",
+        "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "http://127.0.0.1:19237",
+        "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "http://127.0.0.1:20159"
+      }
+    }
+  }
+}

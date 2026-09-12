@@ -16,4 +16,4 @@ dotnet test BunDo.sln --configuration Release --no-build --no-restore
 
 ## Local stack
 
-The selected local host is .NET Aspire. Aspire CLI 13.5.3 and six project-local workflow skills are installed. The AppHost has not been implemented yet. See the [setup and runtime record](docs/research/aspire-local-development.md) and the local-orchestration slice in the [build plan](docs/implementation-plan.md). Bicep remains responsible for Azure resource deployment; local startup must not create cloud resources.
+Aspire CLI 13.5.3 starts a .NET 10 Functions health endpoint and Azurite through Podman. Local readiness, HTTP health, loopback-only listeners and request telemetry have been verified. Azure Functions Core Tools 4.14.0 or later is required. See [local development](docs/local-development.md) for startup and stop commands and the [build plan](docs/implementation-plan.md) for remaining slices. Bicep owns Azure deployment; local startup does not create cloud resources.

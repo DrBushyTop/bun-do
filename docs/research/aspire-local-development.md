@@ -2,6 +2,11 @@
 
 Research and setup record, September 12, 2026.
 
+This file records the initial setup. The subsequent AppHost run succeeded.
+Core Tools was updated to 4.14.0, and the owner's Podman 6.1.1 VM runs
+Azurite directly. See [local development](../local-development.md) for
+current commands and verified behavior. No Podman workaround remains.
+
 ## What changed on this Mac
 
 Installed the official `Aspire.Cli` .NET global tool at version

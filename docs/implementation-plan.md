@@ -31,7 +31,7 @@ Every completed slice gets a fresh adversarial subagent review at low or medium 
 
 ## Local orchestration addition
 
-The owner requested Aspire after map closure. [Run the backend locally with Aspire and explicit emulator profiles](https://github.com/DrBushyTop/bun-do/issues/36) is an independent build slice and a native prerequisite for cloud sync integration. The backlog now has 22 slices. The CLI and six workflow skills are installed; running an AppHost remains untested. Bicep still owns Azure deployment.
+The owner requested Aspire after map closure. [Run the backend locally with Aspire and explicit emulator profiles](https://github.com/DrBushyTop/bun-do/issues/36) is an independent build slice and a native prerequisite for cloud sync integration. The backlog now has 22 slices. The CLI and six workflow skills are installed. The Functions health endpoint, Azurite, loopback-only listeners and request telemetry have been verified through Podman. Bicep still owns Azure deployment.
 
 ## Scope coverage
 

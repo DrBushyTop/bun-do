@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "local-azurite": {
+      "commandName": "Project",
+      "commandLineArgs": "--port 7275 --address 127.0.0.1",
+      "launchBrowser": false
+    }
+  }
+}
