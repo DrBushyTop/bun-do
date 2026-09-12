@@ -7,7 +7,7 @@ import subprocess
 import unittest
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 @unittest.skipUnless(shutil.which("bicep"), "Snapshot template checks require Bicep CLI")
@@ -58,7 +58,7 @@ class SnapshotTemplateTests(unittest.TestCase):
             "services": {"blob": {"enabled": True, "keyType": "Account"}},
         })
         container = self.resource("Microsoft.Storage/storageAccounts/blobServices/containers")
-        self.assertEqual(container["properties"], {"publicAccess": "None"})
+        self.assertEqual(container["properties"]["publicAccess"], "None")
 
     def test_no_automatic_recovery_retention(self):
         properties = self.resource("Microsoft.Storage/storageAccounts/blobServices")["properties"]
@@ -86,30 +86,10 @@ class SnapshotTemplateTests(unittest.TestCase):
             "version": {"delete": {"daysAfterCreationGreaterThan": 1}},
         })
 
-    def test_module_exports_only_backend_connection_and_grant_inputs(self):
-        outputs = self.template["outputs"]
-        self.assertEqual(set(outputs), {"accountName", "blobEndpoint", "containerName", "containerId"})
-        self.assertEqual(outputs["containerName"]["value"], "[variables('containerName')]")
-        self.assertEqual(
-            outputs["containerId"]["value"],
-            "[resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', "
-            "parameters('accountName'), 'default', variables('containerName'))]",
-        )
-        self.assertEqual(set(self.template["parameters"]), {"accountName", "location"})
+    def test_template_does_not_fetch_keys_or_mint_sas_tokens(self):
         serialized = json.dumps(self.template).lower()
         self.assertNotIn("listkeys", serialized)
         self.assertNotIn("listsas", serialized)
-
-    def test_module_owns_artifact_storage_and_disposal_not_backend_roles_or_backups(self):
-        resources = self.template["resources"]
-        self.assertEqual({resource["type"] for resource in resources}, {
-            "Microsoft.Storage/storageAccounts",
-            "Microsoft.Storage/storageAccounts/blobServices",
-            "Microsoft.Storage/storageAccounts/blobServices/containers",
-            "Microsoft.Storage/storageAccounts/managementPolicies",
-        })
-        self.assertEqual(len(resources), 4)
-        self.assertTrue(all(resource["apiVersion"] == "2025-06-01" for resource in resources))
 
 
 if __name__ == "__main__":

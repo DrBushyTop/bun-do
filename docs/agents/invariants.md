@@ -62,11 +62,64 @@ settings or bypass them.
 The configuration follows the official Codex hooks documentation, checked on
 September 12, 2026: `https://developers.openai.com/codex/hooks`.
 
-## Changing the rules
+## Adding or changing steering checks
 
-Add a small regression fixture for both the rejected case and a valid neighboring
-case. Keep diagnostics tied to a rule, path, and concrete repair. For one-off
-comparison against an earlier commit, run:
+This policy applies to `tools/invariants/`, infrastructure template assertions,
+and any new agent guardrail. The purpose is to stop costly mistakes before they
+reach users or Azure. It is not to reproduce the current implementation in tests.
+
+Before adding a check, name the failure it prevents and the owning contract or
+observed incident. If the only justification is "keep this convention consistent",
+do not add a blocking test. Prefer a short example or review guidance.
+
+Every new rule must:
+
+- Protect a stable boundary or costly behavior, such as data loss, privacy,
+  permission scope, destructive deployment, unbounded spend or broken offline work.
+- Include a failing fixture for that mistake and a passing neighboring case.
+  Show that harmless names, ordering or extra provider metadata do not trip the
+  rule where those details are irrelevant.
+- Report the violated property, location or resource, expected and observed
+  values when available, and a concrete repair.
+- State what it cannot prove. Missing tools, failed reads and incomplete evidence
+  must remain visible, never become a successful verification.
+
+Do not assert exact module names, resource totals, output-key sets, dependency
+arrays, API versions or serialized template bodies merely because they match
+today's files. Narrow assertions to the dangerous property. An exact identifier
+is justified when it is an authorization boundary, wire contract or persisted
+resource identity. Explain that reason beside the check. Removing a naming test
+does not authorize renaming deployed storage or replacing data.
+
+Do not build an ARM-expression evaluator, a second compiler or a generic policy
+framework to make these tests more comprehensive. Bicep compilation checks
+syntax and type relationships. A narrow compiled-template assertion may check
+the emitted expression when that is the smallest reliable way to guard a real
+boundary. Review its limits rather than pretending it proves runtime behavior.
+
+Keep the kinds of evidence separate:
+
+| Check | What it establishes | What it does not establish |
+| --- | --- | --- |
+| Source invariant or compiled-template test | The source declares the checked boundary or setting. | Deployed policy, identity access, successful requests. |
+| Read-only live verification | Azure returned the checked settings at a recorded time. | Data-plane access, deletion completion, application correctness. |
+| Behavioral test through a production adapter | The tested operation obeys its contract in that environment. | Untested failure modes or production capacity. |
+| One-off commissioning probe | The specific experiment ran successfully. | A reusable integration suite or a release-wide pass. |
+
+Do not solve a failing policy check by copying the new output into the expected
+value. Determine whether behavior changed, the check overreaches, or the owning
+contract needs an explicit decision. Preserve regression coverage for the actual
+mistake when removing a brittle assertion.
+
+Cloud scripts must keep read-only inspection separate from deployment and paid
+experiments. Commit repeatable readback commands instead of leaving the procedure
+only in ignored evidence files. Use synthetic, bounded writes only in explicitly
+authorized experiments. Do not put cloud calls in local invariant checks or Git
+hooks. Do not retry an ambiguous paid call to get a green test.
+
+## Historical schema comparison
+
+For one-off comparison against an earlier commit, run:
 
 ```sh
 python3 tools/check_invariants.py --git-base BASE_COMMIT

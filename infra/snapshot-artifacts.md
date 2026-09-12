@@ -54,7 +54,7 @@ rebuilt from Cosmos; it does not need geo-replication or a backup policy. Blob
 capacity and operations have separate costs from Cosmos free tier. There is no
 paid-tier fallback, reservation or fixed capacity provisioned by this module.
 
-`python3 -m unittest tools.test_snapshot_template` compiles the module with Bicep
+`python3 -m unittest discover -s tools -p 'test_snapshot_template.py'` compiles the module with Bicep
 and checks the security, retention, region, SKU and integration contract. These
 are template checks, not proof of live authorization or artifact cleanup.
 

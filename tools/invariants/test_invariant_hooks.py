@@ -7,7 +7,7 @@ import tempfile
 import unittest
 
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 DOMAIN = "src/BunDo.Domain/BunDo.Domain.csproj"
 SCHEMA = "src/BunDo.Android/app/schemas/fi.bundo.data.InboxDatabase/1.json"
 VALID_DOMAIN = "<Project />"
@@ -24,7 +24,8 @@ class InvariantHookTests(unittest.TestCase):
         self.git("config", "user.email", "fixture@example.invalid")
         self.git("config", "commit.gpgsign", "false")
         self.git("config", "core.hooksPath", ".githooks")
-        for name in ("tools/check_invariants.py", "tools/run_invariant_hook.py", ".githooks/pre-commit"):
+        for name in ("tools/check_invariants.py", "tools/invariants/__init__.py",
+                     "tools/invariants/check.py", "tools/run_invariant_hook.py", ".githooks/pre-commit"):
             destination = self.root / name
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(REPO / name, destination)

@@ -97,6 +97,38 @@ local Functions/Azurite profile and does not call these scripts.
 
 ## Verification and remaining gates
 
+New template assertions and verification tools must follow the
+[invariant test policy](agents/invariants.md#adding-or-changing-steering-checks).
+Test privacy, data preservation, scope and cost boundaries, not module naming
+or an exact copy of the current template.
+
+### Repeatable read-only storage verification
+
+```sh
+python3 tools/azure-verify-storage.py --subscription SUBSCRIPTION_UUID
+```
+
+Supply the intended subscription explicitly. The command does not change Azure
+CLI defaults. It uses only management-plane reads, verifies the dedicated group's
+tags and region, and discovers storage resources from deployment outputs.
+It needs Azure CLI login and permission to read those resources, not their keys
+or application data. Bicep and a prior local plan are not required.
+
+The JSON report contains a timestamp and each checked resource/property with
+expected value, observed value and repair guidance. Exit zero means all listed
+checks passed. Drift returns `FAIL`; unavailable or malformed evidence returns
+`INCOMPLETE`. Both exit nonzero. Redirect stdout to a new ignored evidence file
+when retaining a run. Never replace an earlier report to imply it passed.
+
+This first readback command covers Cosmos consistency, keyless access, backup,
+database throughput, partition key and TTL, plus snapshot authentication,
+native retention and scoped orphan cleanup. It does not verify every Azure
+setting, resource identity preservation across deployments, backend grants,
+running build identity, health, telemetry ingestion, actual data access or
+30-minute snapshot expiry. Use it after relevant changes or to diagnose drift.
+Extend it only for a concrete repeated check, with a failing and valid fixture.
+Do not redeploy automatically when verification fails.
+
 On September 12, 2026, the Cosmos foundation deployed successfully and passed
 management-plane policy reads. A controlled redeployment after the application
 module rename preserved both database and container RIDs, all checked policies,

@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 SCHEMA = "src/BunDo.Android/app/schemas/fi.bundo.data.InboxDatabase/1.json"
 
 

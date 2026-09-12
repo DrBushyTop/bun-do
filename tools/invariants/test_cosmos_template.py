@@ -7,7 +7,7 @@ import subprocess
 import unittest
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 @unittest.skipUnless(shutil.which("bicep"), "Cosmos template checks require Bicep CLI")
@@ -74,6 +74,8 @@ class CosmosTemplateTests(unittest.TestCase):
         self.assertNotIn("analyticalStorageTtl", container)
 
     def test_workspace_is_the_only_transaction_partition(self):
+        # Database/container IDs are the existing data contract. Renaming them
+        # creates a different store; this is not an account naming convention.
         variables = self.template["variables"]
         self.assertEqual(variables["databaseName"], "bun-do")
         self.assertEqual(variables["containerName"], "workspace-items")

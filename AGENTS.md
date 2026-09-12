@@ -9,7 +9,8 @@
   backend hosting or observability. Avoid one-resource wrapper modules.
 - Run `python3 tools/check_invariants.py` and
   `python3 -m unittest discover -s tools -p 'test_*.py'` after changes.
-  See [enforced invariants and hooks](docs/agents/invariants.md) for scope and setup.
+  Before adding steering checks, read [invariant test policy](docs/agents/invariants.md#adding-or-changing-steering-checks).
+  Protect costly mistakes, not naming preferences or today's file layout.
 - Use [local development](docs/local-development.md) for Aspire lifecycle and
   [README](README.md) for .NET checks. Android builds use `src/BunDo.Android/gradlew`.
   Use [Azure development](docs/azure-development.md) for scoped Bicep planning,

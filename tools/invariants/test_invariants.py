@@ -4,7 +4,7 @@ import subprocess
 import tempfile
 import unittest
 
-from check_invariants import (
+from .check import (
     MAIN, check_android_code, check_backup, check_domain, check_locales, check_schemas, check_server_storage,
 )
 
@@ -83,7 +83,7 @@ import fi.bundo.data.InboxRepository
 
     def test_missing_device_transfer_exclusion_fails(self):
         # Start from the actual policy, then damage a single costly-to-miss domain.
-        repo = Path(__file__).resolve().parents[1]
+        repo = Path(__file__).resolve().parents[2]
         for path in (MAIN / "AndroidManifest.xml", MAIN / "res/xml/backup_rules.xml", MAIN / "res/xml/data_extraction_rules.xml"):
             self.write(path, (repo / path).read_text())
         self.assertEqual([], check_backup(self.root))
