@@ -15,6 +15,8 @@ public sealed class WorkspaceServer(IWorkspaceStore store)
             if (operation.StateEpoch != state.StateEpoch) return new("EPOCH_CHANGED");
             if (!state.Devices.TryGetValue(operation.DeviceId, out var device)) return new("DEVICE_UNKNOWN");
             if (device.MemberId != authenticatedMemberId) return new("FORBIDDEN");
+            if (operation.ProtocolVersion != 1) return new("UNSUPPORTED_PROTOCOL");
+            if (operation.CommandVersion != 1) return new("UNSUPPORTED_COMMAND_VERSION");
             if (operation.Sequence == 0) return new("INVALID_SEQUENCE");
             if (state.Receipts.TryGetValue(operation.OperationId, out var recorded))
                 return recorded.Fingerprint == operation.Fingerprint

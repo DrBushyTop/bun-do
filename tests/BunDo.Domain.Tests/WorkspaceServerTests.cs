@@ -223,6 +223,22 @@ public sealed class WorkspaceServerTests
     public void Task_ids_match_independent_uuid_v5_fixtures(ulong sequence, string expected) =>
         Assert.Equal(expected, TaskIdentity.ForCreate(DeviceA, sequence));
 
+    [Theory]
+    [InlineData(2, 1, "UNSUPPORTED_PROTOCOL")]
+    [InlineData(1, 2, "UNSUPPORTED_COMMAND_VERSION")]
+    public void Unknown_versions_do_not_reinterpret_or_consume_an_operation(int protocol, int command, string code)
+    {
+        var server = Server();
+        var ordinary = Create(1, "Versioned intent");
+        var unsupported = new FrozenOperation(Workspace, Epoch, DeviceA, 1, ordinary.Command, protocol, command);
+
+        Assert.NotEqual(ordinary.Fingerprint, unsupported.Fingerprint);
+        Assert.Equal(code, server.Handle(MemberA, unsupported).Code);
+        Assert.Empty(server.Pull(0).Groups);
+        Assert.Equal("ACCEPTED", server.Handle(MemberA, ordinary).Code);
+        Assert.Equal(code, server.Handle(MemberA, unsupported).Code);
+    }
+
     private sealed class CollidingStore(IWorkspaceStore inner, int failures) : IWorkspaceStore
     {
         private int remaining = failures;

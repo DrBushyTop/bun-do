@@ -112,7 +112,7 @@ public sealed class ReplicaTests
 
         Assert.Throws<ArgumentException>(() => a.Apply(invalid));
         Assert.Equal(0UL, a.Cursor);
-        Assert.Equal(0UL, a.Find(id)!.TitleVersion.Field);
+        Assert.Equal(0UL, a.Find(id)!.TitleVersion.Server);
         a.Apply(valid);
         Assert.Equal(1UL, a.Cursor);
     }
@@ -130,6 +130,82 @@ public sealed class ReplicaTests
         Assert.Equal(operation, a.NextSubmission());
         a.Receive(receipt);
         Assert.Throws<ArgumentException>(() => a.Receive(receipt with { Code = "FIELD_CONFLICT" }));
+    }
+
+    [Fact]
+    public void An_accepted_receipt_needs_a_real_revision_and_matching_task_effect()
+    {
+        var server = Server();
+        var a = new LocalReplica(Workspace, Epoch, DeviceA);
+        var id = a.Capture("Never lose this");
+        var operation = a.NextSubmission()!;
+        var real = server.Handle(Member, operation).Receipt!;
+
+        Assert.Throws<ArgumentException>(() => a.Receive(real with { EffectRevision = 0, Task = null }));
+        Assert.Throws<ArgumentException>(() => a.Receive(real with { Task = real.Task! with { Id = "other" } }));
+        a.Receive(real);
+        Assert.Throws<ArgumentException>(() => a.Apply(new(0, 1, 1, [new(1, [])])));
+        Assert.Equal(0UL, a.Cursor);
+        Assert.Equal("Never lose this", a.Find(id)!.Title);
+        a.Apply(server.Pull(0));
+        Assert.Equal(1UL, a.Cursor);
+    }
+
+    [Fact]
+    public void Receipt_arriving_after_a_page_still_requires_its_effect_in_the_base()
+    {
+        var server = Server();
+        var a = new LocalReplica(Workspace, Epoch, DeviceA);
+        var id = a.Capture("Retain until reconciled");
+        var receipt = server.Handle(Member, a.NextSubmission()!).Receipt!;
+        a.Apply(new(0, 1, 1, [new(1, [])]));
+
+        Assert.Throws<ArgumentException>(() => a.Receive(receipt));
+        Assert.Equal("Retain until reconciled", a.Find(id)!.Title);
+        Assert.NotNull(a.NextSubmission());
+    }
+
+    [Fact]
+    public void A_description_edit_survives_an_inflight_create_and_converges_without_changing_title()
+    {
+        var server = Server();
+        var a = new LocalReplica(Workspace, Epoch, DeviceA);
+        var b = new LocalReplica(Workspace, Epoch, DeviceB);
+        var id = a.Capture("Buy coffee", "Original note");
+        var create = a.NextSubmission()!;
+        var receipt = server.Handle(Member, create).Receipt!;
+        a.EditDescription(id, "Decaf only");
+        a.Receive(receipt);
+        a.Apply(server.Pull(0));
+        Assert.Equal("Decaf only", a.Find(id)!.Description);
+        Send(server, a);
+        b.Apply(server.Pull(0));
+        Assert.Equal(a.Find(id), b.Find(id));
+        Assert.Equal("Buy coffee", b.Find(id)!.Title);
+        Assert.Equal("Decaf only", b.Find(id)!.Description);
+
+        a.EditDescription(id, null);
+        Send(server, a);
+        b.Apply(server.Pull(b.Cursor));
+        Assert.Null(b.Find(id)!.Description);
+    }
+
+    [Theory]
+    [InlineData(2UL, 2UL)]
+    [InlineData(1UL, 2UL)]
+    [InlineData(0UL, 0UL)]
+    public void Impossible_snapshot_versions_cannot_hide_the_acknowledged_local_text(ulong serverVersion, ulong human)
+    {
+        var server = Server();
+        var a = new LocalReplica(Workspace, Epoch, DeviceA);
+        var id = a.Capture("Keep the captured title");
+        var receipt = server.Handle(Member, a.NextSubmission()!).Receipt!;
+        a.Receive(receipt);
+        var forged = receipt.Task! with { Title = "Wrong", TitleVersion = new(serverVersion, human) };
+
+        Assert.Throws<ArgumentException>(() => a.Apply(new(0, 1, 1, [new(1, [forged])])));
+        Assert.Equal(0UL, a.Cursor);
+        Assert.Equal("Keep the captured title", a.Find(id)!.Title);
     }
 
     private static void Send(WorkspaceServer server, LocalReplica replica)

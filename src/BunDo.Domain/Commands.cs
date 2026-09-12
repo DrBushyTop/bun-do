@@ -19,10 +19,13 @@ public sealed class FrozenOperation
     public Guid DeviceId { get; }
     public ulong Sequence { get; }
     public TaskCommand Command { get; }
+    public int ProtocolVersion { get; }
+    public int CommandVersion { get; }
     public string Fingerprint { get; }
     public string OperationId => $"{DeviceId:D}:{Sequence.ToString(CultureInfo.InvariantCulture)}";
 
-    public FrozenOperation(Guid workspaceId, Guid stateEpoch, Guid deviceId, ulong sequence, TaskCommand command)
+    public FrozenOperation(Guid workspaceId, Guid stateEpoch, Guid deviceId, ulong sequence, TaskCommand command,
+        int protocolVersion = 1, int commandVersion = 1)
     {
         ArgumentNullException.ThrowIfNull(command);
         WorkspaceId = workspaceId;
@@ -30,6 +33,8 @@ public sealed class FrozenOperation
         DeviceId = deviceId;
         Sequence = sequence;
         Command = command;
+        ProtocolVersion = protocolVersion;
+        CommandVersion = commandVersion;
         var kind = command switch
         {
             CreateTask => "CreateTask",
@@ -41,6 +46,8 @@ public sealed class FrozenOperation
         var bytes = JsonSerializer.SerializeToUtf8Bytes(new
         {
             workspaceId,
+            protocolVersion,
+            commandVersion,
             stateEpoch,
             deviceId,
             sequence = sequence.ToString(CultureInfo.InvariantCulture),

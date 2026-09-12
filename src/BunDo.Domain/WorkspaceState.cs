@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 
 namespace BunDo.Domain;
 
-public sealed record FieldVersion(ulong Field, ulong Human);
+public sealed record FieldVersion(ulong Server, ulong Human);
 public sealed record TaskSnapshot(
     string Id, string Title, string? Description, FieldVersion TitleVersion, FieldVersion DescriptionVersion);
 public sealed record DeviceRegistration(Guid DeviceId, Guid MemberId, ulong LastTerminalSequence = 0);
