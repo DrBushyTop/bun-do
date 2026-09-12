@@ -1,6 +1,6 @@
 # Bun Do design direction
 
-Status: architect-selected planning contract, 2026-09-12. The owner delegated remaining design decisions. This resolves the planning choices in "Choose how Bun Do expresses the way of the bun." No rendered UI, final logo, device testing, or owner approval of those artifacts is claimed. Implement with Impeccable and its Android guidance, then reconcile this document and generate `.impeccable/design.json` from the reviewed Compose implementation.
+Status: architect-selected UI planning contract, 2026-09-12, with an owner-approved refined logo. The approved salute and its vector assets live in `assets/brand/`. No rendered Android UI or device testing is claimed. Implement with Impeccable and its Android guidance, then reconcile the UI tokens and generate `.impeccable/design.json` from the reviewed Compose implementation.
 
 ## Identity
 
@@ -8,7 +8,9 @@ Bun Do means "the way of the bun." Bun is a bunny. Choose an orderly household n
 
 The palette is restrained. Brand appears in the launcher, welcome, empty queue, and optional completion bow. Keep ordinary task actions literal. No belts, scores, or rankings for members.
 
-Build an original vector mark on a 48-unit square. Use a rounded compact body, two long ears with one slightly inclined, small neutral eyes, tucked forepaws, planted feet, and a single belt knot. Use at most six simple filled shapes plus facial marks. Keep the silhouette within the adaptive icon safe zone. At 24 dp omit eyes and knot detail. At 48 dp show both. Use ink on paper and paper on ink; evergreen supplies the launcher background. No crown, copied comic linework, weapons, lettering inside the icon, gradients, or bread imagery. The supplied King Bun reference informs the dignity and humor only.
+Use the approved refined salute in `assets/brand/bun-do-evergreen.svg`. The small upright rabbit faces right, with one outward-curved ear, a defined nose, a calm eye, joined forepaws, planted feet and a tied belt. The owner preferred this refined drawing over the compact variant and found it recognizable at 24 pixels. Preserve the same drawing, including nose, eye and knot, at every size. The SVG has a nominal 48-pixel size and a 1024-unit view box.
+
+Use exact evergreen `#245B48` on light backgrounds and `assets/brand/bun-do-paper.svg`, `#F8F9F4`, on dark or evergreen backgrounds. Both files share one compound path with opaque fill and transparent cutouts. Do not add gradients, texture or translucent body shading. Keep the silhouette within the adaptive icon safe zone when creating Android launcher layers; browser crop previews are not device validation. No crown, copied comic linework, weapons, lettering inside the icon or bread imagery. The supplied King Bun reference informs the dignity and humor only. Rejected drafts and the compact variant have been removed.
 
 ## Tokens
 
@@ -48,4 +50,4 @@ Rows grow with content and font scale. Queue titles allow three lines and then e
 
 Use 200 ms state transitions and 150 ms fades. The completion bow is on by default, can be disabled in Settings, and lasts 240 ms once after the local write succeeds. Respect system animation settings with immediate transitions and a static mark. No celebratory screen blocks continued work.
 
-Release review must use native emulator/device captures, both themes, Finnish and English, font scales 1.0, 1.3, and 2.0, TalkBack, and contrast checks. Use two Android emulator profiles on this Mac for gestures, voice fixtures, interruptions and functional tests. The vivo X300 Ultra and OnePlus 13 remain target phones, but their performance and Finnish recognition quality are unmeasured owner-accepted assumptions; the skipped benchmark is not a hidden release gate. Impeccable's HTML/CSS detector does not validate Compose. Build fully, inspect once, batch corrections, then confirm once before the skill's independent finish review. Finalize the original vector logo and token sidecar from that evidence.
+Release review must use native emulator/device captures, both themes, Finnish and English, font scales 1.0, 1.3, and 2.0, TalkBack, and contrast checks. Use two Android emulator profiles on this Mac for gestures, voice fixtures, interruptions and functional tests. The vivo X300 Ultra and OnePlus 13 remain target phones, but their performance and Finnish recognition quality are unmeasured owner-accepted assumptions; the skipped benchmark is not a hidden release gate. Impeccable's HTML/CSS detector does not validate Compose. Build fully, inspect once, batch corrections, then confirm once before the skill's independent finish review. Validate the approved logo's Android integration and finalize the UI token sidecar from that evidence.

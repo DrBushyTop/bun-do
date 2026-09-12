@@ -32,7 +32,7 @@ The owner chose to skip the separate speech feasibility experiment and proceed o
 
 ## Brand commitments
 
-The name is Bun Do, "the way of the bun." Bun means bunny. The owner supplied xkcd's King Bun as a reference and requested a martial-arts bunny logo direction. Preserve the small rabbit's dignity and dry humor. UI work must use Impeccable with native Android guidance.
+The name is Bun Do, "the way of the bun." Bun means bunny. The owner supplied xkcd's King Bun as a reference and approved the refined martial-arts rabbit salute in `assets/brand/`, retaining its defined nose and the same drawing at small sizes. Preserve the small rabbit's dignity and dry humor. UI work must use Impeccable with native Android guidance.
 
 ## Evidence on hand
 

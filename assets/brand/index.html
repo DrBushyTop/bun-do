@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bun Do · Approved logo</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; color: #191d19; background: #f8f9f4; accent-color: #245b48; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    ::selection { color: #082116; background: #bcebd2; }
+    :focus-visible { outline: 3px solid #245b48; outline-offset: 5px; }
+    a { color: #245b48; text-underline-offset: .22em; }
+    main { max-width: 1080px; padding: 44px 32px 64px; margin: auto; }
+    header { margin-bottom: 32px; max-width: 720px; }
+    h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.15; font-weight: 650; letter-spacing: -.025em; margin: 12px 0; }
+    h2 { font-size: 23px; line-height: 1.3; font-weight: 600; margin: 0 0 10px; }
+    h3 { font-size: 17px; font-weight: 600; margin: 0; }
+    p { line-height: 1.6; margin: 8px 0; max-width: 68ch; }
+    .muted { color: #52635a; }
+    .brand { font-size: 16px; font-weight: 650; }
+    .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+    figure { margin: 0; min-width: 0; }
+    .art { background: #f8f9f4; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #c4ccc1; }
+    .art img { display: block; width: 100%; height: 100%; object-fit: contain; }
+    figcaption { margin-top: 18px; }
+    figcaption p { font-size: 14px; }
+    .status { display: inline-block; margin-top: 8px; font-size: 13px; color: #52635a; }
+    section { margin-top: 56px; }
+    .section-head { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; margin-bottom: 24px; }
+    .switch { display: flex; border: 1px solid #747d73; border-radius: 8px; padding: 4px; gap: 4px; }
+    button { cursor: pointer; font: inherit; min-height: 44px; padding: 8px 16px; border: 0; border-radius: 4px; background: transparent; color: #245b48; }
+    button[aria-pressed="true"] { background: #245b48; color: #fff; }
+    button:hover { background: #d5e8dc; color: #102018; }
+    button[aria-pressed="true"]:hover { background: #083827; color: #fff; }
+    .size-proof { --sample-bg: #f8f9f4; --sample-ink: #245b48; background: var(--sample-bg); color: var(--sample-ink); padding: 28px 24px; border: 1px solid #c4ccc1; border-radius: 12px; }
+    .size-proof.dark { --sample-bg: #111511; --sample-ink: #f8f9f4; border-color: #444c44; }
+    .size-row { display: grid; grid-template-columns: minmax(120px, 1.4fr) repeat(3, 1fr); align-items: center; gap: 16px; min-height: 130px; }
+    .size-row + .size-row { border-top: 1px solid #747d7370; }
+    .size-label { font-size: 14px; line-height: 1.5; }
+    .size-label small { display: block; opacity: .8; }
+    .sample { display: grid; justify-items: center; gap: 12px; }
+    .sample span { font-size: 12px; font-variant-numeric: tabular-nums; }
+    .mark { display: block; background: var(--sample-ink); mask: var(--mark) center / contain no-repeat; -webkit-mask: var(--mark) center / contain no-repeat; }
+    .refined { --mark: url("bun-do-evergreen.svg"); }
+    .s24 { width: 24px; height: 24px; }
+    .s48 { width: 48px; height: 48px; }
+    .s96 { width: 96px; height: 96px; }
+    .note { font-size: 14px; color: #52635a; margin-top: 16px; }
+    .launcher-grid { display: flex; gap: 48px; flex-wrap: wrap; margin: 28px 0; }
+    .launcher { width: 108px; height: 108px; display: grid; place-items: center; background: #245b48; overflow: hidden; --sample-ink: #f8f9f4; }
+    .launcher .mark { width: 84px; height: 84px; }
+    .circle { border-radius: 50%; }
+    .rounded { border-radius: 24%; }
+    .launcher-grid figure { display: grid; justify-items: center; gap: 10px; }
+    .launcher-grid figcaption { margin: 0; font-size: 13px; color: #52635a; }
+    .changes { padding-left: 20px; line-height: 1.7; max-width: 68ch; }
+    footer { margin-top: 48px; padding-top: 24px; border-top: 1px solid #c4ccc1; color: #52635a; font-size: 13px; line-height: 1.7; }
+    footer a { display: inline-block; padding: 10px 0; margin-right: 24px; }
+    @media (max-width: 640px) {
+      main { padding: 24px 20px 40px; }
+      .comparison { gap: 28px; grid-template-columns: 1fr; }
+      .art { max-height: 340px; }
+      section { margin-top: 40px; }
+      .size-proof { padding: 20px 12px; }
+      .size-row { grid-template-columns: repeat(3, 1fr); gap: 16px 8px; padding: 20px 0; }
+      .size-label { grid-column: 1 / -1; }
+      .size-label small { display: inline; margin-left: 8px; }
+      .launcher-grid { gap: 28px; }
+    }
+    @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <a class="brand" href="README.md">Bun Do</a>
+      <h1>The Bun Do salute</h1>
+      <p class="muted">The approved refined rabbit, now in vector form. One flat color, with the defined nose and salute intact.</p>
+    </header>
+    <div class="comparison">
+      <figure>
+        <div class="art"><img src="source/approved-raster.png" alt="Approved raster reference for the refined Bun Do rabbit" width="1024" height="1024"></div>
+        <figcaption><h2>Approved reference</h2><p>The refined drawing you approved. Kept only as a fidelity reference.</p><span class="status">Reference only</span></figcaption>
+      </figure>
+      <figure>
+        <div class="art"><img src="bun-do-evergreen.svg" alt="Refined martial-arts rabbit retaining its defined nose, with simplified joined paws and belt" width="1024" height="1024"></div>
+        <figcaption><h2>Vector master</h2><p>Smooth vector curves, exact evergreen fill and transparent cutouts.</p><span class="status">Current logo</span></figcaption>
+      </figure>
+    </div>
+    <section aria-labelledby="size-title">
+      <div class="section-head">
+        <div><h2 id="size-title">What survives at small sizes?</h2><p class="muted">Each sample uses the labeled CSS pixel size.</p></div>
+        <div class="switch" role="group" aria-label="Small-size sample background">
+          <button type="button" aria-pressed="true" data-theme="light">Light</button>
+          <button type="button" aria-pressed="false" data-theme="dark">Dark</button>
+        </div>
+      </div>
+      <div class="size-proof" id="size-proof">
+        <div class="size-row">
+          <div class="size-label">Refined salute<small>Same approved drawing</small></div>
+          <div class="sample"><i class="mark refined s24" role="img" aria-label="Refined salute at 24 pixels"></i><span>24 px</span></div>
+          <div class="sample"><i class="mark refined s48" role="img" aria-label="Refined salute at 48 pixels"></i><span>48 px</span></div>
+          <div class="sample"><i class="mark refined s96" role="img" aria-label="Refined salute at 96 pixels"></i><span>96 px</span></div>
+        </div>
+
+      </div>
+      <p class="note">View at 100% browser zoom. These are browser size proofs, not Android device captures. The same vector supplies all three sizes. The rejected compact variant has been removed.</p>
+    </section>
+    <section aria-labelledby="launcher-title">
+      <h2 id="launcher-title">On an evergreen launcher tile</h2>
+      <p class="muted">Two crop previews, using the same foreground and placement.</p>
+      <div class="launcher-grid">
+        <figure><div class="launcher circle"><i class="mark refined" role="img" aria-label="Refined salute in a circular evergreen tile"></i></div><figcaption>Circle</figcaption></figure>
+        <figure><div class="launcher rounded"><i class="mark refined" role="img" aria-label="Refined salute in a rounded-square evergreen tile"></i></div><figcaption>Rounded square</figcaption></figure>
+      </div>
+      <p class="note">These previews check the composition only. Android adaptive-icon layers and device mask checks are still required.</p>
+    </section>
+    <section aria-labelledby="review-title">
+      <h2 id="review-title">Ready for app integration</h2>
+      <p>Use evergreen on light backgrounds and the paper variant on dark backgrounds. Keep the nose, eye and belt at every size. Do not stretch the mark or add shading.</p>
+    </section>
+    <footer>
+      <div>The approved reference came from high-quality Azure Foundry image edits using Azure CLI authentication. The vector is traced from its cleaned silhouette. Generation provenance and reproducible export scripts are included.</div>
+      <a href="bun-do-evergreen.svg" download>Evergreen SVG</a>
+      <a href="bun-do-paper.svg" download>Paper SVG</a>
+      <a href="png/bun-do-evergreen-1024.png" download>1024 px PNG</a>
+      <a href="README.md">Usage and provenance</a>
+    </footer>
+  </main>
+  <script>
+    document.querySelectorAll('[data-theme]').forEach(button => {
+      button.addEventListener('click', () => {
+        const dark = button.dataset.theme === 'dark';
+        document.getElementById('size-proof').classList.toggle('dark', dark);
+        document.querySelectorAll('[data-theme]').forEach(item => {
+          item.setAttribute('aria-pressed', String(item === button));
+        });
+      });
+    });
+  </script>
+</body>
+</html>

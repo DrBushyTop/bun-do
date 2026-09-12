@@ -1,0 +1,7 @@
+Make exactly ONE targeted change to the primary transparent rabbit logo image: restore its defined nose.
+
+The second reference image is the user's original selected Dojo salute. Copy the CHARACTER of that original nose: a small distinct pale triangular rabbit nose with a short vertical stem underneath, positioned inside the right-facing muzzle. Render the nose and stem as clean transparent negative space, not white paint. It must be clear and recognizable, not merely a dot, and not an oversized cartoon snout. The user explicitly wants to KEEP the defined nose because it contributes to this rabbit's identity.
+
+Preserve EVERYTHING ELSE from the primary image: the evergreen #245B48 filled silhouette, exact upright salute pose, head and muzzle contours, small calm eye, proportions, outward-curved ear, tail, feet, simplified joined forepaws, broad paw separation, simplified belt, diamond knot and short belt ends. Do not redraw the face, shift the paws, change the belt, change the ears, add a smile or alter the pose. Only add the nose and short stem in the same visual position as the original selected reference.
+
+1024 square flat graphic mark with native transparent background. All negative space remains transparent. Solid evergreen ink with no texture, gradients, outline, shading or shadows. No white background, checkerboard pattern, new symbols, lettering or decoration. Preserve the primary image's framing.

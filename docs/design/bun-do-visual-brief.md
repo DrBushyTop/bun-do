@@ -1,10 +1,10 @@
 # Bun Do visual brief
 
-Status: owner-confirmed identity, visual study still open. Track the study in [Choose how Bun Do expresses the way of the bun](https://github.com/DrBushyTop/bun-do/issues/10).
+Status: the owner approved the refined rabbit salute on 2026-09-12. Current vectors, exports and provenance live in `assets/brand/`. Android screen review remains open. The broader study is tracked in [Choose how Bun Do expresses the way of the bun](https://github.com/DrBushyTop/bun-do/issues/10).
 
 The app is Bun Do, "the way of the bun." The owner means a bunny and supplied [xkcd's Bun comic](https://xkcd.com/1682/) as the reference. Its tiny King Bun has an amusing amount of authority. The requested direction is a martial-arts bunny logo.
 
-Use Impeccable for UI planning, design, implementation, and review. Apply its native Android guidance to Compose. This brief records the current intent; it is not a finished design system or approval of a logo.
+Use Impeccable for UI planning, design, implementation, and review. Apply its native Android guidance to Compose. The logo is approved; this brief does not claim a finished Android design system or device validation.
 
 The target phones are vivo X300 Ultra and OnePlus 13. Follow native Material 3 navigation, system Back, window insets, scalable text, and touch targets. Verify screenshots on an emulator or device and performance on the actual phones. The selected build workflow is stored in `.impeccable/config.json`.
 

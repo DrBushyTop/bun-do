@@ -1,0 +1,26 @@
+{
+  "name": "Bun Do refined salute",
+  "approvedOn": "2026-09-12",
+  "approvedReference": "approved-raster.png",
+  "vectorSource": "../bun-do-evergreen.svg",
+  "approval": "The owner preferred the refined version over the compact version and found it recognizable at 24 pixels.",
+  "requirements": [
+    "Keep the defined nose, eye, joined-paw salute and belt detail.",
+    "Use the same refined drawing at small sizes.",
+    "Use one flat color with opaque interiors and transparent cutouts.",
+    "Do not restore the rejected compact variant."
+  ],
+  "generation": {
+    "service": "Azure Foundry",
+    "authentication": "Azure CLI",
+    "deployment": "gpt-image-2-1",
+    "size": "1024x1024",
+    "quality": "high",
+    "inputFidelity": "high",
+    "finalEditPrompt": "final-edit.prompt.txt",
+    "history": "The selected Dojo salute concept was refined to simplify the paws and belt. A subsequent edit restored the defined nose at the owner's request. Superseded generated images were removed at the owner's request."
+  },
+  "rasterCleanup": "Threshold native alpha at 50 percent, apply #245B48, trim and fit an 800-pixel bounding box on a transparent 1024-pixel canvas. This removed generated color variation and uneven interior opacity.",
+  "vectorization": "Potrace 1.16, flat compound path, optimization tolerance 0.4. Rebuild with ../build.py.",
+  "androidDeviceValidation": false
+}
