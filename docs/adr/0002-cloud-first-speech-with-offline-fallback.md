@@ -5,8 +5,8 @@ MAI-Transcribe-2 for the primary online transcription path. The 41-clip Finnish
 comparison produced lower word error and lower post-recording latency than local
 Parakeet. Keep Parakeet as an offline fallback and typing available without a
 model. The native recognizer on both test emulators lacks Finnish support.
-See the [comparison procedure](../android-speech-comparison.md) and
-[measured results](../reviews/speech-comparison.md).
+See the [comparison procedure](../android-speech-comparison.md) and the slice
+issue's recorded results.
 
 This explicitly changes the earlier local-only audio boundary. It does not
 authorize audio in telemetry, public storage, source control or unrelated

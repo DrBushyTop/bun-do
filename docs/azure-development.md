@@ -137,8 +137,7 @@ On September 12, 2026, the Cosmos foundation deployed successfully and passed
 management-plane policy reads. A controlled redeployment after the application
 module rename preserved both database and container RIDs, all checked policies,
 and manual 400 RU/s throughput. The full what-if was not empty: provider defaults
-produced modifications that needed review and follow-up reads. See the
-[review and dated evidence](reviews/cosmos-foundation.md).
+produced modifications that needed review and follow-up reads.
 
 The snapshot storage increment also deployed on September 12, 2026. Live reads
 matched its declared SKU, region, transport/authentication controls, encryption,
@@ -150,15 +149,13 @@ resource IDs and checked provider defaults were unchanged, including the
 disabled static website and account encryption scope.
 This negative probe does not prove backend managed-identity access, Shared Key
 rejection with a valid key, runtime expiry or cleanup.
-See the [snapshot review](reviews/snapshot-foundation.md).
 
 The Infrastructure workflow installs the pinned Bicep binary with its SHA-256,
 compiles the subscription template, and tests compiled storage settings and
 deployment safeguards. CI does not authenticate to Azure or provision resources.
 
-The [Cosmos foundation review](reviews/cosmos-foundation.md) records the fresh
-adversarial review. Live provisioning results belong in the implementation
-ticket and a dated evidence note; compilation or what-if is not deployment.
+Live provisioning results belong in the implementation ticket; compilation or
+what-if is not deployment.
 The later backend and AI increments below prove identity access and complete
 schemas. Two-instance transaction tests, real replay and backup restore remain
 separate downstream live gates.
@@ -173,8 +170,7 @@ data migration.
 The Function health endpoint deployed and passed a controlled redeployment on
 September 12, 2026. Live configuration, identity/grant checks and storage
 preservation comparisons passed. Both health probes returned HTTP 200. The
-initial package upload had a reset-workers 503 before the successful probe; see
-the [backend review](reviews/backend-foundation.md) for exact limits and evidence.
+initial package upload had a reset-workers 503 before the successful probe.
 The [backend module](../infra/backend-hosting.md) owns runtime storage and grants.
 
 ## Exception observability evidence
@@ -184,14 +180,11 @@ September 12, 2026. A synthetic result-execution failure proved managed-identity
 ingestion and redaction through the real Function middleware. The temporary
 function-key probe was removed afterward; health returned 200 and Azure listed
 only `Health`. Both emitted tables have 30-day total retention, and successful
-requests/health counts are not exported. See the
-[review and delivery limits](reviews/exception-observability.md).
+requests/health counts are not exported.
 
 The exception-only design above is historical. The owner subsequently chose
-full completion traces. See [wide-trace evidence](reviews/wide-otel.md) and
-[AI inference evidence](reviews/ai-inference.md) for the following increment.
-The final data-plane and negative-AI checks also passed on September 12, 2026.
-See the backend and AI reviews for exact status codes, cleanup and limits.
+full completion traces. The final data-plane and negative-AI checks also passed
+on September 12, 2026.
 Refusal/throttling handling was fixture-tested, not forced against the provider.
 These gates do not prove the durable AI worker or downstream sync.
 

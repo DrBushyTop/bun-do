@@ -11,6 +11,6 @@ gh api repos/DrBushyTop/bun-do/issues/14/sub_issues
 gh api repos/DrBushyTop/bun-do/issues/NUMBER/dependencies/blocked_by
 ```
 
-Assign DrBushyTop when starting work. Only take open slices with closed blockers. Implementation tickets use `implementation` and `ready-for-agent`; readiness still requires checking native dependencies. Record test and fresh adversarial-review evidence before closure. Use `bug` for concrete deferred findings and link them from the slice.
+Assign DrBushyTop when starting work. Only take open slices with closed blockers. Implementation tickets use `implementation` and `ready-for-agent`; readiness still requires checking native dependencies. Before closure, add the test results and fresh adversarial-review conclusion to the slice issue. Use `bug` for concrete deferred findings and link them from the slice. Do not commit standalone review reports; record durable decisions and operating procedures in their owning documentation instead.
 
 Refer to issues by their linked names in prose. Never claim a skipped experiment passed. When opening or working on a pull request, register it with the thread's `link_pull_request` tool.

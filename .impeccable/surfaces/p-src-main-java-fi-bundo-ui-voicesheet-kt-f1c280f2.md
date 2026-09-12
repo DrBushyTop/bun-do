@@ -44,4 +44,4 @@ recording, silence, denial, cancellation, recovery and saved task detail.
 The finish review found no rendered contradiction and required documentation
 to reflect the shipped voice controls. PRODUCT.md, DESIGN.md and the filled
 recording-action sidecar preview now match; the verdict scored that fix resolved
-and returned ship. See `docs/reviews/offline-speech.md` for scope and limits.
+and returned ship. The slice issue records the review scope and limits.

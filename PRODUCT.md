@@ -40,7 +40,7 @@ The name is Bun Do, "the way of the bun." Bun means bunny. The owner supplied xk
 
 ## Evidence on hand
 
-The repository contains the architecture proposal and review. The owner supplied an image of [xkcd's Bun comic](https://xkcd.com/1682/). This is a reference, not a completed app logo. The anonymous Android shell now has a Room-backed queue, typed capture/edit, local voice capture with recording recovery, task detail and bilingual appearance/language settings. It has no sign-in, online speech, shared commands or sync yet. Native phone-emulator evidence is recorded in [the shell visual review](docs/reviews/android-shell-visual.md) and [the offline speech review](docs/reviews/offline-speech.md). The speech evidence covers English light, Finnish dark with large text, landscape, recording, silence, recovery, cancellation and permission denial. No measured physical-device benchmark, tablet validation or owner approval of the rendered app is claimed.
+The repository contains the architecture proposal. The owner supplied an image of [xkcd's Bun comic](https://xkcd.com/1682/). This is a reference, not a completed app logo. The anonymous Android shell now has a Room-backed queue, typed capture/edit, local voice capture with recording recovery, task detail and bilingual appearance/language settings. It has no sign-in, online speech, shared commands or sync yet. No measured physical-device benchmark, tablet validation or owner approval of the rendered app is claimed.
 
 ## Product principles
 

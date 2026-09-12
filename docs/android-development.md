@@ -167,8 +167,5 @@ Pixel 7 API 36 ARM64 emulators, not the target physical phones. The
 `tools/android-restart-smoke.py` script also verified committed task and unfinished
 draft durability through a real force-stop on each profile with connectivity off.
 
-[The visual review](reviews/android-shell-visual.md) records native captures,
-languages, appearance, font scales, measured contrast and the independent finish
-disposition. The [adversarial review](reviews/android-shell-adversarial.md) covers
-persistence, recovery and environment setup. TalkBack traversal, physical-device
-performance and the full release flows remain unverified.
+TalkBack traversal, physical-device performance and the full release flows remain
+unverified.

@@ -12,7 +12,7 @@
 
 The owner confirmed the entire v1 scope on 2026-09-12. Implementation may proceed in stages, but those stages do not remove recurrence, dependencies, nested subtasks, AI split/clarify, statistics, or other included features from the release.
 
-The [Bun Do wayfinder map](https://github.com/DrBushyTop/bun-do/issues/1) records the planning decisions. Read the [implementation contract](docs/architecture/README.md) first. It supersedes conflicting state, wire/schema, identity, ordering, recurrence and retention examples below. This document remains the scope and original proposal, not a second competing protocol. The [adversarial review](docs/reviews/architecture-adversarial-review.md) records the defects that prompted those decisions. Live Azure and rendered UI checks remain implementation work; skipped phone benchmarks remain unmeasured assumptions.
+The [Bun Do wayfinder map](https://github.com/DrBushyTop/bun-do/issues/1) records the planning decisions. Read the [implementation contract](docs/architecture/README.md) first. It supersedes conflicting state, wire/schema, identity, ordering, recurrence and retention examples below. This document remains the scope and original proposal, not a second competing protocol. Live Azure and rendered UI checks remain implementation work; skipped phone benchmarks remain unmeasured assumptions.
 
 ---
 

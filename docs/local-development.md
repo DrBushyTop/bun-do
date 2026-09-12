@@ -62,7 +62,7 @@ On September 12, 2026, Aspire started the Function and Azurite 3.35.0 through th
 
 The first socket check failed with Core Tools 4.11.0. Updating that tool to 4.14.0 and supplying the explicit bind address fixed it. The Podman VM needed no changes.
 
-The domain suite and a focused health-handler test also run without containers. That handler test checks the response value, not HTTP hosting. The running-host verification above is separate from those tests. See [the slice review](reviews/local-hosting.md) for evidence and remaining boundaries.
+The domain suite and a focused health-handler test also run without containers. That handler test checks the response value, not HTTP hosting. The running-host verification above is separate from those tests.
 
 ## Local profile and other test boundaries
 

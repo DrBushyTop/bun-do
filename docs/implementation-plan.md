@@ -2,7 +2,7 @@
 
 The [build backlog](https://github.com/DrBushyTop/bun-do/issues/14) contains all v1 slices. Native GitHub dependencies determine what is ready. This file indexes those tickets; it does not duplicate their status.
 
-Every completed slice gets a fresh adversarial subagent review at low or medium reasoning. Fix material issues before continuing. File concrete deferred bugs with reasons, not vague reminders.
+Every completed slice gets a fresh adversarial subagent review at low or medium reasoning. Fix material issues before continuing. Add the review conclusion and test results to the slice issue. File concrete deferred bugs with reasons, not vague reminders.
 
 | Slice | Blocked by |
 | --- | --- |

@@ -17,6 +17,9 @@
   deployment and live verification.
 - Every completed slice needs a fresh adversarial subagent review. Fix material
   findings, file concrete deferred bugs, then continue to the next ready slice.
+- Record the review conclusion and test evidence in the slice's GitHub issue.
+  Keep only durable decisions, operational procedures and deferred bugs in the
+  repository; do not commit standalone review reports.
 - Keep implementation with the main agent. Use subagents primarily for review.
 - Load the `unslop` skill once per conversation and apply it to writing.
 - Use [.agents/skills/otel-wide-events](.agents/skills/otel-wide-events/SKILL.md)
