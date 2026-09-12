@@ -13,3 +13,7 @@ dotnet restore BunDo.sln --locked-mode
 dotnet build BunDo.sln --configuration Release --no-restore
 dotnet test BunDo.sln --configuration Release --no-build --no-restore
 ```
+
+## Local stack
+
+The selected local host is .NET Aspire. Aspire CLI 13.5.3 and six project-local workflow skills are installed. The AppHost has not been implemented yet. See the [setup and runtime record](docs/research/aspire-local-development.md) and the local-orchestration slice in the [build plan](docs/implementation-plan.md). Bicep remains responsible for Azure resource deployment; local startup must not create cloud resources.

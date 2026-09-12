@@ -8,7 +8,7 @@ android
 
 ## Stack
 
-The selected stack is Kotlin, Jetpack Compose, Room, WorkManager and an Azure .NET 10 backend. The owner delegated architecture to the agent. No application code exists yet. Resolved contracts live in docs/architecture; live deployment checks are implementation gates.
+The selected stack is Kotlin, Jetpack Compose, Room, WorkManager and an Azure .NET 10 backend, with Aspire for local backend composition and Bicep for deployment. The owner delegated architecture to the agent. A tested .NET typed-command and replica model now exists. Native Android and hosted cloud implementation have not started. Resolved contracts live in docs/architecture; live deployment checks are implementation gates.
 
 ## Users
 
