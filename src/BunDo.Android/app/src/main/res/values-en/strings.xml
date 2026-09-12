@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="inbox">My queue</string>
+    <string name="local_only">Only on this phone</string>
+    <string name="local_explanation">Tasks stay on this phone. They are not backed up or shared yet.</string>
+    <string name="empty_title">What needs doing?</string>
+    <string name="empty_body">Write down one thing. Come back to it later, even without a connection.</string>
+    <string name="type_task">Type a task</string>
+    <string name="resume_draft">Resume draft</string>
+    <string name="draft_available">Saved draft</string>
+    <string name="new_task">New task</string>
+    <string name="edit_task">Edit task</string>
+    <string name="task_detail">Task</string>
+    <string name="task_title">Task title</string>
+    <string name="description_optional">Description, optional</string>
+    <string name="save">Save</string>
+    <string name="back">Back</string>
+    <string name="saving">Saving…</string>
+    <string name="draft_saved">Draft saved on this phone</string>
+    <string name="draft_hint">Back keeps your draft.</string>
+    <string name="title_required">Enter a task title before saving.</string>
+    <string name="character_count">Characters: %1$d / %2$d</string>
+    <string name="too_long">Text is too long. Character limit: %1$d. Your draft is kept.</string>
+    <string name="write_failed">Could not save. Your text is still here. Free up storage if needed, then try again.</string>
+    <string name="read_failed">Could not open the local queue. No data was deleted. Try again.</string>
+    <string name="open_failed">Could not open the draft for editing. No data was deleted. Try again.</string>
+    <string name="retry">Try again</string>
+    <string name="loading">Opening your local queue…</string>
+    <string name="settings">Settings</string>
+    <string name="language">App language</string>
+    <string name="language_hint">Changing language does not translate your tasks.</string>
+    <string name="finnish">Suomi</string>
+    <string name="english">English</string>
+    <string name="system_default">Use system setting</string>
+    <string name="appearance">Appearance</string>
+    <string name="light">Light</string>
+    <string name="dark">Dark</string>
+    <string name="original_text">Original text</string>
+    <string name="show_original">Show original text</string>
+    <string name="hide_original">Hide original text</string>
+    <string name="task_row_action">Open task</string>
+    <string name="no_description">No description</string>
+    <plurals name="task_count">
+        <item quantity="one">%d task</item>
+        <item quantity="other">%d tasks</item>
+    </plurals>
+</resources>

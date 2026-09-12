@@ -25,6 +25,16 @@
             "statusMessage": "Design deep pass"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/tools/run_invariant_hook.py\" codex-stop",
+            "timeout": 30,
+            "statusMessage": "Checking repository invariants"
+          }
+        ]
       }
     ]
   }

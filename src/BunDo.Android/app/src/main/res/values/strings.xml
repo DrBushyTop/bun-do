@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">Bun Do</string>
+    <string name="inbox">Oma jono</string>
+    <string name="local_only">Vain tällä puhelimella</string>
+    <string name="local_explanation">Tehtävät säilyvät tällä puhelimella. Niitä ei vielä varmuuskopioida tai jaeta.</string>
+    <string name="empty_title">Mitä pitäisi tehdä?</string>
+    <string name="empty_body">Kirjoita yksi asia muistiin. Voit palata siihen myöhemmin, myös ilman verkkoyhteyttä.</string>
+    <string name="type_task">Kirjoita tehtävä</string>
+    <string name="resume_draft">Jatka luonnosta</string>
+    <string name="draft_available">Tallennettu luonnos</string>
+    <string name="new_task">Uusi tehtävä</string>
+    <string name="edit_task">Muokkaa tehtävää</string>
+    <string name="task_detail">Tehtävä</string>
+    <string name="task_title">Tehtävän nimi</string>
+    <string name="description_optional">Kuvaus, valinnainen</string>
+    <string name="save">Tallenna</string>
+    <string name="back">Takaisin</string>
+    <string name="saving">Tallennetaan…</string>
+    <string name="draft_saved">Luonnos tallennettu puhelimelle</string>
+    <string name="draft_hint">Takaisin säilyttää luonnoksen.</string>
+    <string name="title_required">Kirjoita tehtävän nimi ennen tallentamista.</string>
+    <string name="character_count">Merkkejä: %1$d / %2$d</string>
+    <string name="too_long">Teksti on liian pitkä. Merkkiraja: %1$d. Luonnos säilytetään.</string>
+    <string name="write_failed">Tallennus ei onnistunut. Teksti on yhä tässä. Vapauta tarvittaessa tallennustilaa ja yritä uudelleen.</string>
+    <string name="read_failed">Paikallista jonoa ei voitu avata. Tietoja ei poistettu. Yritä uudelleen.</string>
+    <string name="open_failed">Luonnosta ei voitu avata muokattavaksi. Tietoja ei poistettu. Yritä uudelleen.</string>
+    <string name="retry">Yritä uudelleen</string>
+    <string name="loading">Avataan paikallista jonoa…</string>
+    <string name="settings">Asetukset</string>
+    <string name="language">Sovelluksen kieli</string>
+    <string name="language_hint">Kielen vaihtaminen ei käännä tehtävien tekstiä.</string>
+    <string name="finnish">Suomi</string>
+    <string name="english">English</string>
+    <string name="system_default">Järjestelmän mukaan</string>
+    <string name="appearance">Ulkoasu</string>
+    <string name="light">Vaalea</string>
+    <string name="dark">Tumma</string>
+    <string name="original_text">Alkuperäinen teksti</string>
+    <string name="show_original">Näytä alkuperäinen teksti</string>
+    <string name="hide_original">Piilota alkuperäinen teksti</string>
+    <string name="task_row_action">Avaa tehtävä</string>
+    <string name="no_description">Ei kuvausta</string>
+    <plurals name="task_count">
+        <item quantity="one">%d tehtävä</item>
+        <item quantity="other">%d tehtävää</item>
+    </plurals>
+</resources>

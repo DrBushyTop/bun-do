@@ -8,7 +8,7 @@ android
 
 ## Stack
 
-The selected stack is Kotlin, Jetpack Compose, Room, WorkManager and an Azure .NET 10 backend, with Aspire for local backend composition and Bicep for deployment. The owner delegated architecture to the agent. A tested .NET typed-command and replica model now exists. The local Aspire/Functions health host runs through Podman with Azurite, loopback-only listeners and request telemetry. Native Android and Azure deployment have not started. Resolved contracts live in docs/architecture; live deployment checks are implementation gates.
+The selected stack is Kotlin, Jetpack Compose, Room, WorkManager and an Azure .NET 10 backend, with Aspire for local backend composition and Bicep for deployment. The owner delegated architecture to the agent. A tested .NET typed-command and replica model now exists. The local Aspire/Functions health host runs through Podman with Azurite, loopback-only listeners and request telemetry. The native Android shell implements anonymous offline capture/edit. Azure deployment is a separate slice. Resolved contracts live in docs/architecture; live deployment checks are implementation gates.
 
 ## Users
 
@@ -36,7 +36,7 @@ The name is Bun Do, "the way of the bun." Bun means bunny. The owner supplied xk
 
 ## Evidence on hand
 
-The repository contains the architecture proposal and review. The owner supplied an image of [xkcd's Bun comic](https://xkcd.com/1682/). This is a reference, not a completed app logo. There is no existing app UI or measured device benchmark. DESIGN.md records an architect-selected palette and native screen direction, not owner approval of a rendered app.
+The repository contains the architecture proposal and review. The owner supplied an image of [xkcd's Bun comic](https://xkcd.com/1682/). This is a reference, not a completed app logo. The anonymous Android shell now has a Room-backed queue, typed capture/edit, task detail and bilingual appearance/language settings. It has no sign-in, voice, shared commands or sync yet. Native emulator evidence is recorded in [the shell visual review](docs/reviews/android-shell-visual.md). No measured physical-device benchmark or owner approval of the rendered app is claimed.
 
 ## Product principles
 

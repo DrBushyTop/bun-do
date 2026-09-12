@@ -2,6 +2,13 @@
 
 Reviewed 2026-09-12 for [#12, Prove the Azure deployment and Android sign-in path](https://github.com/DrBushyTop/bun-do/issues/12). This is a read-only inventory and an implementation plan. No Azure resource was created, changed, deployed to, or invoked. No model request was sent. No credential, key, token, or tenant identifier is recorded here.
 
+This inventory describes the planning pass, not the current implementation.
+The [Azure development guide](../azure-development.md),
+[Android development guide](../android-development.md) and
+[local development guide](../local-development.md) record the later builds and
+live checks. The Cosmos foundation is now deployed; the full cloud and identity
+gates below remain incomplete.
+
 The project can start implementation now. It cannot yet claim that the cloud path works. The first infrastructure slice must prove that path in a new, dedicated Bun Do resource group before application features depend on it.
 
 ## What exists on this Mac and in Azure
@@ -36,6 +43,13 @@ The required model names and versions are configuration, not code constants:
 A read-only `az cognitiveservices account list-models` call against an unrelated existing Swedish Central account lists both model/version pairs and compatible SKUs. That is useful corroboration of subscription catalog visibility, but it does not prove capacity, quota, deployment success, or endpoint access in the new resource group. The model catalog and version must be captured again from the new Bun Do account after deployment. Azure's current model documentation and the Responses/structured-output constraints remain in [Azure platform constraints](azure-platform-constraints.md).
 
 ## Bicep plan
+
+The module-name sketch below is historical. During implementation the owner
+requested modules grouped by application responsibility, not one-resource
+wrappers. The current [Azure development guide](../azure-development.md) and
+`infra/` source supersede this sketch. The workspace store is implemented as
+`workspace-store.bicep`; backend hosting will own its runtime storage and
+identity grants, rather than separate storage-account and authorization wrappers.
 
 Put infrastructure under `infra/`. Use a subscription-scope entry point only to create the dedicated resource group, then deploy resource-group modules. The deployment must take names, location, environment, model capacities, and optional features as parameters. It must never contain a key, connection string, FCM credential, or app-registration secret.
 

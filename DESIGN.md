@@ -1,6 +1,92 @@
+---
+name: Bun Do
+description: Native household task notebook
+colors:
+  light-primary: "#245B48"
+  light-onPrimary: "#FFFFFF"
+  light-primaryContainer: "#BCEBD2"
+  light-onPrimaryContainer: "#082116"
+  light-surface: "#F8F9F4"
+  light-onSurface: "#191D19"
+  light-surfaceContainerLow: "#F2F4EE"
+  light-onSurfaceVariant: "#444C44"
+  light-outline: "#747D73"
+  light-outlineVariant: "#C4CCC1"
+  light-error: "#BA1A1A"
+  light-onError: "#FFFFFF"
+  dark-primary: "#A1D2BA"
+  dark-onPrimary: "#083827"
+  dark-primaryContainer: "#28513F"
+  dark-onPrimaryContainer: "#D6F8E4"
+  dark-surface: "#111511"
+  dark-onSurface: "#E0E4DD"
+  dark-surfaceContainerLow: "#191D18"
+  dark-onSurfaceVariant: "#C2CAC0"
+  dark-outline: "#8C958B"
+  dark-outlineVariant: "#444C44"
+  dark-error: "#FFB4AB"
+  dark-onError: "#690005"
+typography:
+  headlineLarge:
+    fontFamily: Android system sans-serif
+    fontSize: "32sp"
+    fontWeight: 400
+    lineHeight: "40sp"
+  headlineSmall:
+    fontFamily: Android system sans-serif
+    fontSize: "24sp"
+    fontWeight: 400
+    lineHeight: "32sp"
+  titleLarge:
+    fontFamily: Android system sans-serif
+    fontSize: "22sp"
+    fontWeight: 500
+    lineHeight: "28sp"
+  titleMedium:
+    fontFamily: Android system sans-serif
+    fontSize: "16sp"
+    fontWeight: 500
+    lineHeight: "24sp"
+  bodyLarge:
+    fontFamily: Android system sans-serif
+    fontSize: "16sp"
+    fontWeight: 400
+    lineHeight: "24sp"
+  bodyMedium:
+    fontFamily: Android system sans-serif
+    fontSize: "14sp"
+    fontWeight: 400
+    lineHeight: "20sp"
+  labelLarge:
+    fontFamily: Android system sans-serif
+    fontSize: "14sp"
+    fontWeight: 500
+    lineHeight: "20sp"
+  labelMedium:
+    fontFamily: Android system sans-serif
+    fontSize: "12sp"
+    fontWeight: 500
+    lineHeight: "16sp"
+spacing:
+  step-4: "4dp"
+  step-8: "8dp"
+  step-12: "12dp"
+  step-16: "16dp"
+  step-24: "24dp"
+  step-32: "32dp"
+components:
+  primary-button:
+    backgroundColor: "{colors.light-primary}"
+    textColor: "{colors.light-onPrimary}"
+    typography: "{typography.labelLarge}"
+  task-row:
+    backgroundColor: "{colors.light-surface}"
+    textColor: "{colors.light-onSurface}"
+    typography: "{typography.titleMedium}"
+---
 # Bun Do design direction
 
-Status: architect-selected UI planning contract, 2026-09-12, with an owner-approved refined logo. The approved salute and its vector assets live in `assets/brand/`. No rendered Android UI or device testing is claimed. Implement with Impeccable and its Android guidance, then reconcile the UI tokens and generate `.impeccable/design.json` from the reviewed Compose implementation.
+Status: the anonymous Android capture/edit shell is implemented as of September 12, 2026. The full v1 direction below remains a plan where the shell has no matching feature. The owner-approved salute and its vector assets remain unchanged in `assets/brand/`. Native evidence and the independent finish disposition are recorded in [the shell review](docs/reviews/android-shell-visual.md). The frontmatter extracts the shell's Compose tokens; `.impeccable/design.json` records their extensions. Neither artifact claims owner approval of the rendered UI.
 
 ## Identity
 
@@ -38,7 +124,7 @@ Use named Material color roles in Compose. These are static light/dark targets. 
 | errorContainer / onErrorContainer | `#FFDAD6` / `#410002` | `#93000A` / `#FFDAD6` |
 | warningContainer / onWarningContainer | `#FFE2A9` / `#402D00` | `#574315` / `#FFE2A9` |
 
-Remaining Material roles derive from the primary seed `#245B48`; verify generated values when freezing the implementation. Success uses primary roles; recording uses error roles plus an explicit label. Warning belongs to decisions requiring attention. Ordinary pending sync uses neutral roles.
+The shell freezes all Material color roles explicitly in `src/BunDo.Android/app/src/main/java/fi/bundo/ui/Theme.kt`; it does not generate them at runtime. The table retains the v1 targets. Warning roles are planned and unused in the shell. Success uses primary roles; recording uses error roles plus an explicit label. Warning belongs to decisions requiring attention. Ordinary pending sync uses neutral roles.
 
 Use Android's system sans family and Material type roles. Sizes/line heights in sp: headlineLarge 32/40, headlineSmall 24/32, titleLarge 22/28, titleMedium 16/24, bodyLarge 16/24, bodyMedium 14/20, labelLarge 14/20, labelMedium 12/16. Titles and labels use medium weight; body uses regular. Other roles retain Material defaults. No custom display font or uppercase tracking.
 
@@ -51,3 +137,26 @@ Rows grow with content and font scale. Queue titles allow three lines and then e
 Use 200 ms state transitions and 150 ms fades. The completion bow is on by default, can be disabled in Settings, and lasts 240 ms once after the local write succeeds. Respect system animation settings with immediate transitions and a static mark. No celebratory screen blocks continued work.
 
 Release review must use native emulator/device captures, both themes, Finnish and English, font scales 1.0, 1.3, and 2.0, TalkBack, and contrast checks. Use two Android emulator profiles on this Mac for gestures, voice fixtures, interruptions and functional tests. The vivo X300 Ultra and OnePlus 13 remain target phones, but their performance and Finnish recognition quality are unmeasured owner-accepted assumptions; the skipped benchmark is not a hidden release gate. Impeccable's HTML/CSS detector does not validate Compose. Build fully, inspect once, batch corrections, then confirm once before the skill's independent finish review. Validate the approved logo's Android integration and finalize the UI token sidecar from that evidence.
+
+## Implemented shell
+
+The shell has a local queue, typed capture/edit, task detail with original text,
+and language/appearance settings. It deliberately has no voice control, shared
+navigation, completion animation, claim state or sync badge. Those belong to
+later slices. A filled Type action remains reachable below the scrolling queue;
+it becomes Resume draft when a new-task draft exists.
+
+The queue uses flat rows and a neutral local-only notice. Editors and settings
+scroll within a 640 dp maximum width. The queue gets 16 dp gutters below 600 dp,
+24 dp above, and a 360 dp queue/detail split from 840 dp when a task is selected.
+Without a selection the queue uses the available width. Below 480 dp height,
+the notice keeps its local-only label while Settings retains the full explanation.
+Tablet release behavior
+remains unverified; both current evidence profiles are phones. Native Material
+components supply focus, pressed, disabled and transition behavior. No custom
+animation or completion bow ships in this slice.
+
+The shipped rabbit is a VectorDrawable conversion of the approved compound path.
+It keeps the original view box and path, with exact evergreen or paper tint.
+There are no generated raster assets in the Android shell. Review screenshots
+are emulator evidence, not product assets.

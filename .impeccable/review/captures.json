@@ -1,0 +1,105 @@
+{
+  "date": "2026-09-12",
+  "source": "adb exec-out screencap -p; Pixel 7 API 36 ARM64 emulators; synthetic Room fixtures",
+  "retention": "13 representative originals and 5 contact sheets from the 58-capture initial matrix. Landscape queue originals were replaced by verified post-fix captures. Other originals were discarded to keep source evidence bounded.",
+  "captures": [
+    {
+      "file": "bun-do-a-detail-fi-dark-2.0.png",
+      "sha256": "112a83eac063a59df740dba12aa3af9eb4c57542a692e3f8afad757c1405a867",
+      "width": 1080,
+      "height": 2400
+    },
+    {
+      "file": "bun-do-a-editor-fi-dark-2.0.png",
+      "sha256": "c9e34efe760f58ba6b6da639e42713f615028ff639d7932fb2e60cb89a747523",
+      "width": 1080,
+      "height": 2400
+    },
+    {
+      "file": "bun-do-a-empty-en-light.png",
+      "sha256": "cead8f1cefb07c56761b9297de443ec5bf6d7dd10dd7ccdd472ca59f2eca156a",
+      "width": 1080,
+      "height": 2400
+    },
+    {
+      "file": "bun-do-a-keyboard-fi-2.0.png",
+      "sha256": "915eb218f828028180c38f13d68c5f663410e7f55dd6161c01666708f9a9f891",
+      "width": 1080,
+      "height": 2400
+    },
+    {
+      "file": "bun-do-a-landscape-editor-fi-2.0.png",
+      "sha256": "306c3ee604b26bb70d73e4d511be62e4eb8f9d4da4afa1bb57f7bea415960901",
+      "width": 2400,
+      "height": 1080
+    },
+    {
+      "file": "bun-do-a-landscape-queue-fi-2.0.png",
+      "sha256": "aa15379ff3a863ef29788064cbb059e96c09fc9b9a8616b660ff1454dd49acb8",
+      "width": 2400,
+      "height": 1080
+    },
+    {
+      "file": "bun-do-a-queue-fi-dark-2.0.png",
+      "sha256": "0568abb6e9226dcc5e1ae6ceaa3b8164357fcda70e21225738f14d0f56cb6f3f",
+      "width": 1080,
+      "height": 2400
+    },
+    {
+      "file": "bun-do-b-empty-fi-dark.png",
+      "sha256": "37495f9420c260f2d505c02cd85ee16aa1983c6452512ae3eb0352118aed06ce",
+      "width": 1080,
+      "height": 2400
+    },
+    {
+      "file": "bun-do-b-keyboard-en-2.0.png",
+      "sha256": "7135e1b7c40edfcde0594d000d263848ec28fd708f8c3ec348704d73fbe4954e",
+      "width": 1080,
+      "height": 2400
+    },
+    {
+      "file": "bun-do-b-landscape-editor-en-2.0.png",
+      "sha256": "7aa2e51118842bc60464447ac164f343e077e90ff26574b4b7af2f205155e4fa",
+      "width": 2400,
+      "height": 1080
+    },
+    {
+      "file": "bun-do-b-landscape-queue-en-2.0.png",
+      "sha256": "52c746b372f507b931f3349a84a3b65a7f6bb665ff43ba40a68e7288f0016499",
+      "width": 2400,
+      "height": 1080
+    },
+    {
+      "file": "bun-do-b-queue-en-light-1.0.png",
+      "sha256": "ac567d4f064aded455e220775d0e2067f8f9fbd8a7689bbd1e40e75b013b0502",
+      "width": 1080,
+      "height": 2400
+    },
+    {
+      "file": "bun-do-b-settings-en-light-2.0.png",
+      "sha256": "de8b5352f0707e8bec2d8e9603e2cca8561add6bffc70da411d7ce1fa4b2fffd",
+      "width": 1080,
+      "height": 2400
+    },
+    {
+      "file": "contact-detail.jpg",
+      "sha256": "582cc7476466dac53ec934956848c86309cacf19fd86484297aca8a510d78672"
+    },
+    {
+      "file": "contact-editor.jpg",
+      "sha256": "1be37a4e7bbfe7912f3c7f0bc5eb2ed2675cc1d638092264e198a827eabd0460"
+    },
+    {
+      "file": "contact-empty.jpg",
+      "sha256": "dd6b6e58bca5a7a4605301383999e1de3643e1fb3d3c79f550141c400bfa946a"
+    },
+    {
+      "file": "contact-queue.jpg",
+      "sha256": "b0c6632742129943b1f10ee4e95686601242259d65a48e01c7ba5367d833672b"
+    },
+    {
+      "file": "contact-settings.jpg",
+      "sha256": "644a4ed60518996535feb80742d64d27843d0322317a01047342178cfea9c780"
+    }
+  ]
+}

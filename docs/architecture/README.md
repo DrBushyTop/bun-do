@@ -24,7 +24,18 @@ Use Kotlin, Compose, Room and WorkManager on Android. Start with one app module 
 
 Use Aspire for local backend composition and diagnostics. Its local profiles must select emulators or explicit substitutes and must not provision Azure during startup. Bicep remains the cloud deployment source. Android emulators connect as clients. See the [Aspire setup record](../research/aspire-local-development.md) and its separate build slice.
 
+Bicep modules own an application responsibility, such as the workspace store,
+backend hosting or observability. Group the resources and policy that implement
+that responsibility. Do not create generic wrappers around single Azure
+resources. Put access grants beside the consuming identity to keep module
+dependencies one-way.
+
 Keep semantic commands and deterministic reducers testable without UI, network or Azure. The Android local workspace module owns atomic local intent, projection and sync. Its production adapter uses Room; two-device model tests use independent in-memory stores. The server workspace module owns authorization-to-commit orchestration behind one command interface; Cosmos and fake-store adapters run the same behavioral contract tests. Speech has a local runtime adapter. AI has a provider adapter but no authority to bypass domain commands.
+
+The owner reaffirmed Cosmos after evaluating Convex, while requesting a practical
+route to switch later. [The storage decision](../adr/0001-cosmos-with-replaceable-storage.md)
+defines the adapter's responsibilities and the behavior any replacement must
+preserve. It does not introduce a second database or generic repository framework.
 
 New infrastructure belongs to Bun Do's own resource group, `rg-bun-do-dev-swc`, through Bicep. Select Sweden Central first, a single write region, Strong Cosmos consistency, .NET 10 Flex, private Blob storage for snapshots/model artifacts, and managed identity for backend resource access. Model deployment names are `bun-do-luna` and optional `bun-do-terra`. Pin actual package, API and model versions during the first live gate. Production uses a separate resource group and non-secret parameter file.
 

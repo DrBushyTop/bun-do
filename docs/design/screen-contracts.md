@@ -2,6 +2,13 @@
 
 Status: architect-selected plan. Scope is the whole v1 in the architecture. All screens use Operate mode and [DESIGN.md](../../DESIGN.md). Code-first implementation is recorded in `.impeccable/config.json`; no comp or rendered approval exists.
 
+The first implemented shell covers anonymous local capture/edit, original-text
+detail and language/appearance settings. Its [native review](../reviews/android-shell-visual.md)
+records the rendered evidence. Until their slices exist, voice, shared
+destinations, task lifecycle and sync controls are absent rather than disabled
+placeholders. The shell uses one filled Type action below its scrolling queue.
+These omissions do not change the full v1 contract below.
+
 ## Direction contract
 
 THESIS: Capture locally, choose any available work, and see shared progress without ranking members.

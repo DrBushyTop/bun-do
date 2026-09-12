@@ -1,0 +1,29 @@
+name: Infrastructure
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Install pinned Bicep
+        run: |
+          curl --fail --silent --show-error --location \
+            https://github.com/Azure/bicep/releases/download/v0.43.8/bicep-linux-x64 \
+            -o "$RUNNER_TEMP/bicep"
+          echo "03b902a8d4da2df36348d20f039a7e6268798781cdeceb38d8c1760f2843bec8  $RUNNER_TEMP/bicep" | sha256sum --check
+          chmod +x "$RUNNER_TEMP/bicep"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - name: Compile the subscription template
+        run: bicep build infra/main.bicep --outfile "$RUNNER_TEMP/bun-do.json"
+      - name: Verify compiled storage policy and deployment guards
+        run: |
+          python3 -m unittest discover -s tools -p 'test_*template.py' -v
+          python3 -m unittest discover -s tools -p 'test_azure_foundation.py' -v

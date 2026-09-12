@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-12T15:11:22.104010+00:00",
+  "title": "Bun Do design direction",
+  "extensions": {
+    "breakpoints": [
+      {
+        "name": "wide-gutters",
+        "value": "600dp"
+      },
+      {
+        "name": "queue-detail",
+        "value": "840dp"
+      },
+      {
+        "name": "compact-notice-height",
+        "value": "480dp"
+      }
+    ],
+    "shadows": [],
+    "motion": [],
+    "typographyMeta": {
+      "headlineSmall": {
+        "displayName": "Task or empty-queue heading",
+        "purpose": "Full task title and empty queue heading."
+      },
+      "titleMedium": {
+        "displayName": "Queue title",
+        "purpose": "Up to three lines before ellipsis; full title in detail."
+      }
+    }
+  },
+  "components": [
+    {
+      "name": "Type action",
+      "kind": "button",
+      "description": "Documentation preview of the light Material filled button. Native Compose renders the shipped control.",
+      "html": "<button class=\"ds-type\">Type a task</button>",
+      "css": ".ds-type{background:#245B48;color:#FFFFFF;font:500 14px/20px sans-serif;min-height:48px;border:0;border-radius:24px;padding:12px 24px}.ds-type:hover{background:#28513F}.ds-type:focus-visible{outline:2px solid #245B48;outline-offset:4px}.ds-type:active{background:#083827}.ds-type:disabled{background:#E0E4DC;color:#444C44}",
+      "refersTo": "primary-button"
+    },
+    {
+      "name": "Text action",
+      "kind": "button",
+      "description": "Documentation preview of the original-text disclosure.",
+      "html": "<button class=\"ds-text\">Show original text</button>",
+      "css": ".ds-text{background:transparent;color:#245B48;font:500 14px/20px sans-serif;min-height:48px;border:0;border-radius:24px;padding:12px 16px}.ds-text:hover,.ds-text:active{background:#BCEBD2}.ds-text:focus-visible{outline:2px solid #245B48;outline-offset:2px}"
+    },
+    {
+      "name": "Task field",
+      "kind": "input",
+      "description": "Documentation preview only. Compose uses an outlined multiline field with localized counts and errors.",
+      "html": "<label class=\"ds-field\">Task title<textarea rows=\"2\">Järjestä varasto</textarea></label>",
+      "css": ".ds-field{display:grid;gap:8px;color:#444C44;font:400 14px/20px sans-serif}.ds-field textarea{background:#F8F9F4;color:#191D19;font:400 16px/24px sans-serif;border:1px solid #747D73;border-radius:4px;padding:16px;min-height:64px}.ds-field textarea:hover{border-color:#191D19}.ds-field textarea:focus-visible{outline:2px solid #245B48;outline-offset:1px}"
+    },
+    {
+      "name": "Queue row",
+      "kind": "custom",
+      "description": "Documentation preview of a synthetic task. The full row opens task detail.",
+      "html": "<button class=\"ds-row\"><strong>Järjestä varasto</strong><span>Vie rikkinäinen lamppu kierrätykseen.</span></button>",
+      "css": ".ds-row{display:grid;gap:4px;background:#F8F9F4;color:#191D19;text-align:left;min-height:48px;border:0;border-bottom:1px solid #C4CCC1;padding:12px 16px}.ds-row strong{font:500 16px/24px sans-serif}.ds-row span{font:400 14px/20px sans-serif}.ds-row:hover,.ds-row:active{background:#ECEFE8}.ds-row:focus-visible{outline:2px solid #245B48;outline-offset:2px}",
+      "refersTo": "task-row"
+    },
+    {
+      "name": "Local-only notice",
+      "kind": "custom",
+      "description": "Documentation preview of the neutral, permanent local-storage limitation.",
+      "html": "<section class=\"ds-local\"><strong>Only on this phone</strong><p>Tasks stay on this phone. They are not backed up or shared yet.</p></section>",
+      "css": ".ds-local{background:#F2F4EE;color:#191D19;padding:12px 16px}.ds-local strong{font:500 14px/20px sans-serif}.ds-local p{color:#444C44;font:400 14px/20px sans-serif;margin:4px 0 0}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Household notebook",
+    "overview": "Orderly native Material 3 lists, evergreen controls, and the approved martial-arts rabbit. This sidecar documents the anonymous shell, not the planned shared release. HTML snippets are token previews, not Android rendering evidence.",
+    "keyCharacteristics": [
+      "Flat queue rows",
+      "Native Material controls",
+      "Explicit local-only status"
+    ],
+    "rules": [
+      {
+        "name": "Task language",
+        "body": "Changing the interface language never translates task content.",
+        "section": "typography"
+      }
+    ],
+    "dos": [
+      "Keep the approved rabbit path unchanged.",
+      "Use native emulator screenshots to review the Android interface."
+    ],
+    "donts": [
+      "Do not add nonfunctional voice or shared-navigation controls.",
+      "Do not claim cross-device sync from two independent offline queues."
+    ]
+  }
+}
