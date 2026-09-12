@@ -25,6 +25,7 @@ The reviewer checked the final fixes and returned approval with no new material 
 - `aspire otel traces functions` contained successful `GET api/health` host and worker spans. Structured request logs contained the health route and HTTP status.
 - `lsof` confirmed loopback listeners for Functions, dashboard, OTLP, resource service and the Azurite proxies. `podman ps` confirmed Azurite 3.35.0's three published ports use `127.0.0.1`.
 - Raw Aspire environment and telemetry output stays outside git. Dashboard login tokens and OTLP keys are not evidence to publish.
+- Repository hygiene follow-up moved local settings to an ignored personal file plus a checked-in emulator example. Aspire readiness and loopback HTTP health passed again with no `local.settings.json` present.
 
 ## Boundaries
 

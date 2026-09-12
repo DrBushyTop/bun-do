@@ -19,6 +19,8 @@ Use .NET SDK 10.0.400, Aspire CLI 13.5.3, Azure Functions Core Tools 4.14.0 or l
 
 The existing Podman VM is working. Inspect it before starting Aspire; do not replace, reset or reconfigure it. There is no process-only Azurite workaround or cloud fallback.
 
+Aspire injects the Function's local settings. It does not require a `local.settings.json` file. The checked-in `local.settings.example.json` contains emulator defaults only. Personal `local.settings.json` files are ignored; never put cloud credentials in the example.
+
 ```bash
 podman machine list
 podman system connection list
