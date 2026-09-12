@@ -1,0 +1,11 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+local.properties
+.gradle/
+**/build/
+**/bin/
+**/obj/
+.impeccable/config.local.json
+.impeccable/live/
