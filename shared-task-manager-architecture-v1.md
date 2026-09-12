@@ -1,6 +1,6 @@
 # Bun Do: product and implementation specification
 
-**Status:** v1 architecture draft, under adversarial review  
+**Status:** product scope retained; implementation mechanics superseded by the resolved contracts
 **App name:** Bun Do, "the way of the bun"  
 **Primary platform:** Android  
 **Target phones:** vivo X300 Ultra and OnePlus 13  
@@ -12,7 +12,7 @@
 
 The owner confirmed the entire v1 scope on 2026-09-12. Implementation may proceed in stages, but those stages do not remove recurrence, dependencies, nested subtasks, AI split/clarify, statistics, or other included features from the release.
 
-The [Bun Do wayfinder map](https://github.com/DrBushyTop/bun-do/issues/1) tracks unresolved architecture decisions. Read the [adversarial review](docs/reviews/architecture-adversarial-review.md) before implementation. Statements below that name a technology or describe a desired outcome do not establish device feasibility, tenant availability, or a complete sync protocol. Section 38 records the original design choices; the linked review qualifies them.
+The [Bun Do wayfinder map](https://github.com/DrBushyTop/bun-do/issues/1) records the planning decisions. Read the [implementation contract](docs/architecture/README.md) first. It supersedes conflicting state, wire/schema, identity, ordering, recurrence and retention examples below. This document remains the scope and original proposal, not a second competing protocol. The [adversarial review](docs/reviews/architecture-adversarial-review.md) records the defects that prompted those decisions. Live Azure and rendered UI checks remain implementation work; skipped phone benchmarks remain unmeasured assumptions.
 
 ---
 
@@ -39,7 +39,7 @@ The name is **Bun Do**, "the way of the bun." Bun means bunny. The owner's refer
 
 The visual direction is a martial-arts bunny. Develop an original, recognizable rabbit mark with a composed bearing and a little deadpan humor. Carry the identity into the launcher icon, onboarding, voice capture, empty states, and shared completion feedback. Task rows and conflict messages must remain easy to read. The theme should express patient practice and working together; it must not introduce competitive member ranks or punish unfinished tasks.
 
-All UI design, implementation, and review must use **Impeccable**, adapted to native Android and Compose. [PRODUCT.md](PRODUCT.md) records the product brief. The [visual brief](docs/design/bun-do-visual-brief.md) records the current direction and open choices. Palette, typography, final logo artwork, and motion are not yet selected.
+All UI design, implementation, and review must use **Impeccable**, adapted to native Android and Compose. [PRODUCT.md](PRODUCT.md) records the product brief. The [visual brief](docs/design/bun-do-visual-brief.md) records the current direction and open choices. Palette, typography and motion now follow [DESIGN.md](DESIGN.md). The original logo artwork and rendered checks remain implementation work.
 
 ---
 
@@ -3118,14 +3118,14 @@ Models are configurable; compare Luna/Terra only if actual quality data justifie
 
 # 43. Implementation sequence
 
-The stages below build toward the entire v1 release. They are not separate scope commitments. Resolve the linked architecture decisions before treating this sequence as executable tickets.
+The stages below build toward the entire v1 release. They are not separate scope commitments. Use the [dependency-linked implementation backlog](docs/implementation-plan.md), which supersedes this preliminary sequence.
 
 ## Phase 0: prove the risky assumptions
 
 1. Use the accepted Parakeet feasibility assumption for the two target phones. The separate benchmark experiment is skipped; implement and test model installation, capture and recovery with the voice feature.
 2. Verify the actual Foundry deployment, schema, identity, and API combination in the target Azure environment.
 3. Specify and exercise two-device sync with response loss, pending edits, transaction limits, and stale-cursor recovery.
-4. Confirm the Impeccable visual study for the martial-arts bunny identity and the main queue's key states.
+4. Implement the architect-selected Impeccable direction and verify the original rabbit mark and queue states on Android emulators.
 
 These checks belong before substantial UI and cloud implementation. They do not remove features from v1.
 

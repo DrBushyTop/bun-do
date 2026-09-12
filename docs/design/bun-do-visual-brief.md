@@ -32,3 +32,7 @@ Keep task actions literal: claim, complete, split, snooze, and edit. Reserve the
 - Device-specific text scaling, touch-target, and accessibility verification.
 
 Do not publish a final DESIGN.md contract until the visual direction has been reviewed with the owner. PRODUCT.md holds confirmed product facts; the GitHub ticket holds the eventual design resolution.
+
+## Resolved planning direction
+
+The owner delegated remaining choices on 2026-09-12. Use [DESIGN.md](../../DESIGN.md) and [the screen contracts](screen-contracts.md) for the selected evergreen Material 3 direction and original, tiny martial-arts rabbit. Earlier open choices in this brief are historical prompts, not unresolved blockers. The supplied King Bun comic informs composure and dry humor, not copied artwork or member ranks. Rendered review belongs to implementation.

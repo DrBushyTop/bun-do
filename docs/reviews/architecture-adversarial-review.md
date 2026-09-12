@@ -1,8 +1,8 @@
 # Bun Do architecture adversarial review
 
-Reviewed 2026-09-12 against all 46 sections of the original `shared-task-manager-architecture-v1.md`. Findings describe that input. The architecture now incorporates the name, visual requirements, corrected date example, provider-schema guidance, explicit conditional transaction, runtime pin, and early feasibility stage. The remaining design decisions stay open. This is a design review; there is no application implementation to test. The [wayfinder map](https://github.com/DrBushyTop/bun-do/issues/1) owns the decision workflow.
+Reviewed 2026-09-12 against all 46 sections of the original `shared-task-manager-architecture-v1.md`. Findings describe that input. The architecture now incorporates the name, visual requirements, corrected date example, provider-schema guidance, explicit conditional transaction, runtime pin, and early feasibility stage. The subsequent [implementation contracts](../architecture/README.md) resolve the planning findings; execution evidence remains in the build backlog. This is a design review; there is no application implementation to test. The [wayfinder map](https://github.com/DrBushyTop/bun-do/issues/1) owns the decision workflow.
 
-The architecture has a sound core: Room drives the UI, local writes include an outbox, the server accepts semantic commands, and cloud AI cannot own task state. Keep those choices. It is not implementation-ready. Several safety guarantees are stated without enough protocol or state to enforce them, and some examples would fail or misinterpret input.
+The architecture has a sound core: Room drives the UI, local writes include an outbox, the server accepts semantic commands, and cloud AI cannot own task state. Keep those choices. The original proposal alone is not implementation-ready. Read the subsequent contracts rather than treating this historical verdict as the current planning status. Several safety guarantees are stated without enough protocol or state to enforce them, and some examples would fail or misinterpret input.
 
 The owner requires the full v1 scope. Recurrence, dependencies, nested tasks, AI splitting and shared statistics stay. My recommendation is to prove the risky parts early and define their limits before building dependent features. The target phones are vivo X300 Ultra and OnePlus 13. Bun Do means "the way of the bun," with a martial-arts bunny identity. UI work uses Impeccable, with the owner's code-first preference saved in its configuration.
 
@@ -124,3 +124,9 @@ Decisions: [Bound task hierarchy, dependencies, and ordering](https://github.com
 5. Convert resolved decisions into implementation tickets covering the entire v1 scope.
 
 The map records what remains open. Documentation research can finish now; actual phone and tenant measurements cannot be inferred from it.
+
+## Planning disposition, 2026-09-12
+
+The sync and command contracts resolve the canonical-base, sequence, receipt, transaction, snapshot and resurrection findings. The task contract bounds graphs and cascades. AI now has durable jobs and complete strict provider schemas. The date/recurrence contract defines capture time, schedule generations and root accounting. Identity/operations covers onboarding, local isolation, reminders, migrations and cloud restore.
+
+The owner skipped physical-phone benchmarking, delegated design choices and authorized a dedicated Bicep-managed Azure resource group. The build backlog still requires real Azure/Entra/schema/Cosmos checks, emulator behavior, native UI review and a restore drill. Planning closure does not claim any of those checks passed.

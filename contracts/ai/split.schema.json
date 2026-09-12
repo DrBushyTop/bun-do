@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["language", "children", "notes", "needsReview"],
+  "properties": {
+    "language": { "type": "string", "enum": ["fi", "en", "mixed", "und"] },
+    "children": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["title", "description", "effortEstimate"], "properties": { "title": { "type": "string" }, "description": { "type": ["string", "null"] }, "effortEstimate": { "type": ["integer", "null"], "enum": [1, 2, 3, 5, 8, null] } } } },
+    "notes": { "type": ["string", "null"] },
+    "needsReview": { "type": "boolean" }
+  }
+}

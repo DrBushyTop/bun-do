@@ -4,7 +4,7 @@ Research date: 2026-09-12. Resolves [Verify Finnish and English offline speech o
 
 Owner decision after research: skip the separate device experiment and proceed assuming satisfactory operation on both phones. The experiment below is retained as the original recommendation, not a planning prerequisite. Normal implementation testing remains required. [Skipped experiment](https://github.com/DrBushyTop/bun-do/issues/11).
 
-Keep Finnish and English offline dictation in the full first-release scope. Parakeet v3 has a credible Android implementation path, but section 4.1 must replace its assumption of satisfactory operation with an early device experiment. Runtime selection affects latency, memory, installation and recording UX, so it cannot remain an unspecified wrapper detail until phase 3.
+Keep Finnish and English offline dictation in the full first-release scope. Parakeet v3 has a credible Android implementation path, and the owner subsequently accepted that feasibility assumption without the separate device experiment. Runtime selection affects latency, memory, installation and recording UX, so it cannot remain an unspecified wrapper detail until phase 3.
 
 ## What exists
 
@@ -14,7 +14,7 @@ The sherpa-onnx maintainers publish an int8 ONNX conversion, export scripts and 
 
 The publisher lists a v3 `arm64-v8a` Android demo APK, currently version 1.13.7, and supplies Android native libraries with JNI and ONNX Runtime. This establishes available artifacts and an integration route. It does not certify Bun Do's two phones. [APK catalog](https://k2-fsa.github.io/sherpa/onnx/android/apk-simulate-streaming-asr.html), [Android build instructions](https://k2-fsa.github.io/sherpa/onnx/android/build-sherpa-onnx.html).
 
-The GitHub release API reports **487,170,055 bytes**, approximately 465 MiB, for `sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2`, with SHA-256 `5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf`. This research checked metadata, not the downloaded bytes. Pin and verify the artifact during the experiment. [Release metadata](https://api.github.com/repos/k2-fsa/sherpa-onnx/releases/tags/asr-models), [download](https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2).
+The GitHub release API reports **487,170,055 bytes**, approximately 465 MiB, for `sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2`, with SHA-256 `5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf`. This research checked metadata, not the downloaded bytes. Pin and verify the artifact during model installation implementation. [Release metadata](https://api.github.com/repos/k2-fsa/sherpa-onnx/releases/tags/asr-models), [download](https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2).
 
 ## Memory and license boundaries
 
@@ -24,7 +24,7 @@ One firsthand upstream report says two-minute Parakeet v3 clips worked on Androi
 
 NVIDIA identifies CC BY 4.0 as the model license. Distribution must preserve required attribution, license information and modification notices. Record NVIDIA provenance and the ONNX/int8 conversion in the model manifest and notices. Sherpa's Apache 2.0 code license is separate; retain applicable runtime and dependency notices. [Model terms](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3), [CC BY 4.0 terms](https://creativecommons.org/licenses/by/4.0/legalcode.en), [sherpa license](https://github.com/k2-fsa/sherpa-onnx/blob/master/LICENSE).
 
-## Required follow-up experiment
+## Historical experiment recommendation, skipped
 
 Create an Android prototype before committing to the voice UX. These are proposed Bun Do acceptance criteria, not measured results or vendor promises.
 
@@ -34,4 +34,4 @@ Create an Android prototype before committing to the voice UX. These are propose
 4. Propose warm p95 stop-to-transcript at most 3 seconds for recordings up to 15 seconds, cold load at most 5 seconds, no crashes or lost recordings, and no meaning-changing error in at least 90% of representative short clips for each person and language. Report actual memory first, then set the supported-device budget with headroom. Run ten minutes of repeated transcription to observe thermal status, throttling and battery consumption. Failure requires revising the local implementation, not silently dropping offline voice or uploading audio.
 5. Test airplane mode after installation, interrupted downloads, corruption, insufficient storage, cancellation, process death and model replacement. Stage and verify downloads before atomic activation, retain the old working model until replacement succeeds, and budget temporary storage for both copies. Provide typed capture during installation or failure. Define bounded local audio retention and retry/delete actions so failed recognition does not lose a task or retain audio indefinitely.
 
-The research issue can close once this evidence and the prototype follow-up are recorded. The Android offline-voice release criterion stays open until both actual phones pass.
+The research issue can close once this evidence and the prototype follow-up are recorded. The Android offline-voice release criterion uses agent-run emulator functional tests. Actual-phone performance remains an accepted unmeasured assumption, not an unassigned release blocker.

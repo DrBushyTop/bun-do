@@ -1,0 +1,16 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["language", "title", "description", "due", "recurrence", "areaId", "explicitPlacement", "ambiguities", "needsReview"],
+  "properties": {
+    "language": { "type": "string", "enum": ["fi", "en", "mixed", "und"] },
+    "title": { "type": "string" },
+    "description": { "type": ["string", "null"] },
+    "due": { "type": ["object", "null"], "additionalProperties": false, "required": ["kind", "localDate", "localTime", "zoneId"], "properties": { "kind": { "type": "string", "enum": ["DATE_ONLY", "DATE_TIME"] }, "localDate": { "type": "string" }, "localTime": { "type": ["string", "null"] }, "zoneId": { "type": ["string", "null"] } } },
+    "recurrence": { "type": ["object", "null"], "additionalProperties": false, "required": ["cadence", "interval", "weekdays", "dayOfMonth", "endLocalDate", "zoneId"], "properties": { "cadence": { "type": "string", "enum": ["DAILY", "WEEKLY", "MONTHLY"] }, "interval": { "type": "integer" }, "weekdays": { "type": ["array", "null"], "items": { "type": "string", "enum": ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"] } }, "dayOfMonth": { "type": ["integer", "null"] }, "endLocalDate": { "type": ["string", "null"] }, "zoneId": { "type": "string" } } },
+    "areaId": { "type": ["string", "null"] },
+    "explicitPlacement": { "type": ["string", "null"], "enum": ["TOP", "BOTTOM", null] },
+    "ambiguities": { "type": "array", "items": { "type": "string" } },
+    "needsReview": { "type": "boolean" }
+  }
+}

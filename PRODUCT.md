@@ -8,7 +8,7 @@ android
 
 ## Stack
 
-The architecture proposes Kotlin, Jetpack Compose, Room, WorkManager, and an Azure backend. The owner has delegated architecture to the agent. No application code exists yet. Runtime and deployment feasibility remain under review.
+The selected stack is Kotlin, Jetpack Compose, Room, WorkManager and an Azure .NET 10 backend. The owner delegated architecture to the agent. No application code exists yet. Resolved contracts live in docs/architecture; live deployment checks are implementation gates.
 
 ## Users
 
@@ -26,7 +26,7 @@ Users dictate or type tasks, choose any available task, claim and complete work,
 
 The owner confirmed the full v1 scope on 2026-09-12, including offline collaboration, local speech, AI enrichment/split/clarify, nested subtasks, dependencies, recurrence, notes, areas, due dates, snooze, deletion/recovery, activity, and shared statistics. Build stages do not authorize feature removal. The detailed scope lives in [the architecture](shared-task-manager-architecture-v1.md).
 
-Azure is the proposed backend platform. Raw audio stays on the phone in the normal voice path. Cloud AI receives text. The target phones are the vivo X300 Ultra and OnePlus 13, confirmed by the owner. OS builds, RAM variants, runtime budgets, and several concurrency rules remain open in [the decision map](https://github.com/DrBushyTop/bun-do/issues/1).
+Azure is the selected backend platform. New resources go into a dedicated Bun Do resource group through Bicep. The owner assumes Foundry model availability. Raw audio stays on the phone in the normal voice path. Cloud AI receives text. The target phones are the vivo X300 Ultra and OnePlus 13, confirmed by the owner. Device-specific performance remains unmeasured. Concurrency and recovery rules are specified in the [implementation contract](docs/architecture/README.md). Agents test functional behavior on two Android emulator profiles on this Mac.
 
 The owner chose to skip the separate speech feasibility experiment and proceed on the assumption that local Parakeet works on both phones. This is an accepted planning assumption, not measured evidence. Normal implementation testing still covers offline recording, transcription and recovery.
 
@@ -36,7 +36,7 @@ The name is Bun Do, "the way of the bun." Bun means bunny. The owner supplied xk
 
 ## Evidence on hand
 
-The repository contains the architecture proposal and review. The owner supplied an image of [xkcd's Bun comic](https://xkcd.com/1682/). This is a reference, not a completed app logo. There is no existing app UI, approved palette, or measured device benchmark.
+The repository contains the architecture proposal and review. The owner supplied an image of [xkcd's Bun comic](https://xkcd.com/1682/). This is a reference, not a completed app logo. There is no existing app UI or measured device benchmark. DESIGN.md records an architect-selected palette and native screen direction, not owner approval of a rendered app.
 
 ## Product principles
 
