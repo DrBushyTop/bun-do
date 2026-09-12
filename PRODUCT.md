@@ -8,7 +8,7 @@ android
 
 ## Stack
 
-The selected stack is Kotlin, Jetpack Compose, Room, WorkManager and an Azure .NET 10 backend, with Aspire for local backend composition and Bicep for deployment. The owner delegated architecture to the agent. A tested .NET typed-command and replica model now exists. The local Aspire/Functions health host runs through Podman with Azurite, loopback-only listeners and request telemetry. The native Android shell implements anonymous offline capture/edit. Azure deployment is a separate slice. Resolved contracts live in docs/architecture; live deployment checks are implementation gates.
+The selected stack is Kotlin, Jetpack Compose, Room, WorkManager and an Azure .NET 10 backend, with Aspire for local backend composition and Bicep for deployment. The owner delegated architecture to the agent. A tested .NET typed-command and replica model now exists. The local Aspire/Functions health host runs through Podman with Azurite, loopback-only listeners and request telemetry. The native Android shell implements anonymous offline typed and voice capture, with task editing. Azure deployment is a separate slice. Resolved contracts live in docs/architecture; live deployment checks are implementation gates.
 
 ## Users
 
@@ -30,13 +30,17 @@ Azure is the selected backend platform. New resources go into a dedicated Bun Do
 
 The owner chose to skip the separate speech feasibility experiment and proceed on the assumption that local Parakeet works on both phones. This is an accepted planning assumption, not measured evidence. Normal implementation testing still covers offline recording, transcription and recovery.
 
+The Android voice path installs and verifies the local Parakeet model, then records and transcribes without a network connection. Stopping a recording transcribes it and commits the task locally before opening its detail. Interrupted, canceled or unsuccessful recordings remain available for retry, explicit export or deletion. The app displays retention limits and expiry dates, explains microphone denial and silence, and keeps typing available without microphone permission or the model. Export uses the user's chosen destination and warns that it may be a cloud drive.
+
+MAI is selected for a separate online speech path, but that path is not implemented in the app. [Prefer MAI online transcription with recoverable offline fallback](https://github.com/DrBushyTop/bun-do/issues/38) tracks it and requires authentication. It does not change the current local-only voice behavior.
+
 ## Brand commitments
 
 The name is Bun Do, "the way of the bun." Bun means bunny. The owner supplied xkcd's King Bun as a reference and approved the refined martial-arts rabbit salute in `assets/brand/`, retaining its defined nose and the same drawing at small sizes. Preserve the small rabbit's dignity and dry humor. UI work must use Impeccable with native Android guidance.
 
 ## Evidence on hand
 
-The repository contains the architecture proposal and review. The owner supplied an image of [xkcd's Bun comic](https://xkcd.com/1682/). This is a reference, not a completed app logo. The anonymous Android shell now has a Room-backed queue, typed capture/edit, task detail and bilingual appearance/language settings. It has no sign-in, voice, shared commands or sync yet. Native emulator evidence is recorded in [the shell visual review](docs/reviews/android-shell-visual.md). No measured physical-device benchmark or owner approval of the rendered app is claimed.
+The repository contains the architecture proposal and review. The owner supplied an image of [xkcd's Bun comic](https://xkcd.com/1682/). This is a reference, not a completed app logo. The anonymous Android shell now has a Room-backed queue, typed capture/edit, local voice capture with recording recovery, task detail and bilingual appearance/language settings. It has no sign-in, online speech, shared commands or sync yet. Native phone-emulator evidence is recorded in [the shell visual review](docs/reviews/android-shell-visual.md) and [the offline speech review](docs/reviews/offline-speech.md). The speech evidence covers English light, Finnish dark with large text, landscape, recording, silence, recovery, cancellation and permission denial. No measured physical-device benchmark, tablet validation or owner approval of the rendered app is claimed.
 
 ## Product principles
 

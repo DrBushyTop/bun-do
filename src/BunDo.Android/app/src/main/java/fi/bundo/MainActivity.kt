@@ -51,6 +51,7 @@ class MainActivity : AppCompatActivity() {
                         preferences.edit { putString("theme", it) }
                         appearance = it
                     },
+                    voice = (application as BunDoApplication).voice,
                 )
             }
         }

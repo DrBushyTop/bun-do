@@ -86,7 +86,7 @@ components:
 ---
 # Bun Do design direction
 
-Status: the anonymous Android capture/edit shell is implemented as of September 12, 2026. The full v1 direction below remains a plan where the shell has no matching feature. The owner-approved salute and its vector assets remain unchanged in `assets/brand/`. Native evidence and the independent finish disposition are recorded in [the shell review](docs/reviews/android-shell-visual.md). The frontmatter extracts the shell's Compose tokens; `.impeccable/design.json` records their extensions. Neither artifact claims owner approval of the rendered UI.
+Status: the anonymous Android capture/edit shell now includes offline voice capture and recording recovery. The full v1 direction below remains a plan where the shell has no matching feature. The owner-approved salute and its vector assets remain unchanged in `assets/brand/`. Native evidence and finish dispositions are recorded in [the shell review](docs/reviews/android-shell-visual.md) and [the offline speech review](docs/reviews/offline-speech.md). The frontmatter extracts the shell's Compose tokens; `.impeccable/design.json` records their extensions. Neither artifact claims owner approval of the rendered UI.
 
 ## Identity
 
@@ -140,11 +140,12 @@ Release review must use native emulator/device captures, both themes, Finnish an
 
 ## Implemented shell
 
-The shell has a local queue, typed capture/edit, task detail with original text,
-and language/appearance settings. It deliberately has no voice control, shared
+The shell has a local queue, typed capture/edit, offline voice capture, task
+detail with original text, and language/appearance settings. It has no shared
 navigation, completion animation, claim state or sync badge. Those belong to
-later slices. A filled Type action remains reachable below the scrolling queue;
-it becomes Resume draft when a new-task draft exists.
+later slices. A Type text action remains reachable below the scrolling queue,
+beside a native microphone floating action button. Type becomes Resume draft
+when a new-task draft exists.
 
 The queue uses flat rows and a neutral local-only notice. Editors and settings
 scroll within a 640 dp maximum width. The queue gets 16 dp gutters below 600 dp,
@@ -160,3 +161,33 @@ The shipped rabbit is a VectorDrawable conversion of the approved compound path.
 It keeps the original view box and path, with exact evergreen or paper tint.
 There are no generated raster assets in the Android shell. Review screenshots
 are emulator evidence, not product assets.
+
+## Components
+
+### Voice capture sheet
+
+Voice capture extends the household notebook with a native Material bottom sheet,
+not a new visual identity. The scrollable column uses 24 dp horizontal and bottom
+padding with 12 dp spacing. Its heading uses headlineSmall; privacy and guidance
+use body roles. Full-width filled buttons carry Install, Record, and Stop and
+transcribe. Type, Cancel and recovery actions use text buttons with a minimum
+48 dp height. Type remains available throughout the flow.
+
+Model checking, download, verification and local transcription each have explicit
+text and native progress indicators. Recording uses the error color for the
+elapsed-time label and microphone level, with a full-width Stop and transcribe
+button. Permission denial, silence and cancellation use localized messages;
+status messages have polite accessibility live-region semantics. Successful
+transcription commits a local task and opens its detail for review and editing.
+
+Saved recordings form a flat list separated by dividers. Each entry names its
+creation time, expiry and recovery reason, followed by retry, export and delete
+actions. The sheet explains retention and warns about the export destination
+before the Android file picker opens. Recovery actions disable during active
+work; committed recordings awaiting audio cleanup cannot be retried or exported.
+
+Phone-emulator captures cover English light, Finnish dark at 2.0 font scale,
+landscape, recording, silence, cancellation, interrupted-recording recovery and
+permission denial. Large text scrolls rather than shrinking. These captures do
+not validate tablets or physical-phone performance. The separate authenticated
+online speech path has no control in this sheet yet.

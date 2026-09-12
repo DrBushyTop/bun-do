@@ -79,12 +79,13 @@ interface InboxDao {
 }
 
 @Database(
-    entities = [InboxTask::class, InboxIntent::class, EditorDraft::class],
-    version = 2,
+    entities = [InboxTask::class, InboxIntent::class, EditorDraft::class, VoiceRecording::class],
+    version = 3,
     exportSchema = true,
 )
 abstract class InboxDatabase : RoomDatabase() {
     abstract fun inbox(): InboxDao
+    abstract fun recordings(): RecordingDao
 
     companion object {
         // Deliberately not derived from a future active account or workspace selection.
@@ -96,9 +97,18 @@ abstract class InboxDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS voice_recordings (id TEXT NOT NULL PRIMARY KEY, createdAt INTEGER NOT NULL, expiresAt INTEGER NOT NULL, state TEXT NOT NULL, reason TEXT NOT NULL)")
+            }
+        }
+
         fun open(context: Context, name: String = FILE_NAME): InboxDatabase =
             Room.databaseBuilder(context, InboxDatabase::class.java, name)
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                // The expiry worker owns a separate connection. Its removals must
+                // invalidate the foreground recovery list too.
+                .enableMultiInstanceInvalidation()
                 .build()
     }
 }

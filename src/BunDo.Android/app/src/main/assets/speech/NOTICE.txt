@@ -1,0 +1,24 @@
+Bun Do local speech
+
+Model: NVIDIA parakeet-tdt-0.6b-v3
+https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3
+License: Creative Commons Attribution 4.0 International.
+https://creativecommons.org/licenses/by/4.0/
+Modified by the sherpa-onnx project: exported to ONNX and quantized to int8.
+https://github.com/k2-fsa/sherpa-onnx
+Bun Do uses the converted model without further model modifications.
+The license text is in CC-BY-4.0.txt.
+
+Runtime: sherpa-onnx 1.13.7
+Copyright (c) 2022-2026 by the sherpa-onnx project authors.
+Apache License 2.0, included in Apache-2.0.txt.
+The pinned AAR contains ONNX Runtime 1.27.1.
+ONNX Runtime copyright (c) Microsoft Corporation. All rights reserved.
+MIT license in ONNX-Runtime-LICENSE.txt and dependency notices in
+ONNX-Runtime-ThirdPartyNotices.txt.
+
+Archive decoding: Apache Commons Compress 1.28.0.
+Copyright The Apache Software Foundation.
+Apache License 2.0, included in Apache-2.0.txt.
+
+These authors do not endorse Bun Do.

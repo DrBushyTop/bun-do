@@ -33,6 +33,7 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -74,6 +75,7 @@ import fi.bundo.R
 import fi.bundo.data.InboxLimits
 import fi.bundo.data.InboxRepository
 import fi.bundo.data.InboxTask
+import fi.bundo.speech.VoiceController
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,8 +84,10 @@ fun InboxApp(
     model: InboxViewModel,
     appearance: String,
     onAppearance: (String) -> Unit,
+    voice: VoiceController? = null,
 ) {
     var settings by rememberSaveable { mutableStateOf(false) }
+    var showVoice by rememberSaveable { mutableStateOf(false) }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     val queueScroll = rememberLazyListState()
     val selected = state.tasks.find { it.id == selectedId }
@@ -152,6 +156,7 @@ fun InboxApp(
                             state = state,
                             onOpen = { selectedId = it },
                             onType = { model.openEditor() },
+                            onVoice = voice?.let { { voice.acknowledgeSaved(); showVoice = true } },
                             onRetry = model::retry,
                             scroll = queueScroll,
                             gutter = gutter,
@@ -165,6 +170,14 @@ fun InboxApp(
                 }
             }
         }
+        if (showVoice && voice != null) {
+            VoiceSheet(
+                voice,
+                onDismiss = { showVoice = false },
+                onType = { showVoice = false; model.openEditor() },
+                onSaved = { showVoice = false; selectedId = it },
+            )
+        }
     }
 }
 
@@ -173,6 +186,7 @@ private fun Queue(
     state: InboxUiState,
     onOpen: (String) -> Unit,
     onType: () -> Unit,
+    onVoice: (() -> Unit)?,
     onRetry: () -> Unit,
     scroll: LazyListState,
     gutter: androidx.compose.ui.unit.Dp,
@@ -264,15 +278,22 @@ private fun Queue(
                 }
             }
         }
-        // Voice is a later slice. Do not expose a nonfunctional voice FAB or shared destinations.
-        Button(
-            onClick = onType,
-            enabled = state.loaded && !state.working && !state.readFailed,
-            modifier = Modifier.padding(gutter).fillMaxWidth().heightIn(min = 48.dp).testTag("capture"),
-        ) {
-            Icon(Icons.Outlined.Add, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text(stringResource(if (hasDraft) R.string.resume_draft else R.string.type_task))
+        Row(Modifier.padding(gutter).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(
+                onClick = onType,
+                enabled = state.loaded && !state.working && !state.readFailed,
+                modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("capture"),
+            ) {
+                Icon(Icons.Outlined.Add, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(if (hasDraft) R.string.resume_draft else R.string.type_task))
+            }
+            if (onVoice != null) {
+                FloatingActionButton(onClick = onVoice, modifier = Modifier.testTag("voice")) {
+                    Icon(painterResource(R.drawable.microphone), stringResource(R.string.voice_capture), Modifier.size(24.dp))
+                }
+            }
         }
     }
 }

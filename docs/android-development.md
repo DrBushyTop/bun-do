@@ -5,6 +5,10 @@ offline inbox. It does not sign in, contact the backend, or sync between devices
 Use [local development](local-development.md) when working on the separate Aspire
 backend. Do not treat two working inboxes as proof of sync.
 
+For opt-in native/Parakeet/Azure speech tests, private WAV manifests and latency
+measurements, use [speech comparison](android-speech-comparison.md). Install test
+APKs directly with `adb install -r` when preserving an installed speech model.
+
 ## Toolchain
 
 The Gradle wrapper pins Gradle 8.13 and verifies its download with SHA-256.

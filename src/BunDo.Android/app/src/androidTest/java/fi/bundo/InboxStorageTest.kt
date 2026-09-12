@@ -121,4 +121,21 @@ class InboxStorageTest {
         assertEquals("Kesken", upgraded.inbox().draft("new")!!.title)
         assertEquals(0L, upgraded.inbox().draft("new")!!.savedAt)
     }
+
+    @Test fun speechMigrationKeepsExistingOfflineWork() = runBlocking {
+        val name = "speech-migration-${UUID.randomUUID()}.db"
+        names += name
+        migrations.createDatabase(name, 2).apply {
+            execSQL("INSERT INTO inbox_tasks VALUES ('task', 'Title', '', 'Original', '', 1, 2)")
+            execSQL("INSERT INTO inbox_intents VALUES (7, 'task', 'CaptureInboxTask', 'Title', '', 1)")
+            execSQL("INSERT INTO editor_drafts VALUES ('new', 'Kesken', 'Retained', 3)")
+            close()
+        }
+        migrations.runMigrationsAndValidate(name, 3, true, InboxDatabase.MIGRATION_2_3).close()
+        val upgraded = open(name)
+        assertEquals("Original", upgraded.inbox().task("task")!!.originalTitle)
+        assertEquals(7L, upgraded.inbox().intents().single().sequence)
+        assertEquals("Kesken", upgraded.inbox().draft("new")!!.title)
+        assertTrue(upgraded.recordings().all().isEmpty())
+    }
 }
