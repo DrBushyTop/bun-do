@@ -24,6 +24,11 @@ This first command covers 26 storage policy checks. It does not prove backend
 access, resource preservation across deployments, health, telemetry delivery,
 actual deletion or application behavior.
 
+The commissioning runner's restore path no longer requires the disposable gate
+ZIP. The docs now distinguish publishing its normal checkout artifact from
+rolling back to a previously deployed build. It remains an opt-in commissioning
+tool, not the default verification workflow.
+
 ## Review and verification
 
 A fresh adversarial reviewer found two material issues. Removing the storage
@@ -33,9 +38,8 @@ regression tests. The reviewer rechecked the fixes and reported no remaining
 material findings in this scope.
 
 - Repository invariants passed.
-- The full working-tree suite passed 71 offline tooling tests, including staged-index
-  and schema-history checks after the folder move. Commit-snapshot verification is
-  recorded below; backend-dependent tests remain with that separate work.
+- All 71 offline tooling tests passed, including staged-index and schema-history
+  checks after the folder move.
 - The final read-only Azure run at 19:21:48 UTC passed all 26 listed policies.
   Its full report is in ignored
   `.azure/foundation/storage-policy-2026-09-12T192148.321566_0000.json`.

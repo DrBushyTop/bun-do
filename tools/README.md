@@ -9,8 +9,11 @@ Choose by the evidence needed, not by the number of checks available.
 | `run_invariant_hook.py`, `ci_schema_base.py` | Git/Codex hook integration and schema-history baseline selection. |
 | `azure-foundation.py` | Guarded plan and deployment. Mutates Azure only with `deploy`. |
 | `azure-verify-storage.py` | Read-only deployed storage policy checks. No keys, data-plane requests, writes or paid model calls. |
+| `azure-gates.py`, `cloud-gates/` | Opt-in commissioning experiments that replace the dev Function package and make synthetic writes and paid AI calls. Not routine invariant checks. |
 | `test_azure_*.py` | Offline tests of cloud tooling's safety and recovery behavior. |
 | `android-*` | Android setup and device smoke checks. |
+| `speech-compare.py` | Prepare private audio corpora, run offline emulator comparisons and score matching reports. See [speech comparison](../docs/android-speech-comparison.md). |
+| `speech-cloud-compare.py` | Explicit paid Azure audio experiments with private-audio consent, scoped account checks and no automatic retries. Never run from tests or hooks. |
 
 Run the source checker and the complete offline tooling suite from the repo root:
 

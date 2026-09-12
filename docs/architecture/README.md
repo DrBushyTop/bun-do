@@ -47,9 +47,13 @@ The owner authorizes new resource deployment and supplies Foundry model availabi
 - Agents use two ARM64 Android emulator profiles on this Mac. Install the missing SDK/JDK/emulator tooling during implementation. Emulator functional evidence does not establish those phones' latency, memory use or recognition quality.
 - Azure deployment, Entra OTP/API access, strict schemas on the real model endpoint, Cosmos concurrency and restore drills are untested. They are explicit early implementation/release gates with failure handling, not completed wayfinder experiments.
 - DESIGN.md is an architect-selected direction, not a rendering or human approval. Implement the original rabbit mark and inspect native screens through Impeccable.
-- Azure budgets alert; they are not a provider cost guarantee. AI admission has hard token/job limits. No production data exists to migrate.
+- The owner skipped all Azure budget alerts on September 12, 2026, then deferred product AI length/rate quotas until after v1. Technical safety bounds remain required. No production data exists to migrate.
 
 If a live gate disproves an assumption, stop dependent work, record the evidence and change the owning decision. Do not silently swap cloud speech for offline speech, remove required features or claim a failed gate passed.
+
+The owner subsequently chose [MAI online transcription with Parakeet fallback](../adr/0002-cloud-first-speech-with-offline-fallback.md).
+This is an explicit change to the local-only audio boundary. The authenticated
+cloud path is a separate v1 slice, not part of the offline capture completion.
 
 ## Release scope
 

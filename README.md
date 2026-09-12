@@ -20,9 +20,11 @@ Aspire CLI 13.5.3 starts a .NET 10 Functions health endpoint and Azurite through
 
 ## Azure development
 
-The dedicated development Cosmos store and private snapshot storage are deployed
-in Sweden Central. The Cosmos controlled redeployment preserved resource
-identities and checked policies.
+The dedicated development Cosmos store, private snapshot storage, .NET 10 Flex
+health backend, full OpenTelemetry completion tracing and Luna deployment are
+deployed in Sweden Central. Live checks verified correlated redacted failures,
+useful request context and all three complete AI schemas under managed identity.
+Controlled redeployments preserved resource identities and checked policies.
 See [Azure development](docs/azure-development.md) for the scoped deployment
 commands, costs and remaining live checks. This does not yet provide an
 authenticated cloud backend or task sync.

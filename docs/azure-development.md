@@ -1,10 +1,15 @@
 # Azure development foundation
 
 The current infrastructure creates the dedicated development resource group,
-Cosmos workspace store and private Blob storage for transient sync snapshots.
-It does not yet deploy Functions, model endpoints, monitoring or budget alerts. The full
-[development-stack slice](https://github.com/DrBushyTop/bun-do/issues/17) remains
-open until those resources and their live checks are complete.
+Cosmos workspace store, private Blob storage for transient sync snapshots, and
+a .NET 10 Flex health endpoint with managed identity, and a dedicated Luna model
+deployment. Full completion tracing is described in the
+[observability contract](../infra/observability.md). All budget alerts are skipped by the owner's
+September 12, 2026 decision. The
+[development-stack slice](https://github.com/DrBushyTop/bun-do/issues/17)
+passed its deployment, identity, schema and restoration checks on that date.
+Downstream sync, authentication and durable AI behavior are not part of this
+foundation evidence.
 
 ## Source and constraints
 
@@ -28,9 +33,8 @@ cap. Do not shorten recovery retention to reduce cost without an explicit
 decision.
 
 The public Cosmos endpoint requires identity authentication. Private endpoints
-are not part of this increment. No application data-plane role is assigned until
-the backend managed identity exists. The workspace-store module outputs the
-container scope and data contributor role definition. Backend hosting will use
+are not part of this increment. The backend managed identity has container-scoped data access. The workspace-store module outputs the
+container scope and data contributor role definition. Backend hosting uses
 those to grant its identity access, including the metadata reads the SDK needs.
 This keeps dependencies one-way instead of passing the backend identity back
 into the datastore module that backend configuration depends on.
@@ -38,7 +42,7 @@ into the datastore module that backend configuration depends on.
 Modules represent application responsibilities. `workspace-store` groups the
 account, database, container and retention policy. `snapshot-artifacts` owns the
 separate transient Blob account, container and orphan cleanup policy.
-Future `observability` groups
+`observability` groups
 telemetry resources and policy; `backend-hosting` groups the Function host, its
 runtime storage, identity and required grants. Do not add one-resource wrappers
 such as `storageaccount.bicep`, or generic optional-feature modules.
@@ -47,7 +51,7 @@ such as `storageaccount.bicep`, or generic optional-feature modules.
 
 `infra/modules/snapshot-artifacts.bicep` uses Standard LRS, Hot tier, in Sweden
 Central. It disables anonymous reads and Shared Key authorization, requires TLS
-1.2 and exports the container scope for the future backend identity grant.
+1.2 and exports the container scope for the backend identity grant.
 Its network endpoint is public; its data is not. Blob capacity and operations
 have costs separate from Cosmos free tier.
 
@@ -155,10 +159,72 @@ deployment safeguards. CI does not authenticate to Azure or provision resources.
 The [Cosmos foundation review](reviews/cosmos-foundation.md) records the fresh
 adversarial review. Live provisioning results belong in the implementation
 ticket and a dated evidence note; compilation or what-if is not deployment.
-The API identity, two-instance transaction tests, real replay, backup restore
-and AI schema checks remain separate live gates.
+The later backend and AI increments below prove identity access and complete
+schemas. Two-instance transaction tests, real replay and backup restore remain
+separate downstream live gates.
 
 The [storage decision](adr/0001-cosmos-with-replaceable-storage.md) keeps Cosmos
 mechanics inside its adapter. A replacement database must prove the same
 transaction and sync behavior; the interface is not a promise of automatic
 data migration.
+
+## Backend hosting evidence
+
+The Function health endpoint deployed and passed a controlled redeployment on
+September 12, 2026. Live configuration, identity/grant checks and storage
+preservation comparisons passed. Both health probes returned HTTP 200. The
+initial package upload had a reset-workers 503 before the successful probe; see
+the [backend review](reviews/backend-foundation.md) for exact limits and evidence.
+The [backend module](../infra/backend-hosting.md) owns runtime storage and grants.
+
+## Exception observability evidence
+
+Exception-focused monitoring deployed and passed a controlled redeployment on
+September 12, 2026. A synthetic result-execution failure proved managed-identity
+ingestion and redaction through the real Function middleware. The temporary
+function-key probe was removed afterward; health returned 200 and Azure listed
+only `Health`. Both emitted tables have 30-day total retention, and successful
+requests/health counts are not exported. See the
+[review and delivery limits](reviews/exception-observability.md).
+
+The exception-only design above is historical. The owner subsequently chose
+full completion traces. See [wide-trace evidence](reviews/wide-otel.md) and
+[AI inference evidence](reviews/ai-inference.md) for the following increment.
+The final data-plane and negative-AI checks also passed on September 12, 2026.
+See the backend and AI reviews for exact status codes, cleanup and limits.
+Refusal/throttling handling was fixture-tested, not forced against the provider.
+These gates do not prove the durable AI worker or downstream sync.
+
+## Opt-in data-plane and negative AI checks
+
+`tools/cloud-gates/` contains the temporary Function and its tested checks.
+It is not part of the normal application package. Read its README before use.
+These are commissioning experiments, not the default verification command.
+Future adapter tests should exercise production code rather than grow a second
+storage or AI implementation inside temporary Functions.
+
+```sh
+python3 tools/azure-gates.py build
+python3 tools/azure-gates.py run
+```
+
+The runner validates exact resource endpoints and identity against ARM in the
+dedicated group, checks package hashes, creates a no-repeat dispatch marker,
+then deploys the temporary package. It verifies synthetic Cosmos/Blob CRUD,
+denied Blob account listing, a rejected AI schema and token-limited incomplete
+output. The two AI calls incur model usage; neither has a retry loop.
+
+The runner keeps Function keys in memory and attempts to restore the normal package
+even when a gate fails. Success requires Health 200, gate 404 and the expected function list.
+Here "restore" means publishing the normal artifact built from the checkout;
+it is not rollback to the previously deployed build. Do not use this commissioning
+workflow when replacing the current dev package is unacceptable.
+If restoration fails, use only:
+
+```sh
+python3 tools/azure-gates.py restore
+```
+
+Do not delete the dispatch marker or rerun paid gates to recover deployment.
+Records and ZIPs stay in ignored `.azure/foundation-gates/`. Inspect full
+exported telemetry for private content, not just a projection of safe fields.

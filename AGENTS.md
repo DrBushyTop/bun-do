@@ -19,3 +19,5 @@
   findings, file concrete deferred bugs, then continue to the next ready slice.
 - Keep implementation with the main agent. Use subagents primarily for review.
 - Load the `unslop` skill once per conversation and apply it to writing.
+- Use [.agents/skills/otel-wide-events](.agents/skills/otel-wide-events/SKILL.md)
+  when adding or reviewing backend telemetry.

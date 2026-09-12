@@ -3,6 +3,15 @@
   "contentVersion": "1.0.0.0",
   "parameters": {
     "location": { "value": "swedencentral" },
-    "resourceGroupName": { "value": "rg-bun-do-dev-swc" }
+    "resourceGroupName": { "value": "rg-bun-do-dev-swc" },
+    "lunaModel": { "value": "gpt-5.6-luna" },
+    "lunaVersion": { "value": "2026-07-09" },
+    "lunaSku": { "value": "DataZoneStandard" },
+    "lunaCapacity": { "value": 10 },
+    "terraEnabled": { "value": false },
+    "terraModel": { "value": "gpt-5.6-terra" },
+    "terraVersion": { "value": "2026-07-09" },
+    "terraSku": { "value": "DataZoneStandard" },
+    "terraCapacity": { "value": 10 }
   }
 }

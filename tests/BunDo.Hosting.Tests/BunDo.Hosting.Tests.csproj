@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\BunDo.Functions\BunDo.Functions.csproj" />
+    <Compile Include="../../tools/cloud-gates/FoundationGateChecks.cs" Link="FoundationGateChecks.cs" />
   </ItemGroup>
 
 </Project>

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plan or deploy only Bun Do's dedicated development storage foundation."""
+"""Plan or deploy only Bun Do's dedicated development foundation."""
 
 import argparse
 import hashlib
@@ -112,7 +112,7 @@ def main():
         (EVIDENCE / "deployment.json").write_text(json.dumps(result, indent=2) + "\n")
         if result.get("properties", {}).get("provisioningState") != "Succeeded":
             raise ValueError("Deployment did not succeed. Inspect local deployment evidence.")
-        print(f"Storage foundation deployed to {GROUP}. No other v1 deployment gate is implied.")
+        print(f"Development foundation deployed to {GROUP}. No other v1 deployment gate is implied.")
 
 
 if __name__ == "__main__":
