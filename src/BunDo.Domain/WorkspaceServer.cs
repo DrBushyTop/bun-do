@@ -1,0 +1,105 @@
+using System.Collections.Immutable;
+using System.Text;
+using System.Text.Json;
+
+namespace BunDo.Domain;
+
+public sealed class WorkspaceServer(IWorkspaceStore store)
+{
+    public SubmissionResult Handle(Guid authenticatedMemberId, FrozenOperation operation)
+    {
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            var state = store.Read();
+            if (operation.WorkspaceId != state.WorkspaceId) return new("WRONG_WORKSPACE");
+            if (operation.StateEpoch != state.StateEpoch) return new("EPOCH_CHANGED");
+            if (!state.Devices.TryGetValue(operation.DeviceId, out var device)) return new("DEVICE_UNKNOWN");
+            if (device.MemberId != authenticatedMemberId) return new("FORBIDDEN");
+            if (operation.Sequence == 0) return new("INVALID_SEQUENCE");
+            if (state.Receipts.TryGetValue(operation.OperationId, out var recorded))
+                return recorded.Fingerprint == operation.Fingerprint
+                    ? new(recorded.Code, recorded)
+                    : new("OPERATION_ID_REUSED");
+            if (operation.Sequence <= device.LastTerminalSequence) return new("OUTCOME_EXPIRED");
+            if (operation.Sequence - device.LastTerminalSequence != 1) return new("SEQUENCE_GAP");
+            var revision = state.Revision + 1;
+            var code = "ACCEPTED";
+            TaskSnapshot? task;
+            TaskSnapshot? changed = null;
+            if (operation.Command is CreateTask create)
+            {
+                task = new(create.TaskId, create.Title, create.Description, new(revision, revision), new(revision, revision));
+                if (create.TaskId != TaskIdentity.ForCreate(operation.DeviceId, operation.Sequence))
+                    code = "INVALID_TASK_ID";
+                else
+                    code = ValidateText(task);
+                if (code == "ACCEPTED") changed = task;
+                else task = null;
+            }
+            else if (operation.Command is DiscardBlockedIntent blocked)
+            {
+                task = null;
+                var dependencyId = $"{operation.DeviceId:D}:{blocked.RejectedDependencySequence}";
+                code = blocked.RejectedDependencySequence < operation.Sequence &&
+                       state.Receipts.TryGetValue(dependencyId, out var dependency) && !dependency.Accepted
+                    ? "BLOCKED_DEPENDENCY"
+                    : "INVALID_DEPENDENCY";
+            }
+            else
+            {
+                var edit = (EditTask)operation.Command;
+                state.Tasks.TryGetValue(edit.TaskId, out task);
+                if (task is null) code = "ENTITY_MISSING";
+                else if (edit.Title is null && edit.Description is null) code = "EMPTY_EDIT";
+                else if (edit.Title is { } t && t.ExpectedHumanVersion != task.TitleVersion.Human ||
+                    edit.Description is { } d && d.ExpectedHumanVersion != task.DescriptionVersion.Human)
+                    code = "FIELD_CONFLICT";
+                else
+                {
+                    var proposed = task;
+                    if (edit.Title is { } title && title.Value != task.Title)
+                        proposed = proposed with { Title = title.Value!, TitleVersion = new(revision, revision) };
+                    if (edit.Description is { } description && description.Value != task.Description)
+                        proposed = proposed with { Description = description.Value, DescriptionVersion = new(revision, revision) };
+                    code = ValidateText(proposed);
+                    if (code == "ACCEPTED")
+                    {
+                        if (proposed != task) changed = proposed;
+                        task = proposed;
+                    }
+                }
+            }
+            var receipt = new OperationReceipt(operation.OperationId, operation.Fingerprint, code, revision,
+                task);
+            var next = state with
+            {
+                Revision = revision,
+                Tasks = changed is not null ? state.Tasks.SetItem(changed.Id, changed) : state.Tasks,
+                Receipts = state.Receipts.Add(operation.OperationId, receipt),
+                Devices = state.Devices.SetItem(operation.DeviceId,
+                    state.Devices[operation.DeviceId] with { LastTerminalSequence = operation.Sequence }),
+                Changes = state.Changes.Add(new(revision, changed is not null ? [changed] : []))
+            };
+            if (store.TryCommit(state.Revision, next)) return new(code, receipt);
+        }
+        return new("BUSY");
+    }
+
+    public ChangePage Pull(ulong afterRevision, int maxGroups = 100)
+    {
+        var state = store.Read();
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(afterRevision, state.Revision);
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxGroups, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(maxGroups, 100);
+        var groups = state.Changes.Where(x => x.Revision > afterRevision).Take(maxGroups).ToImmutableArray();
+        return new(afterRevision, groups.IsEmpty ? afterRevision : groups[^1].Revision, state.Revision, groups);
+    }
+
+    private static string ValidateText(TaskSnapshot task)
+    {
+        if (string.IsNullOrWhiteSpace(task.Title) || task.Title.EnumerateRunes().Count() > 160)
+            return "INVALID_TITLE";
+        if (task.Description?.EnumerateRunes().Count() > 4000) return "INVALID_DESCRIPTION";
+        return JsonSerializer.SerializeToUtf8Bytes(task).Length > 16 * 1024 ? "TASK_TOO_LARGE" : "ACCEPTED";
+    }
+}

@@ -9,3 +9,4 @@ local.properties
 **/obj/
 .impeccable/config.local.json
 .impeccable/live/
+TestResults/
