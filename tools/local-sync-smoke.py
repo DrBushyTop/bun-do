@@ -118,6 +118,31 @@ def main():
         assert identity.request(f"/snapshots/{snapshot_id}/99?{query}", token=token)[0] == 409
         assert send(cursor=manifest["cursor"])["throughRevision"] == str(int(manifest["revision"]) + 1)
         print("PASS Local HTTP: immutable authenticated snapshot, retry, chunk digests, range rejection and delta continuation")
+        def versions(value):
+            return {group: {"fieldVersion": value[f"{group}Version"]}
+                for group in ("lifecycle", "claim", "hierarchy", "deletion")}
+
+        task = next(item for item in snapshots if item["id"] == task_id(1))
+        delete = envelope(6, "DeleteTask", {"taskId": task["id"]}, versions(task))
+        removed = send(delete)
+        assert removed["code"] == "ACCEPTED"
+        assert send(delete)["receipts"] == removed["receipts"]
+        deleted = removed["receipts"][0]["task"]
+        assert deleted["deletion"]["groupId"] == f"{device}:6"
+        stale_edit = envelope(7, "EditTask", {"taskId": task["id"], "title": "Retained draft"},
+            {"title": {"humanVersion": task["titleVersion"]["humanVersion"]},
+             "deletion": {"fieldVersion": task["deletionVersion"]}})
+        assert send(stale_edit)["code"] == "DELETION_CONFLICT"
+        undo = send(envelope(8, "RestoreTask", {"taskId": task["id"]}, versions(deleted)))
+        assert undo["code"] == "ACCEPTED"
+        restored = undo["receipts"][0]["task"]
+        assert restored["deletion"] is None and restored["claimantId"] is None
+        assert restored["title"] == "Synthetic tea"
+        again = send(envelope(9, "DeleteTask", {"taskId": task["id"]}, versions(restored)))
+        assert again["code"] == "ACCEPTED"
+        assert send(envelope(10, "RestoreTask", {"taskId": task["id"]}, versions(deleted)))["code"] == "DELETION_CONFLICT"
+        assert send(envelope(11, "RestoreTask", {"taskId": task["id"]}, versions(again["receipts"][0]["task"])))["code"] == "ACCEPTED"
+        print("PASS Local HTTP: delete retry, stale edit rejection, Undo after sync and stale deletion-group restore rejection")
     finally:
         status, response, _ = identity.request("/households", token=token, method="POST", body={
             "action": "get", "registrationId": device, "workspaceId": workspace})

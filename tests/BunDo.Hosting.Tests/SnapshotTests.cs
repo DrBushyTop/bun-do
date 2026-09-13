@@ -199,6 +199,90 @@ public sealed class SnapshotTests : IDisposable
         Assert.Equal("OUTCOME_EXPIRED", (await sync.SubmitAsync(member, operation, default)).Code);
     }
 
+    [Fact]
+    public async Task Deleted_tasks_survive_snapshots_and_undo_after_a_lost_reply()
+    {
+        var epoch = await Create(); var sync = new SyncService(storage);
+        var created = (await sync.SubmitAsync(member, Capture(epoch), default)).Receipt!.Task!;
+        var deletedCommand = new FrozenOperation(workspace, epoch, device, 2,
+            new DeleteTask(created.Id, Versions(created)));
+        var deleted = (await sync.SubmitAsync(member, deletedCommand, default)).Receipt!.Task!;
+        var manifest = await Module().CreateAsync(member, workspace, epoch, device, Guid.NewGuid(), default);
+        var chunk = await Module().ChunkAsync(member, workspace, epoch, device, manifest.SnapshotId, 0, default);
+        var snapshot = JsonDocument.Parse(chunk).RootElement.GetProperty("tasks")[0];
+        Assert.Equal(deleted.Deletion!.GroupId, snapshot.GetProperty("deletion").GetProperty("groupId").GetString());
+        Assert.Empty(manifest.RootOrder!);
+        Assert.Equal(deleted, (await sync.SubmitAsync(member, deletedCommand, default)).Receipt!.Task);
+        var restored = (await sync.SubmitAsync(member, new(workspace, epoch, device, 3,
+            new RestoreTask(created.Id, Versions(deleted))), default)).Receipt!.Task!;
+        Assert.Null(restored.Deletion);
+        Assert.Null(restored.ClaimantId);
+        Assert.Equal(created.Title, restored.Title);
+    }
+
+    [Fact]
+    public async Task Leaf_purge_waits_for_retirement_and_pins_then_retries_without_resurrection()
+    {
+        var epoch = await Create(); var sync = new SyncService(storage);
+        var created = (await sync.SubmitAsync(member, Capture(epoch), default, "registry")).Receipt!.Task!;
+        var deleted = (await sync.SubmitAsync(member, new(workspace, epoch, device, 2,
+            new DeleteTask(created.Id, Versions(created))), default, "registry")).Receipt!.Task!;
+        var registrations = new RegistrationReader { Registration = new(Guid.NewGuid(), device, clock.Now.AddDays(300)) };
+        await sync.AcknowledgeAsync(member, workspace, epoch, device, 2, default);
+        clock.Now = clock.Now.AddDays(121);
+        var module = Module(registrations: registrations);
+        await module.PruneAsync(member, workspace, epoch, default);
+        var id = WorkspaceCommit.TaskId(created.Id);
+        Assert.False((await storage.ReadAsync<TaskSnapshot>(workspace.ToString(), id, default))!.Value.Deletion!.Purging);
+        registrations.Registration = registrations.Registration with { Revoked = true };
+        // Snapshot creation may mark PURGING, but its pin must prevent final removal.
+        var manifest = await module.CreateAsync(member, workspace, epoch, device, Guid.NewGuid(), default);
+        Assert.True((await storage.ReadAsync<TaskSnapshot>(workspace.ToString(), id, default))!.Value.Deletion!.Purging);
+        await module.PruneAsync(member, workspace, epoch, default);
+        Assert.NotNull(await storage.ReadAsync<TaskSnapshot>(workspace.ToString(), id, default));
+        var purging = (await storage.ReadAsync<TaskSnapshot>(workspace.ToString(), id, default))!.Value;
+        Assert.Equal("TASK_PURGING", (await sync.SubmitAsync(member, new(workspace, epoch, device, 3,
+            new RestoreTask(created.Id, Versions(purging))), default, "registry")).Code);
+        clock.Now = manifest.ExpiresAt.AddSeconds(1);
+        var racing = new InterleavedDocuments(storage) { RejectDeletion = true };
+        await Module(racing, registrations).PruneAsync(member, workspace, epoch, default);
+        Assert.NotNull(await storage.ReadAsync<TaskSnapshot>(workspace.ToString(), id, default));
+        await module.PruneAsync(member, workspace, epoch, default);
+        Assert.Null(await storage.ReadAsync<TaskSnapshot>(workspace.ToString(), id, default));
+        var state = (await storage.ReadAsync<WorkspaceState>(workspace.ToString(), "state", default))!.Value;
+        Assert.Equal(0, state.TaskCount);
+        var group = (await storage.ReadAsync<ChangeGroup>(workspace.ToString(), WorkspaceCommit.GroupId(state.Revision), default))!.Value;
+        Assert.Equal(new[] { created.Id }, group.PurgedTaskIds!.Value);
+        Assert.Contains("PURGED_TASK", SyncGroup.Encode(group).Parts[0].Payload);
+        Assert.Equal("ENTITY_MISSING", (await sync.SubmitAsync(member, new(workspace, epoch, device, 4,
+            new RestoreTask(created.Id, Versions(deleted))), default)).Code);
+        Assert.Equal("INVALID_TASK_ID", (await sync.SubmitAsync(member, new(workspace, epoch, device, 5,
+            new CreateTask(created.Id, "Must use a new ID")), default)).Code);
+    }
+
+    [Fact]
+    public async Task Purging_content_preserves_immutable_first_completion_credit()
+    {
+        var epoch = await Create(); var sync = new SyncService(storage);
+        var created = (await sync.SubmitAsync(member, Capture(epoch), default, "registry")).Receipt!.Task!;
+        var completed = (await sync.SubmitAsync(member, new(workspace, epoch, device, 2,
+            new CompleteTask(created.Id, Versions(created))), default, "registry")).Receipt!.Task!;
+        await sync.SubmitAsync(member, new(workspace, epoch, device, 3,
+            new DeleteTask(created.Id, Versions(completed))), default, "registry");
+        await sync.AcknowledgeAsync(member, workspace, epoch, device, 3, default);
+        clock.Now = clock.Now.AddDays(121);
+        var registrations = new RegistrationReader { Registration = new(Guid.NewGuid(), device, clock.Now.AddDays(-1)) };
+        var module = Module(registrations: registrations);
+        await module.PruneAsync(member, workspace, epoch, default);
+        await module.PruneAsync(member, workspace, epoch, default);
+        Assert.Null(await storage.ReadAsync<TaskSnapshot>(workspace.ToString(), WorkspaceCommit.TaskId(created.Id), default));
+        var credit = (await storage.ReadAsync<FirstCompletion>(workspace.ToString(), $"completion:{created.Id}", default))!.Value;
+        Assert.Equal(completed.FirstCompletion, credit);
+    }
+
+    private static TaskStateVersions Versions(TaskSnapshot task) =>
+        new(task.LifecycleVersion, task.ClaimVersion, task.HierarchyVersion, task.DeletionVersion);
+
     private sealed class Clock : TimeProvider
     {
         public DateTimeOffset Now = DateTimeOffset.UtcNow;

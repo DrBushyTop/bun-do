@@ -25,7 +25,9 @@ class SharedRepository(
     val workspace = dao.observeWorkspace(scope)
     val problems = dao.problems(scope)
     val recovery = dao.observeRecovery(scope)
-    val canonical = dao.observeBase(scope).map { rows -> rows.associate { it.id to it.snapshot } }
+    val canonical = dao.observeBase(scope).map { rows ->
+        rows.filter { JSONObject(it.snapshot).optString("entityType") != "PURGED_TASK" }.associate { it.id to it.snapshot }
+    }
 
     /** The displayed snapshot binds confirmation and dependencies to what the user actually saw. */
     suspend fun act(kind: String, displayed: String, confirmedClaimant: String? = null,
@@ -35,6 +37,8 @@ class SharedRepository(
             val state = current()
             check(state.blocked == null && dao.recoveryState(scope) == null)
             val task = JSONObject(displayed)
+            check(if (kind == "RestoreTask") task.optJSONObject("deletion")?.optBoolean("purging") == false
+                else task.isNull("deletion"))
             val id = task.getString("id")
             check(sameJson(task, JSONObject(checkNotNull(dao.task(scope, id)).snapshot))) { "Task changed" }
             val me = JSONObject(checkNotNull(state.membership)).getString("me")
@@ -46,14 +50,25 @@ class SharedRepository(
             if (kind == "MoveTask") payload.put("expectedParentId", JSONObject.NULL)
                 .put("afterTaskId", after ?: JSONObject.NULL).put("beforeTaskId", before ?: JSONObject.NULL)
             val action = SharedTaskActions.capture(kind, task, prior, payload, me)
-            dao.saveIntent(SharedIntent(scope, sequence.toString(), id, kind, task.getString("title"), null,
+            dao.saveIntent(SharedIntent(scope, sequence.toString(), id, kind, task.getString("title"), task.nullableString("description"),
                 false, false, task.human("title"), task.human("description"), task.decimal("deletionVersion").toString(),
                 prior.lastOrNull()?.sequence, SharedProtocol.context(), taskAction = action))
             val next = state.copy(nextSequence = (sequence + 1u).toString(), journalVersion = state.journalVersion + 1)
             dao.saveWorkspace(next)
             rebuild(next)
             lease.check()
+            sequence.toString()
         }
+    }
+
+    suspend fun undoDelete(id: String, sequence: String) {
+        val displayed = lease.access {
+            val task = JSONObject(checkNotNull(dao.task(scope, id)).snapshot)
+            val group = task.getJSONObject("deletion").getString("groupId")
+            check(group == "$registration:$sequence" || group == "pending:$sequence") { "Deletion changed" }
+            task.toString()
+        }
+        act("RestoreTask", displayed)
     }
 
     /** Only terminal variants can be dismissed. Pending identities must still obtain their outcome. */
@@ -78,6 +93,7 @@ class SharedRepository(
             check(intents.none { it.taskId == retained.taskId && it.status in listOf("PENDING", "SUBMITTED") })
             val task = JSONObject(checkNotNull(dao.baseTask(scope, state.baseGeneration, retained.taskId)).snapshot)
             check(sameJson(task, JSONObject(displayed)))
+            check(task.isNull("deletion"))
             val next = state.nextSequence.toULong()
             check(next < ULong.MAX_VALUE)
             val intent = SharedIntent(scope, next.toString(), retained.taskId, "EditTask",
@@ -132,7 +148,7 @@ class SharedRepository(
         return JSONObject().put("task", task)
             .put("titleAfterSequence", pending.lastOrNull { it.titleChanged }?.sequence ?: JSONObject.NULL)
             .put("descriptionAfterSequence", pending.lastOrNull { it.descriptionChanged }?.sequence ?: JSONObject.NULL)
-            .put("deletionAfterSequence", pending.lastOrNull { it.kind == "CreateTask" }?.sequence ?: JSONObject.NULL)
+            .put("deletionAfterSequence", pending.lastOrNull { "deletion" in SharedTaskActions.writes(it.kind) }?.sequence ?: JSONObject.NULL)
     }
 
     override suspend fun commit(draft: EditorDraft): String = commit(draft, removeDraft = true)
@@ -281,6 +297,8 @@ class SharedRepository(
                     SharedProtocol.validateTask(task, expected + 1u)
                     val id = task.getString("id")
                     require(id == ids.getString(t) && seen.add(id))
+                    // Keep the small marker until the next snapshot so older accepted receipts
+                    // remain provably applied. Never project its removed content back into a task.
                     dao.saveBase(SharedBase(scope, id, task.toString(), state.baseGeneration))
                 }
                 expected++
@@ -334,7 +352,9 @@ class SharedRepository(
 
     private suspend fun rebuild(state: SharedWorkspace) {
         val rebuilding = dao.recoveryState(scope) != null
-        val projected = dao.generationBase(scope, if (rebuilding) state.projectionGeneration else state.baseGeneration)
+        val base = dao.generationBase(scope, if (rebuilding) state.projectionGeneration else state.baseGeneration)
+        val purged = base.filter { JSONObject(it.snapshot).optString("entityType") == "PURGED_TASK" }.map { it.id }.toSet()
+        val projected = base.filter { it.id !in purged }
             .associate { it.id to JSONObject(it.snapshot) }.toMutableMap()
         val intents = dao.intents(scope)
         val applied = mutableSetOf<String>()
@@ -343,7 +363,8 @@ class SharedRepository(
             if (intent.receipt != null && JSONObject(intent.receipt).decimal("effectRevision") <= state.revision.toULong()) continue
             var task = projected[intent.taskId]
             var problem: String? = null
-            if (intent.kind == "CreateTask") {
+            if (intent.taskId in purged) problem = "ENTITY_MISSING"
+            else if (intent.kind == "CreateTask") {
                 if (task == null) { task = SharedProtocol.optimistic(intent); projected[intent.taskId] = task }
             } else if (task == null) problem = "ENTITY_MISSING"
             else if (intent.taskAction != null) problem = SharedTaskActions.project(task, intent, intents, applied)
@@ -354,7 +375,15 @@ class SharedRepository(
                 } ?: observed
                 val titleVersion = version(intent.titleAfterSequence, "title", intent.observedTitle)
                 val descriptionVersion = version(intent.descriptionAfterSequence, "description", intent.observedDescription)
+                val deletionDependency = intent.deletionAfterSequence?.let { seq -> intents.find { it.sequence == seq } }
+                val deletionVersion = deletionDependency?.receipt?.let(::JSONObject)?.optJSONObject("task")
+                    ?.decimal("deletionVersion")?.toString() ?: if (deletionDependency?.sequence in applied)
+                    task.decimal("deletionVersion").toString() else intent.observedDeletion
                 if (prerequisite != null && prerequisite.getString("code") != "ACCEPTED") problem = "BLOCKED_DEPENDENCY"
+                else if (deletionDependency != null && deletionDependency.receipt == null && deletionDependency.sequence !in applied)
+                    problem = "BLOCKED_DEPENDENCY"
+                else if (!task.isNull("deletion")) problem = "TASK_DELETED"
+                else if (task.decimal("deletionVersion").toString() != deletionVersion) problem = "DELETION_CONFLICT"
                 else if (intent.titleChanged && task.human("title").toULong() > titleVersion.toULong() ||
                     intent.descriptionChanged && task.human("description").toULong() > descriptionVersion.toULong()) problem = "FIELD_CONFLICT"
                 else {

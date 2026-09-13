@@ -35,7 +35,7 @@ class SharedTaskUiTest {
     private val alice = UUID.randomUUID().toString()
     private val bob = UUID.randomUUID().toString()
 
-    private fun fixture(language: String, appearance: String, claimed: Boolean = false): Pair<AccountData, SharedWorkspace> {
+    private fun fixture(language: String, appearance: String, claimed: Boolean = false, fontScale: Float = 1.3f): Pair<AccountData, SharedWorkspace> {
         val data = (compose.activity.application as BunDoApplication).accounts.active.value!!
         val workspace = UUID.randomUUID().toString()
         val epoch = UUID.randomUUID().toString()
@@ -68,7 +68,7 @@ class SharedTaskUiTest {
                     LocalActivityResultRegistryOwner provides compose.activity) {
                     BunDoTheme(appearance) {
                         val density = LocalDensity.current
-                        CompositionLocalProvider(LocalDensity provides Density(density.density, 1.3f)) {
+                        CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
                             SharedWorkspaceScreen(data, state, appearance, {}, {})
                         }
                     }
@@ -86,12 +86,14 @@ class SharedTaskUiTest {
         compose.onNodeWithText("Sinulla työn alla").assertIsDisplayed()
         screenshot("tasks-fi-light.png")
         compose.onNodeWithTag("task-complete").performClick()
-        compose.onNodeWithTag("task-reopen").assertIsDisplayed()
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("task-reopen").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("task-reopen").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("back").performClick()
         compose.onNodeWithTag("task-history-view").performScrollTo().performClick()
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
         compose.onNodeWithTag("task-reopen").performClick()
-        compose.onNodeWithTag("task-claim").assertIsDisplayed()
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("task-claim").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("task-claim").performScrollTo().assertIsDisplayed()
         assertEquals(listOf("ClaimTask", "CompleteTask", "ReopenTask"),
             runBlocking { data.database.shared().intents(state.scope).map { it.kind } })
     }
@@ -117,6 +119,35 @@ class SharedTaskUiTest {
         compose.waitUntil(10_000) { runBlocking { data.database.shared().intents(state.scope).size == 1 } }
         assertEquals("MoveTask", runBlocking { data.database.shared().intents(state.scope).single().kind })
         compose.onNodeWithTag("task-later").assertIsNotEnabled()
+    }
+
+    @Test fun englishDeleteUndoAndRecoveryView() {
+        val (data, state) = fixture("en", "light")
+        compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
+        compose.onNodeWithTag("task-delete").performScrollTo().performClick()
+        compose.onNodeWithText("Undo").performClick()
+        compose.waitUntil(10_000) { runBlocking { data.database.shared().intents(state.scope).size == 2 } }
+        compose.onNodeWithTag("task-delete").performScrollTo().performClick()
+        compose.waitUntil(10_000) { runBlocking { data.database.shared().intents(state.scope).size == 3 } }
+        compose.onNodeWithTag("edit").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("back").performClick()
+        compose.onNodeWithText("Vie paperit kierrätykseen").assertDoesNotExist()
+        compose.onNodeWithTag("task-deleted-view").performScrollTo().performClick()
+        compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().assertIsDisplayed()
+        screenshot("deletion-recovery-en.png")
+        compose.onNodeWithText("Vie paperit kierrätykseen").performClick()
+        compose.onNodeWithTag("task-restore").performScrollTo().performClick()
+        compose.waitUntil(10_000) { runBlocking { data.database.shared().intents(state.scope).size == 4 } }
+        assertEquals(listOf("DeleteTask", "RestoreTask", "DeleteTask", "RestoreTask"),
+            runBlocking { data.database.shared().intents(state.scope).map { it.kind } })
+    }
+
+    @Test fun finnishDeletedDetailsRemainReadable() {
+        fixture("fi", "light", fontScale = 2.0f)
+        compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
+        compose.onNodeWithTag("task-delete").performScrollTo().performClick()
+        compose.onNodeWithTag("task-restore").performScrollTo().assertIsDisplayed()
+        screenshot("deletion-detail-fi.png")
     }
 
     private fun screenshot(name: String) {

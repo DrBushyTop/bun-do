@@ -24,6 +24,8 @@ internal fun taskActionLabel(kind: String) = when (kind) {
     "CompleteTask" -> R.string.task_complete
     "ReopenTask" -> R.string.task_reopen
     "CancelTask" -> R.string.task_cancel
+    "DeleteTask" -> R.string.task_delete
+    "RestoreTask" -> R.string.task_restore
     else -> R.string.task_move
 }
 
@@ -41,6 +43,10 @@ private fun memberName(membership: JSONObject?, id: String?): String {
 
 @Composable
 internal fun SharedTaskSummary(task: JSONObject, membership: JSONObject?) {
+    if (!task.isNull("deletion")) {
+        Text(stringResource(R.string.task_deleted), style = MaterialTheme.typography.bodyMedium)
+        return
+    }
     val lifecycle = task.optString("lifecycle", "OPEN")
     val claimant = task.nullableString("claimantId")?.takeIf { member(membership, it)?.optBoolean("active") == true }
     if (lifecycle != "OPEN") {
@@ -66,12 +72,21 @@ internal fun SharedTaskControls(task: JSONObject, ordered: List<JSONObject>, mem
     val me = membership?.optString("me")
     val claimant = task.nullableString("claimantId")?.takeIf { member(membership, it)?.optBoolean("active") == true }
     var confirmation by remember(id) { mutableStateOf<SharedTaskAction?>(null) }
-    val active = ordered.filter { it.optString("lifecycle", "OPEN") == "OPEN" }.map { it.getString("id") }
+    val active = ordered.filter { it.optString("lifecycle", "OPEN") == "OPEN" && it.isNull("deletion") }.map { it.getString("id") }
     val index = active.indexOf(id)
     val canAct = enabled && me != null
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SharedTaskSummary(task, membership)
         if (failed) Text(stringResource(R.string.task_changed_retry), color = MaterialTheme.colorScheme.error)
+        if (!task.isNull("deletion")) {
+            Text(stringResource(R.string.task_restore_explanation))
+            OutlinedButton(enabled = canAct && !task.getJSONObject("deletion").optBoolean("purging"),
+                modifier = Modifier.testTag("task-restore"),
+                onClick = { onAction(SharedTaskAction("RestoreTask", task.toString())) }) {
+                Text(stringResource(R.string.task_restore))
+            }
+            if (task.getJSONObject("deletion").optBoolean("purging")) Text(stringResource(R.string.task_purging))
+        } else {
         if (open) {
             Button(enabled = canAct, modifier = Modifier.testTag("task-complete"), onClick = {
                 val action = SharedTaskAction("CompleteTask", task.toString(), claimant?.takeIf { it != me })
@@ -94,6 +109,9 @@ internal fun SharedTaskControls(task: JSONObject, ordered: List<JSONObject>, mem
                 onClick = { onAction(SharedTaskAction("CancelTask", task.toString())) }) { Text(stringResource(R.string.task_cancel)) }
         } else OutlinedButton(enabled = canAct, modifier = Modifier.testTag("task-reopen"),
             onClick = { onAction(SharedTaskAction("ReopenTask", task.toString())) }) { Text(stringResource(R.string.task_reopen)) }
+        TextButton(enabled = canAct, modifier = Modifier.testTag("task-delete"),
+            onClick = { onAction(SharedTaskAction("DeleteTask", task.toString())) }) { Text(stringResource(R.string.task_delete)) }
+        }
     }
     confirmation?.let { action ->
         AlertDialog(onDismissRequest = { confirmation = null },

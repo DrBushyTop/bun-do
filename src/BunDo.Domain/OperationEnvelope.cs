@@ -68,6 +68,8 @@ public static class OperationEnvelope
                 case "CompleteTask":
                 case "ReopenTask":
                 case "CancelTask":
+                case "DeleteTask":
+                case "RestoreTask":
                     var kind = root.GetProperty("command").GetString();
                     Fields(payload, kind == "CompleteTask" ? ["taskId", "confirmedClaimantId"] : ["taskId"]);
                     Fields(observed, ["lifecycle", "claim", "hierarchy", "deletion"]);
@@ -80,6 +82,8 @@ public static class OperationEnvelope
                         "CompleteTask" => new CompleteTask(taskId, expected,
                             payload.GetProperty("confirmedClaimantId").ValueKind == JsonValueKind.Null ? null : Uuid(payload.GetProperty("confirmedClaimantId"))),
                         "ReopenTask" => new ReopenTask(taskId, expected),
+                        "DeleteTask" => new DeleteTask(taskId, expected),
+                        "RestoreTask" => new RestoreTask(taskId, expected),
                         _ => new CancelTask(taskId, expected),
                     };
                     break;

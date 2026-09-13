@@ -3,7 +3,7 @@ namespace BunDo.Domain;
 public static class TaskLifecycle
 {
     public static string Apply(TaskSnapshot? task, TaskTransition command, HouseholdMembership members,
-        Guid actor, ulong revision, DateTimeOffset now, out TaskSnapshot? result)
+        Guid actor, ulong revision, DateTimeOffset now, out TaskSnapshot? result, string? operationId = null)
     {
         result = task;
         if (task is null) return "ENTITY_MISSING";
@@ -12,6 +12,23 @@ public static class TaskLifecycle
         if (expected.Lifecycle != task.LifecycleVersion) return "LIFECYCLE_CONFLICT";
         if (expected.Hierarchy != task.HierarchyVersion) return "HIERARCHY_CONFLICT";
         if (expected.Claim != task.ClaimVersion) return "CLAIM_CONFLICT";
+        if (command is RestoreTask)
+        {
+            if (task.Deletion is null) return "TASK_NOT_DELETED";
+            if (task.Deletion.Purging) return "TASK_PURGING";
+            result = ClearClaim(task, revision) with { Deletion = null, DeletionVersion = revision };
+            return "ACCEPTED";
+        }
+        if (task.Deletion is not null) return "TASK_DELETED";
+        if (command is DeleteTask)
+        {
+            // Lifecycle, snooze and first credit stay on the retained record, but claims never return.
+            result = ClearClaim(task, revision) with {
+                Deletion = new(operationId ?? throw new ArgumentNullException(nameof(operationId)), now),
+                DeletionVersion = revision,
+            };
+            return "ACCEPTED";
+        }
         var claimant = task.ClaimantId is { } member && members.CanRead(member) ? task.ClaimantId : null;
         if (command is ClaimTask)
         {

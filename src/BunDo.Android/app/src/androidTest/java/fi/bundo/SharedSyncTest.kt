@@ -328,6 +328,28 @@ class SharedSyncTest {
         assertEquals(2, server.tasks.size)
     }
 
+    @Test fun snapshotKeepsDeletedTaskHiddenAndPreservesPendingText() = runBlocking {
+        val server = Server()
+        val client = client(server)
+        val id = client.repository.copyText("Before deletion", "")
+        client.synchronize(server)
+        val draft = client.repository.draft(id).copy(title = "My offline text")
+        client.repository.commit(draft)
+        server.tasks[id]!!.put("deletion", JSONObject().put("groupId", "remote:1")
+            .put("deletedAt", "2026-09-13T12:00:00Z").put("purging", false))
+        val request = client.prepare()
+        val recovery = SharedSnapshotRecovery(client.database, client.lease, client.state.scope)
+        recovery.begin(request)
+        val transport = SnapshotPeer(server)
+        repeat(16) { if (recovery.pending()) recovery.step(request, transport, Long.MAX_VALUE, 0) }
+        client.repository.release(request)
+        assertFalse(recovery.pending())
+        assertFalse(client.repository.taskStates.first().single().isNull("deletion"))
+        assertEquals("Before deletion", client.repository.taskStates.first().single().getString("title"))
+        assertEquals("My offline text", client.repository.problems.first().single().title)
+        assertEquals("TASK_DELETED", client.repository.problems.first().single().problem)
+    }
+
     @Test fun lostCreateResponseThenPurgedSnapshotDoesNotResurrectAcceptedCreate() = runBlocking {
         val server = Server()
         val client = client(server)

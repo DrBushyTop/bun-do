@@ -96,7 +96,8 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
             else if (operation.Command is TaskTransition transition)
             {
                 state.Tasks.TryGetValue(transition.TaskId, out task);
-                code = TaskLifecycle.Apply(task, transition, state.Membership, authenticatedMemberId, revision, acceptedAt, out var proposed);
+                code = TaskLifecycle.Apply(task, transition, state.Membership, authenticatedMemberId, revision, acceptedAt, out var proposed,
+                    operation.OperationId);
                 if (code == "ACCEPTED" && proposed != task) { changed = proposed; task = proposed; }
             }
             else if (operation.Command is MoveTask move)
@@ -104,6 +105,7 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
                 state.Tasks.TryGetValue(move.TaskId, out task);
                 if (task is null) code = "ENTITY_MISSING";
                 else if (move.ExpectedDeletionVersion != task.DeletionVersion) code = "DELETION_CONFLICT";
+                else if (task.Deletion is not null) code = "TASK_DELETED";
                 else if (move.ExpectedParentId is not null) code = "HIERARCHY_CONFLICT";
                 else if (move.ExpectedOrderVersion != task.OrderIntentVersion) code = "ORDER_CONFLICT";
                 else if (task.Lifecycle != "OPEN") code = "TASK_NOT_OPEN";
@@ -121,6 +123,7 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
                 if (task is null) code = "ENTITY_MISSING";
                 else if (edit.ExpectedDeletionVersion is { } deletion && deletion != task.DeletionVersion)
                     code = "DELETION_CONFLICT";
+                else if (task.Deletion is not null) code = "TASK_DELETED";
                 else if (edit.Title is null && edit.Description is null) code = "EMPTY_EDIT";
                 else if (edit.Title is { } t && t.ExpectedHumanVersion != task.TitleVersion.Human ||
                     edit.Description is { } d && d.ExpectedHumanVersion != task.DescriptionVersion.Human)
@@ -142,7 +145,7 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
             }
             if (changed is not null)
             {
-                if (changed.Lifecycle != "OPEN") order = order.Remove(changed.Id);
+                if (changed.Lifecycle != "OPEN" || changed.Deletion is not null) order = order.Remove(changed.Id);
                 else if (!order.Contains(changed.Id)) order = order.Add(changed.Id);
             }
             var receipt = new OperationReceipt(operation.OperationId, operation.Fingerprint, code, revision,

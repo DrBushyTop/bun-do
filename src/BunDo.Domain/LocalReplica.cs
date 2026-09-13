@@ -6,6 +6,7 @@ public sealed record RecoveryVariant(string TaskId, string Title, string? Descri
 public sealed class LocalReplica(Guid workspaceId, Guid epoch, Guid deviceId)
 {
     private readonly Dictionary<string, TaskSnapshot> canonical = [];
+    private readonly HashSet<string> purged = [];
     private readonly List<Intent> journal = [];
     private ulong nextSequence = 1;
     public ulong Cursor { get; private set; }
@@ -83,7 +84,7 @@ public sealed class LocalReplica(Guid workspaceId, Guid epoch, Guid deviceId)
                 effect.TitleVersion.Server > receipt.EffectRevision ||
                 effect.DescriptionVersion.Server > receipt.EffectRevision)
                 throw new ArgumentException("Accepted receipt does not describe the requested task effect.", nameof(receipt));
-            if (receipt.EffectRevision <= Cursor && !ContainsEffect(canonical, effect))
+            if (receipt.EffectRevision <= Cursor && !purged.Contains(effect.Id) && !ContainsEffect(canonical, effect))
                 throw new ArgumentException("The canonical base does not contain the accepted effect.", nameof(receipt));
         }
         intent.Receipt = receipt;
@@ -108,33 +109,39 @@ public sealed class LocalReplica(Guid workspaceId, Guid epoch, Guid deviceId)
         if (expected != page.ThroughRevision)
             throw new ArgumentException("Page cursor exceeds the supplied effects.", nameof(page));
         var staged = new Dictionary<string, TaskSnapshot>(canonical);
+        var stagedPurged = new HashSet<string>(purged);
         foreach (var group in page.Groups)
+        {
             foreach (var task in group.Tasks)
                 staged[task.Id] = task;
+            foreach (var id in group.PurgedTaskIds ?? []) { staged.Remove(id); stagedPurged.Add(id); }
+        }
         foreach (var receipt in journal.Select(x => x.Receipt))
             if (receipt is { Accepted: true } && receipt.EffectRevision <= page.ThroughRevision &&
-                !ContainsEffect(staged, receipt.Task!))
+                !stagedPurged.Contains(receipt.Task!.Id) && !ContainsEffect(staged, receipt.Task!))
                 throw new ArgumentException("Page skipped an acknowledged effect.", nameof(page));
         canonical.Clear();
         foreach (var pair in staged) canonical.Add(pair.Key, pair.Value);
+        purged.UnionWith(stagedPurged);
         Cursor = page.ThroughRevision;
     }
 
     public TaskSnapshot? Find(string id)
     {
+        if (purged.Contains(id)) return null;
         canonical.TryGetValue(id, out var visible);
         foreach (var intent in journal.Where(x => x.TaskId == id && !IsSettled(x)))
         {
             if (intent.IsCreate)
                 visible ??= new(id, intent.Title, intent.Description, new(0, 0), new(0, 0));
-            else if (visible is not null)
+            else if (visible is { Deletion: null })
                 visible = visible with
                 {
                     Title = intent.ChangesTitle ? intent.Title : visible.Title,
                     Description = intent.ChangesDescription ? intent.Description : visible.Description
                 };
         }
-        return visible;
+        return visible?.Deletion is null ? visible : null;
     }
 
     private bool IsSettled(Intent intent) =>

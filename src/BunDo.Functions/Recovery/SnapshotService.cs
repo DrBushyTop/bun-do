@@ -201,11 +201,63 @@ public sealed class SnapshotService(IHouseholdDocuments documents, ISnapshotArti
                 }
                 deletes.Add(receiptId);
             }
-            else if (!group.Tasks.IsEmpty) break;
+            else if (!group.Tasks.IsEmpty && !group.Tasks.All(t => t.Deletion?.Purging == true)) break;
             deletes.Add(groupId); through++;
         }
-        if (through == stored.Value.PrunedThrough) return 0;
+        if (through == stored.Value.PrunedThrough)
+            return await PurgeDeletedTasksAsync(member, workspace, epoch, ct);
         var changed = Advance(stored.Value) with { PrunedThrough = through };
-        return await documents.CommitWorkspaceAsync(stored, changed, ct, deletes) ? deletes.Count : 0;
+        if (!await documents.CommitWorkspaceAsync(stored, changed, ct, deletes)) return 0;
+        return deletes.Count + await PurgeDeletedTasksAsync(member, workspace, epoch, ct);
+    }
+
+    // Leaf captures are embedded in their task document. PURGING is the durable cleanup cursor:
+    // the next maintenance pass removes the document and its capture together, at most 32 per commit.
+    private async Task<int> PurgeDeletedTasksAsync(Guid member, Guid workspace, Guid epoch, CancellationToken ct)
+    {
+        if (registrations is null) return 0;
+        var stored = await State(member, workspace, epoch, ct);
+        if (Pins(stored.Value).Values.Any(x => x.ExpiresAt > clock.GetUtcNow())) return 0;
+        var partition = workspace.ToString("D");
+        var devices = stored.Value.Devices.ToDictionary();
+        string? continuation = null;
+        do
+        {
+            var page = await documents.ReadPageAsync<DeviceRegistration>(partition, "device:", continuation, 64, ct);
+            foreach (var item in page.Items) devices[item.Value.DeviceId] = item.Value;
+            continuation = page.Continuation;
+        } while (continuation is not null);
+        // Without a per-device observed-deletion watermark, keep tombstones while any installation
+        // remains valid. Unknown legacy registrations are retained too, rather than guessed safe.
+        foreach (var device in devices.Values)
+        {
+            var registration = device.RegistryPartition is { } registry && registrations is not null
+                ? await registrations.ReadAsync(registry, device.DeviceId, ct) : null;
+            if (registration is null || !registration.Revoked && registration.ExpiresAt > clock.GetUtcNow()) return 0;
+        }
+        var candidates = new List<TaskSnapshot>();
+        do
+        {
+            var page = await documents.ReadPageAsync<TaskSnapshot>(partition, "task:", continuation, 64, ct);
+            candidates.AddRange(page.Items.Select(x => x.Value).Where(task =>
+                !stored.Value.Tasks.ContainsKey(task.Id) &&
+                task.Deletion is { } deletion && deletion.DeletedAt <= clock.GetUtcNow().AddDays(-120) &&
+                (deletion.Purging || task.DeletionVersion <= stored.Value.PrunedThrough)).Take(32 - candidates.Count));
+            continuation = page.Continuation;
+        } while (continuation is not null && candidates.Count < 32);
+        if (candidates.Count == 0) return 0;
+        var next = Advance(stored.Value);
+        var purge = candidates.Where(t => t.Deletion!.Purging).Select(t => t.Id).ToImmutableArray();
+        var marked = candidates.Where(t => !t.Deletion!.Purging)
+            .Select(t => t with { Deletion = t.Deletion! with { Purging = true }, DeletionVersion = next.Revision }).ToImmutableArray();
+        next = next with {
+            TaskCount = next.TaskCount - purge.Length,
+            RootOrder = next.RootOrder?.RemoveRange(purge),
+            Changes = [new(next.Revision, marked, clock.GetUtcNow(), PurgedTaskIds: purge,
+                RetainedCompletions: candidates.Where(t => purge.Contains(t.Id) && t.FirstCompletion is not null)
+                    .Select(t => t.FirstCompletion!).ToImmutableArray())],
+        };
+        return await documents.CommitWorkspaceAsync(stored, next, ct, purge.Select(WorkspaceCommit.TaskId).ToArray())
+            ? candidates.Count : 0;
     }
 }

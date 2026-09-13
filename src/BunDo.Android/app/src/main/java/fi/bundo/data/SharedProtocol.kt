@@ -121,6 +121,11 @@ internal object SharedProtocol {
     }
 
     fun validateTask(task: JSONObject, revision: ULong) {
+        if (task.optString("entityType") == "PURGED_TASK") {
+            require(UUID.fromString(task.getString("id")).toString() == task.getString("id"))
+            require(task.decimal("version") in 1uL..revision)
+            return
+        }
         if (task.optString("id") == SharedTaskActions.ORDER_ID) {
             require(task.getString("entityType") == "ROOT_ORDER" && task.decimal("version") in 1uL..revision)
             val ids = task.getJSONArray("taskIds")
@@ -137,6 +142,11 @@ internal object SharedProtocol {
             require(human > 0u && human <= field && field <= revision)
         }
         require(task.decimal("deletionVersion") in 1uL..revision)
+        task.optJSONObject("deletion")?.let {
+            require(it.getString("groupId").isNotBlank())
+            Instant.parse(it.getString("deletedAt"))
+            it.getBoolean("purging")
+        }
         for (group in SharedTaskActions.groups - "deletion")
             require(SharedTaskActions.version(task, group).toULong() <= revision)
         require(task.optString("lifecycle", "OPEN") in listOf("OPEN", "COMPLETED", "CANCELLED"))
@@ -147,7 +157,12 @@ internal object SharedProtocol {
         }
     }
 
-    fun containsEffect(current: JSONObject?, effect: JSONObject): Boolean = current != null &&
+    fun containsEffect(current: JSONObject?, effect: JSONObject): Boolean {
+        if (current?.optString("entityType") == "PURGED_TASK")
+            return current.getString("id") == effect.getString("id") &&
+                (SharedTaskActions.groups.map { SharedTaskActions.version(effect, it).toULong() } +
+                    listOf(effect.field("title"), effect.field("description"))).all { it < current.decimal("version") }
+        return current != null &&
         listOf("title", "description").all { group ->
             current.field(group) >= effect.field(group) &&
                 (current.field(group) != effect.field(group) || current.nullableString(group) == effect.nullableString(group))
@@ -157,9 +172,11 @@ internal object SharedProtocol {
             val fields = when (group) {
                 "lifecycle" -> listOf("lifecycle", "lifecycleActorId", "lifecycleAt")
                 "claim" -> listOf("claimantId")
+                "deletion" -> listOf("deletion")
                 else -> emptyList()
             }
             actual >= expected && (actual > expected || fields.all { sameJson(current.opt(it), effect.opt(it)) })
         } && (effect.optJSONObject("firstCompletion") == null ||
             sameJson(current.optJSONObject("firstCompletion"), effect.getJSONObject("firstCompletion")))
+    }
 }

@@ -92,6 +92,8 @@ fun InboxApp(
     queueTasks: List<InboxTask>? = null,
     rowSummary: (@Composable (String) -> Unit)? = null,
     taskControls: (@Composable (String) -> Unit)? = null,
+    canEditTask: (String) -> Boolean = { true },
+    snackbarHost: @Composable () -> Unit = {},
 ) {
     var settings by rememberSaveable { mutableStateOf(false) }
     var showVoice by rememberSaveable { mutableStateOf(false) }
@@ -112,6 +114,7 @@ fun InboxApp(
         val short = maxHeight < 480.dp
         val gutter = if (maxWidth < 600.dp) 16.dp else 24.dp
         Scaffold(
+            snackbarHost = snackbarHost,
             topBar = {
                 TopAppBar(
                     title = {
@@ -162,7 +165,7 @@ fun InboxApp(
                     settings -> Settings(appearance, onAppearance, Modifier.align(Alignment.TopCenter).widthIn(max = 640.dp).fillMaxWidth(), queueTitle == null)
                     selected != null && !wide -> TaskDetail(
                         selected, { model.openEditor(selected.id) }, state, model::retry, Modifier.fillMaxSize(), queueTitle == null,
-                        taskControls,
+                        taskControls, canEdit && canEditTask(selected.id),
                     )
                     else -> Row(Modifier.fillMaxSize()) {
                         Queue(
@@ -180,7 +183,7 @@ fun InboxApp(
                             modifier = if (wide && selected != null) Modifier.width(360.dp) else Modifier.weight(1f),
                         )
                         if (wide && selected != null) {
-                            TaskDetail(selected, { model.openEditor(selected.id) }, state, model::retry, Modifier.weight(1f), queueTitle == null, taskControls)
+                            TaskDetail(selected, { model.openEditor(selected.id) }, state, model::retry, Modifier.weight(1f), queueTitle == null, taskControls, canEdit && canEditTask(selected.id))
                         }
                     }
                 }
@@ -376,6 +379,7 @@ private fun FieldCount(value: String, limit: Int) {
 private fun TaskDetail(
     task: InboxTask, onEdit: () -> Unit, state: InboxUiState, onRetry: () -> Unit, modifier: Modifier, localOnly: Boolean,
     controls: (@Composable (String) -> Unit)? = null,
+    editable: Boolean = true,
 ) {
     var original by rememberSaveable(task.id) { mutableStateOf(false) }
     Column(
@@ -387,7 +391,7 @@ private fun TaskDetail(
         controls?.invoke(task.id)
         if (localOnly) Text(stringResource(R.string.local_only), style = MaterialTheme.typography.labelLarge)
         Text(task.description.ifEmpty { stringResource(R.string.no_description) }, style = MaterialTheme.typography.bodyLarge)
-        Button(onClick = onEdit, enabled = !state.working, modifier = Modifier.heightIn(min = 48.dp).testTag("edit")) {
+        Button(onClick = onEdit, enabled = editable && !state.working, modifier = Modifier.heightIn(min = 48.dp).testTag("edit")) {
             Text(stringResource(R.string.edit_task))
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)

@@ -13,6 +13,10 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
@@ -56,7 +60,12 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
     val byId = taskStates.associateBy { it.getString("id") }
     val membership = current?.membership?.let(::JSONObject)
     var history by rememberSaveable(selected.scope) { mutableStateOf(false) }
-    val queueRows = taskStates.filter { (it.optString("lifecycle", "OPEN") != "OPEN") == history }
+    var deleted by rememberSaveable(selected.scope) { mutableStateOf(false) }
+    val snackbar = remember(selected.scope) { SnackbarHostState() }
+    val deletedMessage = stringResource(R.string.task_deleted)
+    val undoLabel = stringResource(R.string.task_undo)
+    val queueRows = taskStates.filter { if (deleted) !it.isNull("deletion")
+        else it.isNull("deletion") && (it.optString("lifecycle", "OPEN") != "OPEN") == history }
         .let { rows -> if (history) rows.sortedByDescending { it.optString("lifecycleAt") } else rows }
         .map(SharedProtocol::inbox)
     var imports by remember { mutableStateOf<List<RecoveryText>?>(null) }
@@ -89,21 +98,34 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
     }
     InboxApp(state, model, appearance, onAppearance, onAccount = onAccount, queueTitle = selected.name,
         canEdit = current?.blocked == null, queueTasks = queueRows,
+        canEditTask = { id -> byId[id]?.isNull("deletion") == true },
+        snackbarHost = { SnackbarHost(snackbar) },
         rowSummary = { id -> byId[id]?.let { SharedTaskSummary(it, membership) } },
         taskControls = { id -> byId[id]?.let { task ->
             SharedTaskControls(task, taskStates, membership, !busy && current?.blocked == null && recovery == null, failed) { action ->
                 run {
-                    repository.act(action.kind, action.displayed, action.confirmedClaimant, action.after, action.before)
+                    val sequence = repository.act(action.kind, action.displayed, action.confirmedClaimant, action.after, action.before)
                     SharedSyncWorker.request(context, data)
+                    if (action.kind == "DeleteTask") scope.launch {
+                        snackbar.currentSnackbarData?.dismiss()
+                        if (snackbar.showSnackbar(deletedMessage, undoLabel, withDismissAction = true,
+                                duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) run {
+                            repository.undoDelete(JSONObject(action.displayed).getString("id"), sequence)
+                            SharedSyncWorker.request(context, data)
+                        }
+                    }
                 }
             }
         } },
         queueHeader = {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-            FilterChip(selected = !history, onClick = { history = false }, modifier = Modifier.testTag("task-active-view"),
+            FilterChip(selected = !history && !deleted, onClick = { history = false; deleted = false }, modifier = Modifier.testTag("task-active-view"),
                 label = { Text(stringResource(R.string.task_active_view)) })
-            FilterChip(selected = history, onClick = { history = true }, modifier = Modifier.testTag("task-history-view"),
+            FilterChip(selected = history && !deleted, onClick = { history = true; deleted = false }, modifier = Modifier.testTag("task-history-view"),
                 label = { Text(stringResource(R.string.task_history_view)) })
+            FilterChip(selected = deleted, onClick = { deleted = true }, modifier = Modifier.testTag("task-deleted-view"),
+                label = { Text(stringResource(R.string.task_deleted_view)) })
+            if (deleted) Text(stringResource(if (queueRows.isEmpty()) R.string.task_deleted_empty else R.string.task_deleted_retention))
             recovery?.let { recovering ->
                 Text(stringResource(if (recovering.problem == "STORAGE_REQUIRED") R.string.shared_storage_required
                     else if (recovering.problem != null) R.string.shared_recovery_paused else R.string.shared_rebuilding))
@@ -169,7 +191,8 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
                 if (intent.taskAction != null) Text(stringResource(taskActionLabel(intent.kind)))
                 Text(stringResource(when (intent.problem) {
                     "CLAIM_CONFLICT", "ALREADY_CLAIMED", "CLAIM_CONFIRMATION_REQUIRED", "CLAIM_NOT_YOURS" -> R.string.task_claim_conflict
-                    "LIFECYCLE_CONFLICT", "HIERARCHY_CONFLICT", "ORDER_CONFLICT", "TASK_NOT_OPEN" -> R.string.task_state_conflict
+                    "LIFECYCLE_CONFLICT", "HIERARCHY_CONFLICT", "ORDER_CONFLICT", "TASK_NOT_OPEN", "TASK_NOT_DELETED" -> R.string.task_state_conflict
+                    "TASK_DELETED", "TASK_PURGING" -> R.string.task_deleted_conflict
                     "FIELD_CONFLICT", "DELETION_CONFLICT" -> R.string.shared_conflict_reason
                     "TASK_LIMIT" -> R.string.shared_limit_reason
                     "BLOCKED_DEPENDENCY" -> R.string.shared_dependency_reason
@@ -184,12 +207,13 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
                     SharedTaskSummary(task, membership)
                 } else Text(stringResource(R.string.shared_missing))
                 val terminal = intent.status in listOf("REJECTED", "BLOCKED_DEPENDENCY", "QUARANTINED")
-                if (shared != null && intent.kind == "EditTask" && terminal) TextButton(
+                if (shared != null && JSONObject(shared).isNull("deletion") && intent.kind == "EditTask" && terminal) TextButton(
                     enabled = !busy && current?.blocked == null && recovery == null,
                     onClick = { reapply = intent.sequence to shared }) {
                     Text(stringResource(R.string.shared_reapply))
                 }
-                if (intent.taskAction == null) TextButton(enabled = !busy && current?.blocked == null && terminal, onClick = { run {
+                if (intent.taskAction == null || shared == null || !JSONObject(shared).isNull("deletion"))
+                    TextButton(enabled = !busy && current?.blocked == null && terminal, onClick = { run {
                     repository.copyText(intent.title, intent.description.orEmpty())
                     showProblems = false
                     SharedSyncWorker.request(context, data)

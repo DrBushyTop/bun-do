@@ -78,4 +78,14 @@
     <string name="voice_exported">Audio exported.</string>
     <string name="voice_cleanup_pending">Text is saved, but audio cleanup failed. Delete the recording below.</string>
     <string name="voice_failed">Speech could not finish. Your typed work is safe. Retry, or export any saved recording below.</string>
+    <string name="task_delete">Delete task</string>
+    <string name="task_restore">Restore task</string>
+    <string name="task_undo">Undo</string>
+    <string name="task_deleted">Task deleted</string>
+    <string name="task_deleted_view">Deleted tasks</string>
+    <string name="task_deleted_empty">No deleted tasks to restore.</string>
+    <string name="task_deleted_retention">Deleted tasks remain restorable for at least 120 days.</string>
+    <string name="task_restore_explanation">Restore keeps the previous task status and snooze, without a claim.</string>
+    <string name="task_purging">This task is being permanently removed and can no longer be restored.</string>
+    <string name="task_deleted_conflict">The task was deleted. Your text is saved here and can be copied to a new task.</string>
 </resources>

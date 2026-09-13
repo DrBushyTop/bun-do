@@ -6,7 +6,7 @@ namespace BunDo.Domain;
 public static class RootOrdering
 {
     public static ImmutableArray<string> Current(WorkspaceState state) => state.RootOrder ??
-        state.Tasks.Values.Where(t => t.Lifecycle == "OPEN")
+        state.Tasks.Values.Where(t => t.Lifecycle == "OPEN" && t.Deletion is null)
             .OrderBy(t => t.Capture?.ReceivedAt ?? DateTimeOffset.MinValue)
             .ThenBy(t => t.Id, StringComparer.Ordinal).Select(t => t.Id).ToImmutableArray();
 

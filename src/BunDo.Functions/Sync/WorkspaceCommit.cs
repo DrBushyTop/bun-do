@@ -28,6 +28,9 @@ public sealed record WorkspaceCommit(WorkspaceState Metadata, IReadOnlyList<Work
             throw new ArgumentException("Invalid maintenance deletion set.");
         var writes = new List<WorkspaceWrite> { new(GroupId(next.Revision), group, true) };
         foreach (var task in group.Tasks) writes.Add(new(TaskId(task.Id), task, false));
+        // Completion credit outlives task content and remains available to household statistics.
+        foreach (var completion in group.RetainedCompletions ?? [])
+            writes.Add(new($"completion:{completion.RootId}", completion, true));
         foreach (var receipt in next.Receipts.Values.Where(x => x.EffectRevision == next.Revision))
             writes.Add(new(ReceiptId(receipt.OperationId), receipt, true));
         foreach (var device in next.Devices.Values)

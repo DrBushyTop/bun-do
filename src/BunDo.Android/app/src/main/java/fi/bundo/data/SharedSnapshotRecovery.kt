@@ -270,6 +270,7 @@ internal class SharedSnapshotRecovery(
                 val dependency = intent.afterSequence?.let { seq -> intents.find { it.sequence == seq } }
                 problem = when {
                     dependency?.status in listOf("QUARANTINED", "REJECTED", "BLOCKED_DEPENDENCY") -> "BLOCKED_DEPENDENCY"
+                    !task.isNull("deletion") -> "TASK_DELETED"
                     task.decimal("deletionVersion").toString() != (intent.deletionAfterSequence?.let { seq ->
                         intents.find { it.sequence == seq }?.receipt?.let(::JSONObject)?.optJSONObject("task")?.decimal("deletionVersion")?.toString()
                     } ?: intent.observedDeletion) -> "STALE_LIFECYCLE"

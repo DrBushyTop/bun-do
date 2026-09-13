@@ -79,4 +79,14 @@
     <string name="voice_exported">Äänitiedosto viety.</string>
     <string name="voice_cleanup_pending">Teksti on tallennettu. Äänitiedoston poisto ei onnistunut. Poista se alla olevalla painikkeella.</string>
     <string name="voice_failed">Puheen käsittely ei onnistunut. Kirjoitetut tehtäväsi ovat tallessa. Yritä uudelleen tai vie tallennettu äänitys alta.</string>
+    <string name="task_delete">Poista tehtävä</string>
+    <string name="task_restore">Palauta tehtävä</string>
+    <string name="task_undo">Kumoa</string>
+    <string name="task_deleted">Tehtävä poistettu</string>
+    <string name="task_deleted_view">Poistetut tehtävät</string>
+    <string name="task_deleted_empty">Ei palautettavia tehtäviä.</string>
+    <string name="task_deleted_retention">Poistetut tehtävät voi palauttaa vähintään 120 päivän ajan.</string>
+    <string name="task_restore_explanation">Palautus säilyttää aiemman tilan ja lykkäyksen mutta poistaa varauksen.</string>
+    <string name="task_purging">Tehtävää poistetaan pysyvästi, eikä sitä voi enää palauttaa.</string>
+    <string name="task_deleted_conflict">Tehtävä poistettiin. Tekstisi on tallessa tässä, ja sen voi kopioida uuteen tehtävään.</string>
 </resources>

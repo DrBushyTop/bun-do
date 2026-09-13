@@ -70,6 +70,27 @@ class SharedRecoveryUiTest {
         bitmap.recycle()
     }
 
+    @Test fun rejectedRestoreAfterPurgeOffersANewCopyWithoutReplayingRestore() {
+        val (data, state) = fixture(false, "light")
+        runBlocking {
+            val dao = data.database.shared()
+            val intent = dao.intents(state.scope).single()
+            dao.saveIntent(intent.copy(kind = "RestoreTask", taskAction = "{}", problem = "ENTITY_MISSING"))
+            dao.saveBase(SharedBase(state.scope, intent.taskId, JSONObject().put("id", intent.taskId)
+                .put("entityType", "PURGED_TASK").put("version", "3").toString()))
+            dao.deleteProjectionTask(state.scope, state.projectionGeneration, intent.taskId)
+        }
+        compose.onNodeWithTag("shared-recovery").performClick()
+        compose.onNodeWithText(text(R.string.shared_copy_new)).performScrollTo().performClick()
+        compose.waitUntil(10_000) { runBlocking { data.database.shared().intents(state.scope).size == 2 } }
+        val intents = runBlocking { data.database.shared().intents(state.scope) }
+        assertEquals("RestoreTask", intents[0].kind)
+        assertEquals("REJECTED", intents[0].status)
+        assertEquals("CreateTask", intents[1].kind)
+        assertNotEquals(intents[0].taskId, intents[1].taskId)
+        assertEquals("Oma muistiinpano", intents[1].description)
+    }
+
     @Test fun lowStorageKeepsQueueAndOffersExportAndSystemCleanup() {
         fixture(true, "light")
         compose.waitUntil(10_000) {

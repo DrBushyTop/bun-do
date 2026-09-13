@@ -203,6 +203,112 @@ class SharedTaskActionsTest {
         assertFalse(SharedProtocol.containsEffect(later, effect))
     }
 
+    @Test fun offlineDeleteUndoAndRetryKeepExactDeletionDependenciesAcrossRestart() = runBlocking {
+        fixture { db, state, repository ->
+            val task = task("Dishes").put("description", "Keep the draft")
+            val first = repository.prepare(1000, 1)!!
+            repository.apply(first, reply(first, listOf(task, order(task.getString("id")))))
+            val sequence = repository.act("DeleteTask", task.toString())
+            assertFalse(repository.taskStates.first().single().isNull("deletion"))
+            repository.undoDelete(task.getString("id"), sequence)
+            assertTrue(repository.taskStates.first().single().isNull("deletion"))
+            val request = repository.prepare(1001, 1)!!
+            val deleted = JSONObject(task.toString()).put("deletionVersion", "2")
+                .put("deletion", deletion("${state.registration}:$sequence"))
+            repository.apply(request, reply(request, listOf(deleted), receipt(request, deleted)))
+            val restore = repository.prepare(1002, 1)!!
+            val wire = JSONObject(restore.envelope!!)
+            assertEquals("RestoreTask", wire.getString("command"))
+            assertEquals("2", wire.getJSONObject("observedVersions").getJSONObject("deletion").getString("fieldVersion"))
+            val name = checkNotNull(db.openHelper.databaseName)
+            db.close()
+            val reopened = InboxDatabase.open(context, name)
+            try {
+                val restarted = SharedRepository(reopened, DataLease(), state.scope, state.registration)
+                assertEquals(restore.envelope, restarted.prepare(100_000, 2)!!.envelope)
+                assertTrue(restarted.taskStates.first().single().isNull("deletion"))
+                assertTrue(restarted.problems.first().isEmpty())
+            } finally { reopened.close() }
+        }
+    }
+
+    @Test fun remoteDeletionPreservesEditorAndRejectedTextAndPurgeAllowsCopyWithNewIdentity() = runBlocking {
+        fixture { db, state, repository ->
+            val task = task("Dishes")
+            val id = task.getString("id")
+            val first = repository.prepare(1000, 1)!!
+            repository.apply(first, reply(first, listOf(task, order(id))))
+            val draft = repository.draft(id).copy(title = "My unsaved title", description = "My notes")
+            repository.saveDraft(draft)
+            val poll = repository.prepare(1001, 1)!!
+            val deleted = JSONObject(task.toString()).put("deletionVersion", "2").put("deletion", deletion("remote:1"))
+            repository.apply(poll, reply(poll, listOf(deleted)))
+            assertEquals("My unsaved title", repository.draft(id).title)
+            repository.commit(draft)
+            assertEquals("Dishes", repository.taskStates.first().single().getString("title"))
+            assertEquals("TASK_DELETED", repository.problems.first().single().problem)
+            val edit = repository.prepare(1002, 1)!!
+            repository.apply(edit, reply(edit, emptyList(), receipt(edit, deleted, "DELETION_CONFLICT")))
+            assertEquals("My unsaved title", repository.problems.first().single().title)
+            val purge = repository.prepare(1003, 1)!!
+            val marker = JSONObject().put("id", id).put("entityType", "PURGED_TASK").put("version", "4")
+            repository.apply(purge, reply(purge, listOf(marker)))
+            assertTrue(repository.taskStates.first().isEmpty())
+            val recovered = repository.copyText("My unsaved title", "My notes")
+            assertNotEquals(id, recovered)
+            assertEquals("My unsaved title", repository.tasks.first().single().title)
+            assertEquals("My notes", db.shared().intents(state.scope).first().description)
+        }
+    }
+
+    @Test fun undoAfterSyncRestoresOnlyTheDeletionThatProducedTheUndo() = runBlocking {
+        fixture { _, state, repository ->
+            val task = task("Dishes")
+            val first = repository.prepare(1000, 1)!!
+            repository.apply(first, reply(first, listOf(task, order(task.getString("id")))))
+            val sequence = repository.act("DeleteTask", task.toString())
+            val request = repository.prepare(1001, 1)!!
+            val deleted = JSONObject(task.toString()).put("deletionVersion", "2").put("deletion", deletion("${state.registration}:$sequence"))
+            repository.apply(request, reply(request, listOf(deleted), receipt(request, deleted)))
+            repository.undoDelete(task.getString("id"), sequence)
+            assertTrue(repository.taskStates.first().single().isNull("deletion"))
+            val restore = repository.prepare(1002, 1)!!
+            val restored = JSONObject(task.toString()).put("deletionVersion", "3")
+            repository.apply(restore, reply(restore, listOf(restored), receipt(restore, restored)))
+            val poll = repository.prepare(1003, 1)!!
+            val again = JSONObject(task.toString()).put("deletionVersion", "4").put("deletion", deletion("remote:2"))
+            repository.apply(poll, reply(poll, listOf(again)))
+            assertTrue(runCatching { repository.undoDelete(task.getString("id"), sequence) }.isFailure)
+            assertFalse(repository.taskStates.first().single().isNull("deletion"))
+        }
+    }
+
+    @Test fun purgeMarkerRetiresAcceptedReceiptsAcrossLaterPullsWithoutResurrectingContent() = runBlocking {
+        fixture { _, state, repository ->
+            val id = repository.copyText("Old capture", "")
+            val create = repository.prepare(1000, 1)!!
+            val created = task("Old capture").put("id", id).put("description", "")
+            repository.apply(create, reply(create, listOf(created, order(id)), receipt(create, created)))
+            val sequence = repository.act("DeleteTask", created.toString())
+            val delete = repository.prepare(1001, 1)!!
+            val deleted = JSONObject(created.toString()).put("deletionVersion", "2")
+                .put("deletion", deletion("${state.registration}:$sequence"))
+            repository.apply(delete, reply(delete, listOf(deleted), receipt(delete, deleted)))
+            val poll = repository.prepare(1002, 1)!!
+            repository.apply(poll, reply(poll, listOf(JSONObject().put("id", id)
+                .put("entityType", "PURGED_TASK").put("version", "3"))))
+            assertTrue(repository.tasks.first().isEmpty())
+            assertFalse(repository.canonical.first().containsKey(id))
+            val later = repository.prepare(1003, 1)!!
+            repository.apply(later, reply(later, emptyList()))
+            assertTrue(repository.tasks.first().isEmpty())
+            assertTrue(repository.problems.first().isEmpty())
+        }
+    }
+
+    private fun deletion(group: String) = JSONObject().put("groupId", group)
+        .put("deletedAt", "2026-09-13T12:00:00Z").put("purging", false)
+
     private fun receipt(request: SharedRequest, task: JSONObject, code: String = "ACCEPTED"): JSONObject {
         val wire = JSONObject(request.envelope!!)
         return JSONObject().put("operationId", "${request.workspace.registration}:${wire.getString("sequence")}")

@@ -18,6 +18,8 @@ public sealed record CompleteTask(string TaskId, TaskStateVersions Expected, Gui
     : TaskTransition(TaskId, Expected);
 public sealed record ReopenTask(string TaskId, TaskStateVersions Expected) : TaskTransition(TaskId, Expected);
 public sealed record CancelTask(string TaskId, TaskStateVersions Expected) : TaskTransition(TaskId, Expected);
+public sealed record DeleteTask(string TaskId, TaskStateVersions Expected) : TaskTransition(TaskId, Expected);
+public sealed record RestoreTask(string TaskId, TaskStateVersions Expected) : TaskTransition(TaskId, Expected);
 public sealed record MoveTask(string TaskId, ulong ExpectedOrderVersion, ulong ExpectedDeletionVersion,
     string? ExpectedParentId = null, string? AfterTaskId = null, string? BeforeTaskId = null) : TaskCommand;
 public sealed record DiscardBlockedIntent(ulong RejectedDependencySequence) : TaskCommand;
@@ -64,6 +66,8 @@ public sealed class FrozenOperation
             CompleteTask => "CompleteTask",
             ReopenTask => "ReopenTask",
             CancelTask => "CancelTask",
+            DeleteTask => "DeleteTask",
+            RestoreTask => "RestoreTask",
             MoveTask => "MoveTask",
             DiscardBlockedIntent => "DiscardBlockedIntent",
             _ => throw new ArgumentException("Unsupported model command.", nameof(command))

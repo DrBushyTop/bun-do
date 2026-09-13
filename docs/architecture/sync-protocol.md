@@ -89,6 +89,13 @@ An expired client preserves its old base and pending intents as recovery materia
 
 Task purge is separate from receipt pruning. Retain a task deletion group for at least 120 days after its latest member deletion, until no live valid device can submit a pre-deletion command and no snapshot pin needs its tombstones. Mark the group `PURGING` in one revisioned command, making restore reject. Delete its owned capture content in chunks of at most 32 items, then remove task documents and order entries in a bounded final command with purge markers. Persist the cleanup cursor; retries are idempotent. Already separately deleted descendants retain their own groups and cannot be purged through an active ancestor group's restore.
 
+Leaf purge deliberately waits while any installation registered with the workspace
+is still valid. Unknown legacy registration state also blocks purge. This is
+conservative because the server does not yet track whether each installation
+has observed a deletion. Retention is a minimum recovery guarantee, not a promise
+of immediate erasure when that minimum expires. Active households may retain
+deleted tasks longer. Snapshot pins still fence both purge stages.
+
 If a retained deleted descendant depends on an ancestor scheduled for purge, wait until all descendant deletion groups are independently eligible, then mark the whole bounded subtree purging. No live child may be orphaned. The new-entity ID rule prevents reuse of purged IDs without storing full tombstones forever. Cross-task prerequisites are outside v1. Activity retains only IDs and permitted summary metadata after content purge.
 
 ## Stable bootstrap and stale cursors

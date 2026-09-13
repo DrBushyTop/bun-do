@@ -193,6 +193,11 @@ public sealed record SyncGroup(ulong Revision, int PartCount, SyncPart[] Parts, 
     {
         var entities = group.Tasks.Select(t => (object)t).ToList();
         var ids = group.Tasks.Select(t => t.Id).ToList();
+        foreach (var id in group.PurgedTaskIds ?? [])
+        {
+            entities.Add(new { id, entityType = "PURGED_TASK", version = group.Revision });
+            ids.Add(id);
+        }
         if (group.RootOrder is { } order)
         {
             entities.Add(new { id = "root-order", entityType = "ROOT_ORDER", taskIds = order, version = group.Revision });
