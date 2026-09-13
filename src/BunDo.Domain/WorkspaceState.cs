@@ -23,7 +23,9 @@ public sealed record WorkspaceState(
     ImmutableDictionary<Guid, DeviceRegistration> Devices,
     ImmutableDictionary<string, TaskSnapshot> Tasks,
     ImmutableDictionary<string, OperationReceipt> Receipts,
-    ImmutableArray<ChangeGroup> Changes);
+    ImmutableArray<ChangeGroup> Changes,
+    HouseholdMembership Membership,
+    string Name = "Household");
 
 /// <summary>The transaction seam; a failed compare-and-swap must have no effects.</summary>
 public interface IWorkspaceStore
@@ -38,12 +40,13 @@ public sealed class InMemoryWorkspaceStore : IWorkspaceStore
     private readonly object gate = new();
     private WorkspaceState state;
 
-    public InMemoryWorkspaceStore(Guid workspaceId, Guid stateEpoch, IEnumerable<DeviceRegistration> devices)
+    public InMemoryWorkspaceStore(Guid workspaceId, Guid stateEpoch, HouseholdMembership membership,
+        IEnumerable<DeviceRegistration> devices)
     {
         state = new(workspaceId, stateEpoch, 0,
             devices.ToImmutableDictionary(x => x.DeviceId),
             ImmutableDictionary<string, TaskSnapshot>.Empty,
-            ImmutableDictionary<string, OperationReceipt>.Empty, []);
+            ImmutableDictionary<string, OperationReceipt>.Empty, [], membership);
     }
 
     public WorkspaceState Read()

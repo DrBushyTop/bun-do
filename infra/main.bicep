@@ -13,6 +13,9 @@ param resourceGroupName string = 'rg-bun-do-dev-swc'
 @description('Dedicated Bun Do API application ID for Microsoft access tokens.')
 param identityAudience string
 
+@description('Semicolon-separated SHA-256 signing certificate fingerprints for Android App Links.')
+param androidSigningCertificates string = ''
+
 param lunaModel string
 param lunaVersion string
 @allowed(['DataZoneStandard', 'GlobalStandard'])
@@ -87,6 +90,7 @@ module backendHosting 'modules/backend-hosting.bicep' = {
   params: {
     appName: 'func-bun-do-dev-${uniqueString(subscription().subscriptionId, resourceGroupName)}'
     identityAudience: identityAudience
+    androidSigningCertificates: androidSigningCertificates
     insightsName: observability.outputs.insightsName
     telemetryConnectionString: observability.outputs.connectionString
     runtimeStorageName: 'stbundohost${uniqueString(subscription().subscriptionId, resourceGroupName)}'

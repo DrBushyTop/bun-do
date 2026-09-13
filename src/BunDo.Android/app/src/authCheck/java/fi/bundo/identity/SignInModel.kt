@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import fi.bundo.BunDoApplication
 import fi.bundo.data.AccountStore
+import fi.bundo.data.AccountData
 
 /** Both providers use the same API-validated identity and request-generation guard. */
 class SignInModel internal constructor(
@@ -43,6 +44,27 @@ class SignInModel internal constructor(
     var registrationChoices by mutableStateOf<List<String>>(emptyList())
         private set
     private var ready = false
+
+    /** Network features share this provider and the account generation, never a second sign-in session. */
+    suspend fun <T> withAccountToken(data: AccountData, operation: suspend (String, String) -> T): T {
+        check(ready && hasAccount && !busy)
+        val identity = checkNotNull(data.identity)
+        val registration = checkNotNull(data.registrationId)
+        val request = session.beginRefresh()
+        fun checkCurrent() {
+            data.lease.check()
+            if (!session.isCurrent(request) || accounts?.active?.value !== data || request.expected != identity)
+                throw CancellationException("Account session ended")
+        }
+        checkCurrent()
+        val token = provider.refresh()
+        checkCurrent()
+        check(verifyIdentity(token) == identity) { "Account changed during refresh" }
+        checkCurrent()
+        val result = operation(token, registration)
+        checkCurrent()
+        return result
+    }
 
     init {
         viewModelScope.launch {

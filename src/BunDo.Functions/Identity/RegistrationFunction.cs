@@ -10,7 +10,7 @@ public sealed class RegistrationFunction(AccessTokens tokens, IServiceProvider s
 {
     [Function("RegisterInstallation")]
     public async Task<IActionResult> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "identity/registrations")] HttpRequest request)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "api/identity/registrations")] HttpRequest request)
     {
         request.HttpContext.Response.Headers.CacheControl = "no-store";
         var headers = request.Headers.Authorization;

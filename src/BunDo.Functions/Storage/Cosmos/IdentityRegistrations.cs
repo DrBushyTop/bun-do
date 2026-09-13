@@ -23,12 +23,32 @@ public sealed class IdentityRegistrations(Container container) : IRegistrationSt
                 UseSystemTextJsonSerializerWithOptions = new JsonSerializerOptions(),
                 ConnectionMode = ConnectionMode.Gateway,
             }));
+        services.AddSingleton<BunDo.Functions.Households.IHouseholdDocuments>(provider => new HouseholdDocuments(
+            provider.GetRequiredService<CosmosClient>().GetContainer(
+                configuration["WorkspaceStore:DatabaseName"], configuration["WorkspaceStore:ContainerName"])));
+        services.AddSingleton(provider => new BunDo.Functions.Households.HouseholdService(
+            provider.GetRequiredService<BunDo.Functions.Households.IHouseholdDocuments>(),
+            invitationUrl: BunDo.Functions.Households.InvitationLinks.HttpsJoinUrl));
         services.AddSingleton<IRegistrationStore>(provider => new IdentityRegistrations(
             provider.GetRequiredService<CosmosClient>().GetContainer(
                 configuration["WorkspaceStore:DatabaseName"], configuration["WorkspaceStore:ContainerName"])));
     }
 
     private sealed record Registry(string id, string workspaceId, InstallationRegistration[] Records);
+
+    public async Task<bool> IsActiveAsync(AccountIdentity identity, Guid registrationId, CancellationToken cancellationToken)
+    {
+        var partition = "identity:" + Convert.ToHexString(
+            SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(identity))));
+        try
+        {
+            var read = await container.ReadItemAsync<Registry>("registrations", new PartitionKey(partition),
+                cancellationToken: cancellationToken);
+            return read.Resource.Records.Any(x =>
+                x.RegistrationId == registrationId && !x.Revoked && x.ExpiresAt > DateTimeOffset.UtcNow);
+        }
+        catch (CosmosException error) when (error.StatusCode == HttpStatusCode.NotFound) { return false; }
+    }
 
     public async Task<RegistrationDecision> RegisterAsync(AccountIdentity identity, Guid installationId,
         Guid? revoke, CancellationToken cancellationToken)

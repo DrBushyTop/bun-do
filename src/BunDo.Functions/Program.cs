@@ -22,6 +22,11 @@ if (!string.IsNullOrWhiteSpace(cosmosEndpoint))
 else if (builder.Configuration["AZURE_FUNCTIONS_ENVIRONMENT"] == "Development"
     && string.IsNullOrEmpty(builder.Configuration["WEBSITE_INSTANCE_ID"]))
 {
+    builder.Services.AddSingleton<BunDo.Functions.Households.IHouseholdDocuments>(
+        new BunDo.Functions.Identity.Development.LocalHouseholdDocuments(
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "BunDo", "local-households")));
+    builder.Services.AddSingleton<BunDo.Functions.Households.HouseholdService>();
     builder.Services.AddSingleton<BunDo.Functions.Identity.IRegistrationStore>(
         new BunDo.Functions.Identity.Development.LocalRegistrationStore(
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

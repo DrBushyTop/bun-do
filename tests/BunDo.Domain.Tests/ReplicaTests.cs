@@ -24,14 +24,14 @@ public sealed class ReplicaTests
         Assert.Equal("Edited while the response was lost", a.Find(id)!.Title);
         a.Receive(server.Handle(Member, create).Receipt!);
         Assert.Equal("Edited while the response was lost", a.Find(id)!.Title);
-        a.Apply(server.Pull(a.Cursor));
+        a.Apply(server.Pull(Member, a.Cursor));
         Assert.Equal("Edited while the response was lost", a.Find(id)!.Title);
         var edit = a.NextSubmission()!;
         Assert.Equal(2UL, edit.Sequence);
         Assert.Equal(1UL, ((EditTask)edit.Command).Title!.ExpectedHumanVersion);
         a.Receive(server.Handle(Member, edit).Receipt!);
-        a.Apply(server.Pull(a.Cursor));
-        b.Apply(server.Pull(b.Cursor));
+        a.Apply(server.Pull(Member, a.Cursor));
+        b.Apply(server.Pull(Member, b.Cursor));
 
         Assert.Equal(a.Find(id), b.Find(id));
         Assert.Equal("Edited while the response was lost", b.Find(id)!.Title);
@@ -50,14 +50,14 @@ public sealed class ReplicaTests
         var b = new LocalReplica(Workspace, Epoch, DeviceB);
         var id = a.Capture("Original");
         Send(server, a);
-        b.Apply(server.Pull(0));
+        b.Apply(server.Pull(Member, 0));
         a.EditTitle(id, "A's offline title");
         b.EditTitle(id, "B's offline title");
 
         Send(server, bFirst ? b : a);
         Send(server, bFirst ? a : b);
-        a.Apply(server.Pull(a.Cursor));
-        b.Apply(server.Pull(b.Cursor));
+        a.Apply(server.Pull(Member, a.Cursor));
+        b.Apply(server.Pull(Member, b.Cursor));
 
         Assert.Equal(a.Find(id), b.Find(id));
         Assert.Equal(bFirst ? "B's offline title" : "A's offline title", a.Find(id)!.Title);
@@ -101,7 +101,7 @@ public sealed class ReplicaTests
         var a = new LocalReplica(Workspace, Epoch, DeviceA);
         var id = a.Capture("Keep local text");
         server.Handle(Member, a.NextSubmission()!);
-        var valid = server.Pull(0);
+        var valid = server.Pull(Member, 0);
         var invalid = defect switch
         {
             "gap" => valid with { Groups = [valid.Groups[0], new(3, [])], ThroughRevision = 3, HeadRevision = 3 },
@@ -147,7 +147,7 @@ public sealed class ReplicaTests
         Assert.Throws<ArgumentException>(() => a.Apply(new(0, 1, 1, [new(1, [])])));
         Assert.Equal(0UL, a.Cursor);
         Assert.Equal("Never lose this", a.Find(id)!.Title);
-        a.Apply(server.Pull(0));
+        a.Apply(server.Pull(Member, 0));
         Assert.Equal(1UL, a.Cursor);
     }
 
@@ -176,17 +176,17 @@ public sealed class ReplicaTests
         var receipt = server.Handle(Member, create).Receipt!;
         a.EditDescription(id, "Decaf only");
         a.Receive(receipt);
-        a.Apply(server.Pull(0));
+        a.Apply(server.Pull(Member, 0));
         Assert.Equal("Decaf only", a.Find(id)!.Description);
         Send(server, a);
-        b.Apply(server.Pull(0));
+        b.Apply(server.Pull(Member, 0));
         Assert.Equal(a.Find(id), b.Find(id));
         Assert.Equal("Buy coffee", b.Find(id)!.Title);
         Assert.Equal("Decaf only", b.Find(id)!.Description);
 
         a.EditDescription(id, null);
         Send(server, a);
-        b.Apply(server.Pull(b.Cursor));
+        b.Apply(server.Pull(Member, b.Cursor));
         Assert.Null(b.Find(id)!.Description);
     }
 
@@ -211,9 +211,9 @@ public sealed class ReplicaTests
     private static void Send(WorkspaceServer server, LocalReplica replica)
     {
         replica.Receive(server.Handle(Member, replica.NextSubmission()!).Receipt!);
-        replica.Apply(server.Pull(replica.Cursor));
+        replica.Apply(server.Pull(Member, replica.Cursor));
     }
 
     private static WorkspaceServer Server() => new(new InMemoryWorkspaceStore(
-        Workspace, Epoch, [new(DeviceA, Member), new(DeviceB, Member)]));
+        Workspace, Epoch, HouseholdMembership.Create(Member), [new(DeviceA, Member), new(DeviceB, Member)]));
 }

@@ -84,3 +84,28 @@ python3 tools/android-local-identity-smoke.py emulator-5556
 Run the smoke on each dedicated emulator profile. It uses synthetic data and
 does not establish browser consent, production signing, or real token refresh.
 Stop Aspire after testing.
+
+## Household links
+
+Owners share invitation links themselves. Secrets live in the URI fragment, not
+the request path or query. If a share response is lost, cancel the unused
+invitation and create another. The server cannot recover its secret.
+
+Android App Links require the signing certificate to match the website
+association. Set `androidSigningCertificates` in the Bicep parameters to the
+colon-separated SHA-256 fingerprint reported by `keytool -list -v`. Separate
+multiple accepted certificates with semicolons. Publish the backend and verify
+that its `/.well-known/assetlinks.json` endpoint serves the intended app and
+certificate, without a redirect. The development parameters trust the local
+development certificate only. Release signing must replace or explicitly extend
+that trust alongside the MSAL redirect setup.
+
+Install the corresponding APK, then run `adb -s SERIAL shell pm verify-app-links
+--re-verify fi.bundo`. After verification completes, inspect `pm get-app-links
+fi.bundo` and open a synthetic HTTPS invitation. It must open the authenticated
+join screen without exposing shared data before approval. When the app is not
+installed, the link page explains how to paste the full link into the app.
+The Local build uses app-scheme links and does not prove HTTPS association.
+
+Do not put real invitation links, codes, bearer tokens, or private UI dumps into
+test evidence. Record results in the household issue.

@@ -1,6 +1,7 @@
 targetScope = 'resourceGroup'
 
 param identityAudience string
+param androidSigningCertificates string
 
 // Owns the Function runtime, its storage, identity and consumer-side grants.
 param appName string
@@ -192,6 +193,7 @@ resource app 'Microsoft.Web/sites@2024-04-01' = {
         { name: 'AZURE_CLIENT_ID', value: identity.properties.clientId }
         { name: 'BunDoIdentity__Mode', value: 'Microsoft' }
         { name: 'BunDoIdentity__Audience', value: identityAudience }
+        { name: 'BunDoAndroid__SigningCertificates', value: androidSigningCertificates }
         { name: 'WorkspaceStore__Endpoint', value: cosmosEndpoint }
         { name: 'WorkspaceStore__DatabaseName', value: databaseName }
         { name: 'WorkspaceStore__ContainerName', value: containerName }

@@ -23,6 +23,8 @@ public sealed class RegistrationTests
             var restarted = new LocalRegistrationStore(directory);
             var retry = await restarted.RegisterAsync(alice, installation, null, default);
             Assert.Equal(first.Registration, retry.Registration);
+            Assert.True(await restarted.IsActiveAsync(alice, first.Registration!.RegistrationId, default));
+            Assert.False(await restarted.IsActiveAsync(bob, first.Registration.RegistrationId, default));
             var other = await restarted.RegisterAsync(bob, installation, null, default);
             Assert.NotEqual(first.Registration!.RegistrationId, other.Registration!.RegistrationId);
             for (var i = 0; i < 4; i++) await restarted.RegisterAsync(alice, Guid.NewGuid(), null, default);
@@ -31,6 +33,7 @@ public sealed class RegistrationTests
             var admitted = await restarted.RegisterAsync(alice, Guid.NewGuid(), first.Registration.RegistrationId, default);
             Assert.Equal("accepted", admitted.Code);
             Assert.Equal("registration_retired", (await restarted.RegisterAsync(alice, installation, null, default)).Code);
+            Assert.False(await restarted.IsActiveAsync(alice, first.Registration.RegistrationId, default));
         }
         finally { Directory.Delete(directory, recursive: true); }
     }

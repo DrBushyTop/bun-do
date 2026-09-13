@@ -5,6 +5,7 @@
     "location": { "value": "swedencentral" },
     "resourceGroupName": { "value": "rg-bun-do-dev-swc" },
     "identityAudience": { "value": "d33b7867-41ed-45c3-805a-b5e841323d20" },
+    "androidSigningCertificates": { "value": "99:9E:9E:42:FA:7F:26:36:9D:51:53:67:70:3C:6E:24:1A:42:93:21:FF:37:56:3B:E0:A6:CC:4E:59:5B:41:71" },
     "lunaModel": { "value": "gpt-5.6-luna" },
     "lunaVersion": { "value": "2026-07-09" },
     "lunaSku": { "value": "DataZoneStandard" },

@@ -34,6 +34,13 @@ class AccountData internal constructor(
     private val context: Context,
 ) {
     val inbox = InboxRepository(database, lease)
+    // Selection never imports local drafts. The sync slice owns workspace projections and persistence.
+    private val selectedHouseholdValue = MutableStateFlow<String?>(null)
+    val selectedHousehold = selectedHouseholdValue.asStateFlow()
+    fun selectHousehold(id: String?) {
+        lease.check()
+        selectedHouseholdValue.value = id
+    }
     private var controller: VoiceController? = null
     val voice: VoiceController get() = controller ?: VoiceController(context, recordings).also { controller = it }
     internal fun revoke() {

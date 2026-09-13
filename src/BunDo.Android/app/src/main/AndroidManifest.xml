@@ -17,10 +17,22 @@
         android:localeConfig="@xml/locales_config"
         tools:targetApi="33">
         <activity android:name=".identity.SignInActivity" android:exported="false" />
-        <activity android:name=".MainActivity" android:exported="true">
+        <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="bundo" android:host="join" />
+            </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="func-bun-do-dev-qrquvcgmhocc6.azurewebsites.net" android:path="/api/join" />
             </intent-filter>
         </activity>
         <service android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"

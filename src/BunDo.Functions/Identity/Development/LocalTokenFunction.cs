@@ -9,7 +9,7 @@ public sealed class LocalTokenFunction(IServiceProvider services)
 {
     [Function("LocalToken")]
     public IActionResult Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "dev/token/{account}/{scenario}")] HttpRequest request,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "api/dev/token/{account}/{scenario}")] HttpRequest request,
         string account, string scenario)
     {
         request.HttpContext.Response.Headers.CacheControl = "no-store";

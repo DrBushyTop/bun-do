@@ -122,6 +122,8 @@ public sealed class IdentityTests : IDisposable
 
     private sealed class UnexpectedRegistrationStore : IRegistrationStore
     {
+        public Task<bool> IsActiveAsync(AccountIdentity identity, Guid registrationId, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Unauthenticated request reached storage.");
         public Task<RegistrationDecision> RegisterAsync(AccountIdentity identity, Guid installationId,
             Guid? revoke, CancellationToken cancellationToken) =>
             throw new InvalidOperationException("Invalid requests must not reach registration storage.");

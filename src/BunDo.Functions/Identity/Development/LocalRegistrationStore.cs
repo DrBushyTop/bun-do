@@ -9,6 +9,20 @@ namespace BunDo.Functions.Identity.Development;
 public sealed class LocalRegistrationStore(string directory) : IRegistrationStore
 {
     private readonly SemaphoreSlim gate = new(1);
+    public async Task<bool> IsActiveAsync(AccountIdentity identity, Guid registrationId, CancellationToken cancellationToken)
+    {
+        await gate.WaitAsync(cancellationToken);
+        try
+        {
+            var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(identity))));
+            var file = Path.Combine(directory, key + ".json");
+            var records = File.Exists(file)
+                ? JsonSerializer.Deserialize<InstallationRegistration[]>(await File.ReadAllBytesAsync(file, cancellationToken))!
+                : [];
+            return records.Any(x => x.RegistrationId == registrationId && !x.Revoked && x.ExpiresAt > DateTimeOffset.UtcNow);
+        }
+        finally { gate.Release(); }
+    }
     public async Task<RegistrationDecision> RegisterAsync(AccountIdentity identity, Guid installationId,
         Guid? revoke, CancellationToken cancellationToken)
     {

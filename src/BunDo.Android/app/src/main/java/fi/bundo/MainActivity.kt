@@ -1,6 +1,7 @@
 package fi.bundo
 
 import android.os.Bundle
+import android.content.Intent
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -14,6 +15,8 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.material3.CircularProgressIndicator
 import fi.bundo.ui.AccountScreen
+import fi.bundo.ui.HouseholdScreen
+import fi.bundo.household.InvitationLink
 import fi.bundo.identity.SignInModel
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.luminance
@@ -28,14 +31,33 @@ import fi.bundo.ui.InboxApp
 import fi.bundo.ui.InboxViewModel
 
 class MainActivity : AppCompatActivity() {
+    private var invitation by mutableStateOf<String?>(null)
+
+    private fun acceptInvitation(intent: Intent?) {
+        val value = intent?.dataString ?: return
+        if (InvitationLink.parse(value) != null) invitation = value
+        // Do not retain an invitation secret in the Activity intent or saved state.
+        intent.data = null
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        acceptInvitation(intent)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        acceptInvitation(intent)
         enableEdgeToEdge()
         val preferences = getSharedPreferences("appearance", MODE_PRIVATE)
         val accounts = (application as BunDoApplication).accounts
         setContent {
             val account by accounts.active.collectAsStateWithLifecycle()
-            var showAccount by remember { mutableStateOf(false) }
+            var showAccount by remember { mutableStateOf(invitation != null) }
+            var showHouseholds by remember { mutableStateOf(invitation != null) }
+            androidx.compose.runtime.LaunchedEffect(invitation) {
+                if (invitation != null) { showAccount = true; showHouseholds = true }
+            }
             val signIn: SignInModel = viewModel()
             var appearance by remember { mutableStateOf(preferences.getString("theme", "system")!!) }
             BunDoTheme(appearance) {
@@ -46,8 +68,14 @@ class MainActivity : AppCompatActivity() {
                         isAppearanceLightNavigationBars = lightBars
                     }
                 }
-                if (showAccount) {
-                    AccountScreen(accounts, signIn) { showAccount = false }
+                if (showHouseholds && account?.identity != null) {
+                    key(account!!.lease.generation) {
+                        HouseholdScreen(account!!, signIn, invitation, { invitation = null }) {
+                            showHouseholds = false
+                        }
+                    }
+                } else if (showAccount) {
+                    AccountScreen(accounts, signIn, onHouseholds = { showHouseholds = true }) { showAccount = false }
                 } else if (account == null) {
                     CircularProgressIndicator()
                 } else key(account!!.lease.generation) {

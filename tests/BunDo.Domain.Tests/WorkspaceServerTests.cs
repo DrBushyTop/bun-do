@@ -21,7 +21,7 @@ public sealed class WorkspaceServerTests
 
         Assert.Equal("ACCEPTED", result.Code);
         Assert.Equal(1UL, result.Receipt!.EffectRevision);
-        var page = server.Pull(0);
+        var page = server.Pull(MemberA, 0);
         Assert.Equal(1UL, page.ThroughRevision);
         var task = Assert.Single(Assert.Single(page.Groups).Tasks);
         Assert.Equal("bb91e5a1-1364-5966-8b14-fd2f32d0c1a8", task.Id);
@@ -43,7 +43,7 @@ public sealed class WorkspaceServerTests
 
         Assert.Equal(code, retry.Code);
         if (!changePayload) Assert.Equal(committed.Receipt, retry.Receipt);
-        var page = first.Pull(0);
+        var page = first.Pull(MemberA, 0);
         Assert.Equal(1UL, page.HeadRevision);
         Assert.Equal("Buy coffee", Assert.Single(Assert.Single(page.Groups).Tasks).Title);
     }
@@ -58,7 +58,7 @@ public sealed class WorkspaceServerTests
             new CreateTask("bb91e5a1-1364-5966-8b14-fd2f32d0c1a8", "Wrong order"));
 
         Assert.Equal(code, server.Handle(MemberA, outOfOrder).Code);
-        Assert.Empty(server.Pull(0).Groups);
+        Assert.Empty(server.Pull(MemberA, 0).Groups);
         Assert.Equal("ACCEPTED", server.Handle(MemberA, Create(1, "Correct order")).Code);
     }
 
@@ -81,7 +81,7 @@ public sealed class WorkspaceServerTests
 
         Assert.Equal(code, result.Code);
         Assert.Null(result.Receipt);
-        Assert.Equal(1UL, server.Pull(0).HeadRevision);
+        Assert.Equal(1UL, server.Pull(MemberA, 0).HeadRevision);
     }
 
     [Fact]
@@ -98,7 +98,7 @@ public sealed class WorkspaceServerTests
         Assert.Equal("Decaf", result.Receipt.Task.Description);
         Assert.Equal(new FieldVersion(1, 1), result.Receipt.Task.TitleVersion);
         Assert.Equal(new FieldVersion(2, 2), result.Receipt.Task.DescriptionVersion);
-        Assert.Equal(result.Receipt.Task, Assert.Single(Assert.Single(server.Pull(1).Groups).Tasks));
+        Assert.Equal(result.Receipt.Task, Assert.Single(Assert.Single(server.Pull(MemberA, 1).Groups).Tasks));
     }
 
     [Theory]
@@ -120,7 +120,7 @@ public sealed class WorkspaceServerTests
         Assert.Equal("A's title", result.Receipt!.Task!.Title);
         Assert.Equal(sameField ? null : "B's description", result.Receipt.Task.Description);
         Assert.Equal(3UL, result.Receipt.EffectRevision);
-        if (sameField) Assert.Empty(Assert.Single(server.Pull(2).Groups).Tasks);
+        if (sameField) Assert.Empty(Assert.Single(server.Pull(MemberA, 2).Groups).Tasks);
         // A terminal rejection consumes B's sequence, so independent later work can proceed.
         Assert.Equal("ACCEPTED", server.Handle(MemberB, new FrozenOperation(Workspace, Epoch, DeviceB, 2,
             new CreateTask(TaskIdentity.ForCreate(DeviceB, 2), "Independent task"))).Code);
@@ -145,7 +145,7 @@ public sealed class WorkspaceServerTests
         Assert.Equal(expected, result.Code);
         Assert.False(result.Receipt!.Accepted);
         Assert.Null(result.Receipt.Task);
-        Assert.Empty(Assert.Single(server.Pull(0).Groups).Tasks);
+        Assert.Empty(Assert.Single(server.Pull(MemberA, 0).Groups).Tasks);
         Assert.Equal(result, server.Handle(MemberA, operation));
         Assert.Equal("ACCEPTED", server.Handle(MemberA, Create(2, "Next task")).Code);
     }
@@ -166,7 +166,7 @@ public sealed class WorkspaceServerTests
         var result = server.Handle(MemberA, operation);
 
         Assert.Equal(code, result.Code);
-        Assert.Empty(Assert.Single(server.Pull(1).Groups).Tasks);
+        Assert.Empty(Assert.Single(server.Pull(MemberA, 1).Groups).Tasks);
         Assert.Equal(mode == "missing" ? null : original, result.Receipt!.Task);
         Assert.Equal(result, server.Handle(MemberA, operation));
     }
@@ -178,8 +178,8 @@ public sealed class WorkspaceServerTests
         var server = new WorkspaceServer(fault);
 
         Assert.Equal("ACCEPTED", server.Handle(MemberA, Create(1, "Retry after CAS")).Code);
-        Assert.Equal(1UL, server.Pull(0).HeadRevision);
-        Assert.Single(Assert.Single(server.Pull(0).Groups).Tasks);
+        Assert.Equal(1UL, server.Pull(MemberA, 0).HeadRevision);
+        Assert.Single(Assert.Single(server.Pull(MemberA, 0).Groups).Tasks);
     }
 
     [Fact]
@@ -190,7 +190,7 @@ public sealed class WorkspaceServerTests
         var operation = Create(1, "Keep this intent");
 
         Assert.Equal("BUSY", server.Handle(MemberA, operation).Code);
-        Assert.Empty(server.Pull(0).Groups);
+        Assert.Empty(server.Pull(MemberA, 0).Groups);
         Assert.Equal("ACCEPTED", server.Handle(MemberA, operation).Code);
     }
 
@@ -202,18 +202,18 @@ public sealed class WorkspaceServerTests
         server.Handle(MemberA, Create(2, ""));
         server.Handle(MemberA, Create(3, "Last"));
 
-        var first = server.Pull(0, 1);
-        var second = server.Pull(first.ThroughRevision, 1);
-        var third = server.Pull(second.ThroughRevision, 1);
+        var first = server.Pull(MemberA, 0, 1);
+        var second = server.Pull(MemberA, first.ThroughRevision, 1);
+        var third = server.Pull(MemberA, second.ThroughRevision, 1);
 
         Assert.Equal(1UL, first.ThroughRevision);
         Assert.Equal(2UL, second.ThroughRevision);
         Assert.Empty(Assert.Single(second.Groups).Tasks);
         Assert.Equal(3UL, third.ThroughRevision);
         Assert.Equal(3UL, first.HeadRevision);
-        Assert.Throws<ArgumentOutOfRangeException>(() => server.Pull(4));
-        Assert.Throws<ArgumentOutOfRangeException>(() => server.Pull(0, 0));
-        Assert.Throws<ArgumentOutOfRangeException>(() => server.Pull(0, 101));
+        Assert.Throws<ArgumentOutOfRangeException>(() => server.Pull(MemberA, 4));
+        Assert.Throws<ArgumentOutOfRangeException>(() => server.Pull(MemberA, 0, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => server.Pull(MemberA, 0, 101));
     }
 
     [Theory]
@@ -234,7 +234,7 @@ public sealed class WorkspaceServerTests
 
         Assert.NotEqual(ordinary.Fingerprint, unsupported.Fingerprint);
         Assert.Equal(code, server.Handle(MemberA, unsupported).Code);
-        Assert.Empty(server.Pull(0).Groups);
+        Assert.Empty(server.Pull(MemberA, 0).Groups);
         Assert.Equal("ACCEPTED", server.Handle(MemberA, ordinary).Code);
         Assert.Equal(code, server.Handle(MemberA, unsupported).Code);
     }
@@ -250,7 +250,9 @@ public sealed class WorkspaceServerTests
     private static WorkspaceServer Server() => new(Store());
 
     private static InMemoryWorkspaceStore Store() => new(
-        Workspace, Epoch, [new DeviceRegistration(DeviceA, MemberA), new DeviceRegistration(DeviceB, MemberB)]);
+        Workspace, Epoch, HouseholdMembership.Create(MemberA) with {
+            Members = HouseholdMembership.Create(MemberA).Members.Add(MemberB, new(MemberB, 0)),
+        }, [new DeviceRegistration(DeviceA, MemberA), new DeviceRegistration(DeviceB, MemberB)]);
 
     private static FrozenOperation Create(ulong sequence, string title) => new(
         Workspace, Epoch, DeviceA, sequence, new CreateTask(TaskIdentity.ForCreate(DeviceA, sequence), title));

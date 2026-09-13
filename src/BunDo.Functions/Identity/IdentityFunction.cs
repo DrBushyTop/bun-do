@@ -8,7 +8,7 @@ public sealed class IdentityFunction(AccessTokens tokens)
 {
     [Function("Identity")]
     public async Task<IActionResult> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "identity")] HttpRequest request)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "api/identity")] HttpRequest request)
     {
         request.HttpContext.Response.Headers.CacheControl = "no-store";
         var headers = request.Headers.Authorization;

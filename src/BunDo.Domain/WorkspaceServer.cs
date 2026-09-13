@@ -4,8 +4,9 @@ using System.Text.Json;
 
 namespace BunDo.Domain;
 
-public sealed class WorkspaceServer(IWorkspaceStore store)
+public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timeProvider = null)
 {
+    private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
     public SubmissionResult Handle(Guid authenticatedMemberId, FrozenOperation operation)
     {
         for (var attempt = 0; attempt < 5; attempt++)
@@ -13,6 +14,8 @@ public sealed class WorkspaceServer(IWorkspaceStore store)
             var state = store.Read();
             if (operation.WorkspaceId != state.WorkspaceId) return new("WRONG_WORKSPACE");
             if (operation.StateEpoch != state.StateEpoch) return new("EPOCH_CHANGED");
+            // Membership is checked inside every CAS attempt, before receipts or task data.
+            if (!state.Membership.CanRead(authenticatedMemberId)) return new("FORBIDDEN");
             if (!state.Devices.TryGetValue(operation.DeviceId, out var device)) return new("DEVICE_UNKNOWN");
             if (device.MemberId != authenticatedMemberId) return new("FORBIDDEN");
             if (operation.ProtocolVersion != 1) return new("UNSUPPORTED_PROTOCOL");
@@ -87,9 +90,32 @@ public sealed class WorkspaceServer(IWorkspaceStore store)
         return new("BUSY");
     }
 
-    public ChangePage Pull(ulong afterRevision, int maxGroups = 100)
+    public MembershipResult ChangeMembership(Guid authenticatedMemberId, Guid stateEpoch,
+        MembershipCommand command)
+    {
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            var state = store.Read();
+            if (state.StateEpoch != stateEpoch) return new("EPOCH_CHANGED");
+            var revision = checked(state.Revision + 1);
+            var decision = MembershipPolicy.Apply(state.Membership, authenticatedMemberId, command,
+                clock.GetUtcNow(), revision);
+            if (decision.State == state.Membership) return new(decision.Code, decision.Invitation);
+            var next = state with {
+                Revision = revision,
+                Membership = decision.State,
+                Changes = state.Changes.Add(new(revision, [])),
+            };
+            if (store.TryCommit(state.Revision, next)) return new(decision.Code, decision.Invitation);
+        }
+        return new("BUSY");
+    }
+
+    public ChangePage Pull(Guid authenticatedMemberId, ulong afterRevision, int maxGroups = 100)
     {
         var state = store.Read();
+        if (!state.Membership.CanRead(authenticatedMemberId))
+            throw new UnauthorizedAccessException("Workspace membership required.");
         ArgumentOutOfRangeException.ThrowIfGreaterThan(afterRevision, state.Revision);
         ArgumentOutOfRangeException.ThrowIfLessThan(maxGroups, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(maxGroups, 100);
@@ -105,3 +131,5 @@ public sealed class WorkspaceServer(IWorkspaceStore store)
         return JsonSerializer.SerializeToUtf8Bytes(task).Length > 16 * 1024 ? "TASK_TOO_LARGE" : "ACCEPTED";
     }
 }
+
+public sealed record MembershipResult(string Code, HouseholdInvitation? Invitation = null);

@@ -8,7 +8,7 @@ public sealed class HealthFunction
 {
     [Function("Health")]
     public IActionResult Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "health")] HttpRequest request)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "api/health")] HttpRequest request)
     {
         return new OkObjectResult(new { status = "ok" });
     }

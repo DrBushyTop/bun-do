@@ -32,7 +32,7 @@ import kotlinx.coroutines.flow.combine
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AccountScreen(accounts: AccountStore, model: SignInModel, onClose: () -> Unit) {
+fun AccountScreen(accounts: AccountStore, model: SignInModel, onHouseholds: () -> Unit = {}, onClose: () -> Unit) {
     val context = LocalContext.current
     val activity = context as Activity
     val data by accounts.active.collectAsState()
@@ -97,6 +97,10 @@ fun AccountScreen(accounts: AccountStore, model: SignInModel, onClose: () -> Uni
             if (signedIn && model.choices.isNotEmpty()) {
                 Text(stringResource(R.string.identity_selected,
                     if (current!!.identity!!.subject == "alice") "Alice" else "Bob"))
+            }
+            if (signedIn) Button(onClick = onHouseholds, enabled = !model.busy,
+                modifier = Modifier.fillMaxWidth().testTag("account-households")) {
+                Text(stringResource(R.string.households_title))
             }
             Text(stringResource(R.string.account_local_notice))
             if (accounts.unexpectedFiles) Text(stringResource(R.string.account_installation_reset),
