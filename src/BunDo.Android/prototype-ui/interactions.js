@@ -9,7 +9,7 @@ for(const [id,paths] of Object.entries({
 
 const fixtureTimes=[['Jenny','2026-09-12T08:15:00+03:00','Jenny','2026-09-13T09:20:00+03:00'],['Pasi','2026-09-11T17:40:00+03:00','Jenny','2026-09-13T10:10:00+03:00'],['Pasi','2026-09-12T12:30:00+03:00','Pasi','2026-09-13T11:05:00+03:00'],['Jenny','2026-09-13T08:50:00+03:00','Jenny','2026-09-13T08:50:00+03:00']];
 tasks.forEach((t,i)=>{[t.createdBy,t.createdAt,t.modifiedBy,t.modifiedAt]=fixtureTimes[i]});
-function sceneForTask(t){const scene={home:'storage',bike:'bike',pet:'pet'}[classify(t.title)];return scene?'url(art/'+scene+'-royal.webp)':'none'}
+function sceneForTask(t){const scene={home:'storage',bike:'bike',pet:'pet'}[classify(t.title)];return scene==='storage'?'url(art/dojo-storage.webp)':scene?'url(art/'+scene+'-royal.webp)':'none'}
 function expedited(t){
   if(t.urgent||t.date==='Tänään')return true;
   if(!t.date)return false;

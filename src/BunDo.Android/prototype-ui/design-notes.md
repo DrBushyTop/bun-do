@@ -54,3 +54,18 @@ controls and world visibility. Quests are canned groups referring to real demo
 tasks; accepting one does not change task order. No real quest AI or animated
 character rig is implemented. The supplied scenes are stills with small
 transitions. See `art/ARTWORK.md` for generation provenance and prompts.
+
+## Adventure progress study
+
+Use Seikkailu in Finnish and Adventure in English. Varaston koetus names the
+existing checklist stages; Kylän kierros groups existing leaf tasks. Stars and
+approximate minutes are editable sample AI estimates, not skill ratings or XP.
+The header sign and adventure show current completed/total phases and a bar.
+Finishing gives a short Bun bow in the sheet and a seal animation when the
+header becomes visible. Ordinary renders do not replay either celebration.
+Reopening a phase reduces progress; motion-off keeps static completion feedback.
+The dojo courtyard and storage art strengthen the royal martial-arts Bun theme.
+
+This study uses checklist indexes, not stable persisted item identities. Editing
+or removing source tasks needs production reconciliation. It does not implement
+first-completion journey stops or an animated character rig.
