@@ -1,22 +1,20 @@
 # Implementation contract
 
-Decision date: 2026-09-12. The owner delegated the remaining decisions and asked for the wayfinder map to finish before implementation. The full v1 release remains required.
+The owner revised v1 on September 13, 2026 to prioritize daily household use. [Product scope](../../shared-task-manager-architecture-v1.md) replaces the earlier full-feature proposal. [V2](https://github.com/DrBushyTop/bun-do/issues/42) holds deferred capabilities. The owner explicitly retained the full in-progress stale-client recovery slice in v1 and requested a simple weekly streak alongside counts and milestones.
 
 ## Read order and authority
 
-The [original proposal](../../shared-task-manager-architecture-v1.md) owns product scope, not the final wire/schema examples. The contracts below supersede conflicting mechanics in that proposal. Do not implement its older receipt, rank, schema, state or API examples directly.
-
 | Contract | What it owns |
 | --- | --- |
-| [Sync and recovery](sync-protocol.md) | Canonical base, outbox replay, receipts, sequences, Strong reads, revisions, snapshots, retention and epochs. |
-| [Commands and versions](command-catalog.md) | Shared version names, command preconditions and conflict rules. |
-| [Task graph and queue](task-domain.md) | Limits, lifecycle, claims, hierarchy, dependency cycles, ordering, areas, notes and deletion groups. |
-| [Dates, recurrence and progress](dates-recurrence-progress.md) | Capture time, deadlines, calendar rules, occurrence identities and statistics. |
-| [AI processing](ai-processing.md) | Durable jobs, leases, paid-call uncertainty, validation, patches, split and clarify. |
-| [Identity and operations](identity-and-operations.md) | Joining, permissions, account isolation, reminders, migrations, export and cloud restore. |
-| [Design direction](../../DESIGN.md) and [screen contracts](../design/screen-contracts.md) | Native Android interaction and visual requirements, including unfinished rendered verification. |
+| [Sync and recovery](sync-protocol.md) | Local intent, receipts, revisions, retained snapshots/retention/expiry and epoch recovery. |
+| [Commands and versions](command-catalog.md) | V1 command preconditions and conflict rules. |
+| [Task queue](task-domain.md) | Task lifecycle, claims, direct checklist items, ordering and deletion. |
+| [Dates, repeats and progress](dates-recurrence-progress.md) | Capture-relative dates, simple server-generated repeats, completion counts, milestones and weekly streak. |
+| [AI processing](ai-processing.md) | Durable cleanup/split requests and safe result application, without product quotas. |
+| [Identity and operations](identity-and-operations.md) | Existing joining/account boundaries, reminders, safe upgrades and manual recovery. |
+| [Design direction](../../DESIGN.md) and [screen contracts](../design/screen-contracts.md) | Native Android behavior, accessibility and the approved rabbit identity. |
 
-GitHub decision tickets hold the resolution history. This directory holds the implementation contract those resolutions select. The [implementation plan](../implementation-plan.md) maps required behavior to build tickets.
+GitHub owns work status and evidence. The [implementation plan](../implementation-plan.md) indexes the revised native dependency graph. Completed decision tickets retain historical context; their earlier full-v1 scope does not override this revision. Code, schemas, Bicep and tests own implementation details and pinned values. Existing schemas or methods for deferred features do not make those features release requirements.
 
 ## Chosen deployment and modules
 
@@ -49,9 +47,9 @@ Bicep owns the dedicated development and production resource configuration. Keep
 
 - Local Parakeet is assumed feasible on vivo X300 Ultra and OnePlus 13. The owner skipped the separate phone benchmark. Do not reopen it as a mandatory gate under another name.
 - Agents use two ARM64 Android emulator profiles on this Mac. Install the missing SDK/JDK/emulator tooling during implementation. Emulator functional evidence does not establish those phones' latency, memory use or recognition quality.
-- Azure deployment, Entra sign-in/API access, strict schemas on the real model endpoint, Cosmos concurrency and restore drills are early implementation/release gates with failure handling. Check the owning slice for current evidence; the original map did not verify them.
-- DESIGN.md is an architect-selected direction, not a rendering or human approval. Implement the original rabbit mark and inspect native screens through Impeccable.
-- The owner skipped all Azure budget alerts on September 12, 2026, then deferred product AI length/rate quotas until after v1. Technical safety bounds remain required. No production data exists to migrate.
+- Azure deployment, Entra sign-in/API access, strict schemas on the configured model endpoint and Cosmos concurrency remain relevant live gates with failure handling. The complete cloud restore drill moves to V2; v1 verifies backup configuration and documents safe manual recovery. Check the owning slice for current evidence; the original map did not verify them.
+- DESIGN.md is an architect-selected direction, not a rendering or human approval. Preserve the owner-approved rabbit mark in assets/brand/ and inspect native screens through Impeccable.
+- The owner skipped all Azure budget alerts on September 12, 2026, then moved product AI usage-policy review until after V2 on September 13, 2026. Start without product quotas and use measured usage to decide whether any are needed. Technical safety bounds remain required. No production data exists to migrate.
 
 If a live gate disproves an assumption, stop dependent work, record the evidence and change the owning decision. Do not silently swap cloud speech for offline speech, remove required features or claim a failed gate passed.
 
@@ -61,6 +59,6 @@ cloud path is a separate v1 slice, not part of the offline capture completion.
 
 ## Release scope
 
-Include typed and local voice capture, original text, safe cloud enrichment, manual/AI split and clarify, nested tasks, shared ordering/claims/completion, due and snooze, notes, areas, dependencies, recurrence, delete/restore, activity, Together metrics, reminders, account-safe recovery, Finnish and English. Terra remains configurable and disabled until its live contract passes. Shared weekly streak is included without rankings or punishment.
+V1 includes typed capture, MAI online transcription with Parakeet fallback, original text, cleanup and manual/AI checklist split, shared claims/completion/order, description, due/snooze, delete/restore, simple daily/weekly repeats, reminders, activity, first-completion counts, lifetime milestones and a weekly streak. Keep Finnish/English, accessibility, account-safe persistence and the full retained recovery slice.
 
-Tags, effort scores, attachments, public sharing, large-team roles, arbitrary RRULEs and non-Android clients are not required v1 capabilities. Do not confuse optional items in the original proposal with cuts to the owner-confirmed scope.
+V2 owns deeper subtasks/dependencies, notes/areas, AI clarify, advanced scheduling and offline predictions, exact historical metrics, FCM, explicit AI queue placement/recurrence extraction, optional model escalation and expanded workspace operations. No V2 work blocks v1. AI product-limit policy is outside both releases and begins only after V2. Technical bounds and authentication remain.

@@ -23,8 +23,4 @@ capture ships only after its authentication and recovery integration passes.
 The completed offline slice and local comparison scripts do not constitute that
 integration.
 
-The owner deferred product limits for AI length and usage frequency until after
-v1. Do not make quota-policy work a release blocker for the two-user application.
-Authentication, technical payload/memory bounds, timeouts and lossless recovery
-remain required. Existing numeric AI admission proposals must be revisited in
-the post-v1 limits issue, not treated as a settled product policy.
+On September 13, 2026, the owner moved product AI length and usage-policy review until after V2. Start without product quotas and observe household usage before deciding whether limits are needed. Authentication, provider constraints, technical payload/memory/output bounds, timeouts and recoverable input remain required. The [usage-policy issue](https://github.com/DrBushyTop/bun-do/issues/37) is outside both release parents; earlier numeric admission proposals are superseded.

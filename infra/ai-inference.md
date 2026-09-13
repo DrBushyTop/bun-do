@@ -19,8 +19,10 @@ content filtering remains enabled. `store: false` prevents Responses history
 storage, but does not claim an exemption from Azure's abuse-monitoring policy.
 
 The backend receives the v1 base URL and deployment names, never an account key.
-`AI__Enabled` remains `false` until the durable worker, admission and token limits
-exist. Provisioning the endpoint does not enable application AI.
+`AI__Enabled` remains `false` until the authenticated cleanup worker and safe
+result application pass their integration checks. Product quotas and token budgets
+are not enablement gates; their review waits until after V2. Provisioning the
+endpoint does not enable application AI.
 
 ## Verification
 
@@ -30,7 +32,8 @@ template assertions or a policy-readback tool.
 
 When the production AI adapter is implemented or its model is changed, integration
 tests should exercise that adapter through the deployed identity, with synthetic
-text and the complete schemas from `contracts/ai/`. Keep strict output validation,
+text and the schemas selected for the active v1 cleanup/split paths. Unused
+clarify, recurrence or area fields in older schemas do not expand release scope. Keep strict output validation,
 `store: false` and no tools. Record only status, latency, deployment/model version,
 usage and result classification. Do not log prompts or output, and do not retry
 an ambiguous paid call merely to get a passing result. This is future application

@@ -18,7 +18,7 @@ A member's intention to work on an available task. A claim made offline is provi
 A task with no parent. Root tasks are the unit for shared completion milestones.
 
 **Container task**:
-A task split into subtasks whose progress comes from its actionable descendants.
+A root task split into direct checklist items whose progress comes from those items.
 
 **Occurrence**:
 One scheduled task created from a recurrence template. Splitting an occurrence does not change the next occurrence's decomposition by default.
@@ -35,5 +35,5 @@ Locally authored work retained when it cannot safely join the shared state. The 
 **Lifetime completion credit**:
 The first completed state of a root task. Reopening and completing it again does not award another credit.
 
-**Period clearance**:
-The share of roots open at a period's start that are completed at its end, or now for the current period. This differs from lifetime completion credit.
+**Weekly streak**:
+Consecutive weeks with at least one shared first-completion credit. The current unfinished week gives the household time to continue the run.

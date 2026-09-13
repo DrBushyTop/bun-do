@@ -4,7 +4,7 @@ Use GitHub repository `DrBushyTop/bun-do` through the authenticated `gh` CLI.
 
 ## Wayfinding operations
 
-The completed architecture map is "Find the route to Bun Do's first usable release". The execution parent is "Build the complete Bun Do v1 Android release". Query their native sub-issues and blocked-by edges rather than treating a copied checklist as status.
+The completed architecture map is "Find the route to Bun Do's first usable release". The execution parent is "Build the Bun Do v1 household release". [V2](https://github.com/DrBushyTop/bun-do/issues/42) holds deferred work. AI usage-policy review starts only after V2 and belongs to neither release parent. Query their native sub-issues and blocked-by edges rather than treating a copied checklist as status.
 
 ```sh
 gh api repos/DrBushyTop/bun-do/issues/14/sub_issues

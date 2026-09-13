@@ -1,6 +1,6 @@
 # Lossless sync and recovery
 
-Architect decision, 2026-09-12. Resolves [Define lossless offline sync and recovery](https://github.com/DrBushyTop/bun-do/issues/5). This is the protocol to implement and test, not a claim that a server or client already exists.
+The owner explicitly retained the full in-progress recovery slice in v1 on September 13, 2026, including snapshots, retention, expiry and epoch recovery. The earlier architect decision resolves [Define lossless offline sync and recovery](https://github.com/DrBushyTop/bun-do/issues/5). This is the protocol to implement and test, not a claim that a server or client already exists.
 
 ## Ownership and invariants
 
@@ -8,7 +8,7 @@ Room owns the visible local projection. The server owns accepted shared state. K
 
 1. A local action commits its intent, local sequence allocation and updated projection in one Room transaction before UI success.
 2. Every submitted device sequence gets at most one terminal outcome. A retry cannot repeat effects, even after detailed receipts expire.
-3. Every shared mutation, including maintenance, AI, recurrence and membership, commits through the same workspace revision compare-and-swap.
+3. Every shared mutation, including maintenance, AI, simple recurrence and membership, commits through the same workspace revision compare-and-swap.
 4. Clients apply complete revision groups. A cursor never advances past effects not durably applied.
 5. Deletion is not an upsert. Only an explicit restore revives a retained deletion group. Recovery after purge creates new IDs.
 6. Network errors, stale cursors, logout, removed membership and server restore never silently discard locally authored text.
@@ -23,7 +23,7 @@ Each operation contains `protocolVersion`, `commandVersion`, `stateEpoch`, `work
 
 A pending intent may refer to the output versions of an earlier local operation with `AfterOperation(operationId, versionGroup)`. Resolve those references from terminal receipts before freezing the envelope for its first submission. This permits create then edit then split without guessing server versions. Once frozen, bytes never change. A new user correction creates a new operation.
 
-Use UUIDv5 with the device UUID as namespace and the ASCII name `task/{sequence}/{ordinal}` for new ordinary task IDs. Ordinal is decimal starting at zero for roots or split children. Other new entity types use their own name prefix. The server recomputes and checks IDs. An old task ID therefore cannot be recreated by resubmitting a create under a newer sequence. Recurrence IDs follow the separate occurrence-key contract. Never accept arbitrary IDs in a new-entity create command.
+Use UUIDv5 with the device UUID as namespace and the ASCII name `task/{sequence}/{ordinal}` for new ordinary task IDs. Ordinal is decimal starting at zero for roots or split children. Other new entity types use their own name prefix. The server recomputes and checks IDs. An old task ID therefore cannot be recreated by resubmitting a create under a newer sequence. Server-created simple-repeat occurrences use persisted stable identities; v1 has no client-predicted recurrence IDs. Never accept arbitrary IDs in a new-entity create command.
 
 Allow at most 32 operation dependencies, all lower sequences of this device, and at most 16 KiB envelope metadata excluding the bounded command payload. Same-task causal commands automatically depend on the preceding local command that supplies their preconditions. Independent tasks do not depend on a rejected operation merely because they follow it in sequence.
 
@@ -43,7 +43,7 @@ For each command:
 4. Build one transactional batch containing entity writes, complete immutable changes, activity when applicable, receipt, updated device high-water record and conditional metadata replacement using the originally read `_etag`. Increment the revision even for terminal rejections that consume a sequence; those groups may contain no shared task changes.
 5. On metadata conflict, discard the computed effects and reread/revalidate. On a receipt-create conflict, read the committed receipt. Other failures roll back the batch. Retry at most five CAS collisions per request, then return retryable busy with no asserted outcome.
 
-Check membership in that same CAS, so removal racing an operation has a defined order. All internal writers use stable request identities or canonical entity keys and the same commit function. Internal lease bookkeeping that changes visible job state is revisioned too.
+Check membership in that same CAS, so removal racing an operation has a defined order. All internal writers use stable request identities or canonical entity keys and the same commit function. Visible AI request status changes are revisioned too; this does not require the deferred AI dispatch/accounting system.
 
 Plan at most 90 batch operations and 1.75 MiB serialized request bytes, below the provider's limits. Count snapshots, wrappers, all ancestors, order indexes, device/receipt and statistics writes. Reject oversized effects without partial changes. Split worker work into independently valid bounded commands, not partial user cascades. Transaction timeout or transport loss means outcome unknown: look up/retry the same operation, never allocate another ID.
 
@@ -63,11 +63,11 @@ Give each editable field or atomic field group `fieldVersion` and `humanVersion`
 
 For human text/due edits, compare the observed `humanVersion`. If unchanged, an explicit human edit can replace an intervening AI-only value. If another human changed the same group, reject that group and preserve both values. An edit command is atomic across its requested groups; no hidden partial acceptance. The conflict UI can make separate new edits.
 
-AI must match its exact base `fieldVersion`, plus lifecycle/deletion guards. Claims, complete/reopen, split, restore and other state transitions require exact group preconditions, not the human-only exception. Moving uses explicit anchors and increments human order-intent version for a user move. AI placement must match the recorded order-intent base.
+AI must match its exact base `fieldVersion`, plus lifecycle/deletion guards. Claims, complete/reopen, split, restore and other state transitions require exact group preconditions, not the human-only exception. Moving uses explicit anchors and increments human order-intent version for a user move. AI placement is outside v1.
 
 Rebuild projections from the canonical base by replaying pending intents in local sequence order. A pending human edit remains visible over an AI-only update. A remote human conflict becomes a visible recoverable variant rather than a replaced title. Unsupported replay, failed dependencies or deleted targets move intent to recovery; ordinary edits cannot revive a deleted task. Never silently revise an expected version to make a stale command succeed.
 
-Reapplying means user confirmation against the displayed current state and a new sequence. Text and notes may be copied to new tasks after purge. Claims, completion, deletion, splits and membership actions must be chosen again; never offer an automatic bulk replay of these transitions.
+Reapplying means user confirmation against the displayed current state and a new sequence. Locally authored text may be copied to new tasks after purge. Claims, completion, deletion, splits and membership actions must be chosen again; never offer an automatic bulk replay of these transitions.
 
 ## Pull, pagination and local worker
 
@@ -87,9 +87,9 @@ Retain receipts, revision groups and deletion tombstones for at least 120 days. 
 
 An expired client preserves its old base and pending intents as recovery material, registers with a new ID, fetches current state and asks for explicit comparison/import. It does not reassign old sequences to a new device. A server state epoch change follows the same process, even when its old receipt or entity exists in the restored database.
 
-Task purge is separate from receipt pruning. Retain a task deletion group for at least 120 days after its latest member deletion, until no live valid device can submit a pre-deletion command and no snapshot pin needs its tombstones. Mark the group `PURGING` in one revisioned command, making restore reject. Delete its notes/capture content in chunks of at most 32 items, then remove task documents and order entries in a bounded final command with purge markers. Persist the cleanup cursor; retries are idempotent. Already separately deleted descendants retain their own groups and cannot be purged through an active ancestor group's restore.
+Task purge is separate from receipt pruning. Retain a task deletion group for at least 120 days after its latest member deletion, until no live valid device can submit a pre-deletion command and no snapshot pin needs its tombstones. Mark the group `PURGING` in one revisioned command, making restore reject. Delete its owned capture content in chunks of at most 32 items, then remove task documents and order entries in a bounded final command with purge markers. Persist the cleanup cursor; retries are idempotent. Already separately deleted descendants retain their own groups and cannot be purged through an active ancestor group's restore.
 
-If a retained deleted descendant depends on an ancestor scheduled for purge, wait until all descendant deletion groups are independently eligible, then mark the whole bounded subtree purging. No live child may be orphaned. Purged IDs remain historical nonblocking prerequisite references; the new-entity ID rule prevents reuse without storing full tombstones forever. Activity retains only IDs and permitted summary metadata after content purge.
+If a retained deleted descendant depends on an ancestor scheduled for purge, wait until all descendant deletion groups are independently eligible, then mark the whole bounded subtree purging. No live child may be orphaned. The new-entity ID rule prevents reuse of purged IDs without storing full tombstones forever. Cross-task prerequisites are outside v1. Activity retains only IDs and permitted summary metadata after content purge.
 
 ## Stable bootstrap and stale cursors
 
@@ -105,11 +105,9 @@ For a still-valid device, reconcile every previously submitted pending operation
 
 Fresh installs have no old replay. Expired registration, missing installation identity or changed global epoch always uses explicit recovery, never the still-valid-device shortcut.
 
-## Statistics and maintenance journals
+## Shared completion metadata
 
-Every command changing a root's membership, lifecycle or first credit writes a compact `root-state-event:{revision}:{rootId}` with before/after values and server acceptance time in the same batch. These events have 365-day retention independent of the 120-day sync log. Include their writes and public statistical changes in the transaction budget. They contain no task title or description.
-
-Statistics workers use deterministic `period:{zone}:{kind}:{start}` and `queue-day:{zone}:{date}` IDs, a source revision cutoff and `FINALIZING`/`FINAL` states. Recompute under CAS from immutable events plus the last retained checkpoint. Process at most seven daily boundaries or one week/month per continuation. Persist the cursor. Repeated identical finalization is a no-op with no new activity; a late credit updates only its versioned aggregate. Store a compact daily checkpoint before expiring events, so unchanged roots older than the event window remain reconstructable. Do not prune source data required by an unfinished checkpoint. Milestone identity is its threshold and workspace, so duplicate workers cannot celebrate twice.
+First root completion records one immutable credit in the same command transaction. Retain compact credit metadata after content purge. Weekly/monthly counts, lifetime milestones and the simple weekly streak follow [dates and progress](dates-recurrence-progress.md). No root-state reconstruction journal, midnight queue snapshots or checkpoint finalization workers are required.
 
 ## Interface and required proof
 

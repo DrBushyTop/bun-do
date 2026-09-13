@@ -1,65 +1,45 @@
 # V1 screen contracts
 
-Status: architect-selected plan. Scope is the whole v1 in the architecture. All screens use Operate mode and [DESIGN.md](../../DESIGN.md). Code-first implementation is recorded in `.impeccable/config.json`; no comp or rendered approval exists.
-
-The first implemented shell covers anonymous local capture/edit, original-text
-detail and language/appearance settings. Until their slices exist, voice, shared
-destinations, task lifecycle and sync controls are absent rather than disabled
-placeholders. The shell uses one filled Type action below its scrolling queue.
-These omissions do not change the full v1 contract below.
-
-## Direction contract
-
-THESIS: Capture locally, choose any available work, and see shared progress without ranking members.
-
-OWN-WORLD: Pale paper, dark ink, evergreen Material controls, flat task rows, and one small martial-arts bunny.
-
-STORY: Open the queue, capture or select a task, act immediately, resolve shared changes when necessary.
-
-FIRST VIEWPORT: Native top bar, compact status strip when needed, full-width queue rows, reachable voice FAB and adjacent Type action, then three labeled navigation destinations. Task content gets the largest area.
-
-FORM: Native shared queue selected by delegated architect judgment. No concept-seed or owner selection is claimed. This planning document substitutes for a direction interview under the owner's autonomous instruction.
-
-FINISH: implementation ends with rendered emulator evidence, Impeccable finish review, reconciled DESIGN.md and token sidecar, and provenance for every shipping raster. None of these rendering checks has run during planning.
+These requirements follow the September 13, 2026 [scope revision](../../shared-task-manager-architecture-v1.md). Use Operate mode, native Material behavior and [DESIGN.md](../../DESIGN.md). The approved rabbit artwork remains unchanged. This document specifies behavior; owning issues contain actual rendered evidence.
 
 ## Navigation and queue
 
-Compact width uses localized destinations Jono / Queue, Tapahtumat / Activity, Yhdessä / Together. These pairs name Finnish and English resources, never hard-coded bilingual labels. Settings opens from the top bar. Preserve scroll, filters, and drafts across navigation. Use system and predictive Back, display/IME insets, and native sheets. At 600 dp use a navigation rail; at 840 dp use queue/detail panes, with a 360 dp minimum queue. Editors stay within 640 dp.
+Use Queue, Activity and Together destinations with Finnish/English resources. Settings opens from the top bar. Adapt navigation to available width, preserve scroll and drafts, honor system Back and display/IME insets. Keep the queue and task content dominant.
 
-Queue rows contain title, claimant name, then relevant due/area/blocker metadata. Containers have a disclosure control and textual progress. Indent children 16 dp through two visible levels; deeper navigation opens detail with a parent breadcrumb. Order remains shared priority. Filter sheets expose available, all active, snoozed, completed, and area views. Deleted tasks live in Settings recovery.
+Queue rows show title, claimant and relevant due/snooze state. Checklist roots show direct items and textual progress. V1 has one child level, no blocker badges, area filters or deeper breadcrumbs. Allow active, snoozed and completed views. Deleted tasks have a recovery view.
 
-The only FAB starts voice. Kirjoita / Type is a neighboring text button, with independent touch space. Reorder through long-press drag or accessible Move before/after actions. Never require dragging. Preserve row position while interacting; explain any canonical reorder after sync without stealing focus.
+Voice is the primary capture action and Type is adjacent. Reorder by long-press drag or accessible move actions; never require dragging. Reconciliation must not steal focus or move a row while the user is acting on it.
 
 ## Capture and task work
 
-Voice opens a sheet with explicit recording label, elapsed time, level indicator, Stop, Cancel, and Type. Ask microphone permission on first use. Denial keeps typing available. Stopping shows local transcription progress, then the committed task. Failures preserve recoverable input and offer Retry or Type. Interrupted recording explains what was retained. Cloud processing is a separate task status; it never gates editing or completion.
+Recording shows elapsed time, recording state, Stop, Cancel and Type. Request microphone permission when needed. Prefer MAI online and installed Parakeet offline; explain a failure without exposing provider mechanics. Keep retry/export/delete for retained unsuccessful recordings. Commit transcript/task before cleaning up audio. Later cleanup never blocks editing or completion.
 
-Typed creation uses an autofocus multiline field, optional description, and expandable due, recurrence, and area controls. Save commits locally; Back retains a draft. Reopening restores it.
+Typed capture starts with one text field. Description and due editing remain available without requiring a metadata form. Save commits locally and Back preserves a draft. Task detail puts title, claim/completion, description and checklist first, followed by scheduling and collapsed original text/attribution.
 
-Task detail orders title, lifecycle/claim, description, subtasks/blockers, scheduling/area, notes, and collapsed provenance. Provenance contains transcript, creator, timestamps, and completers. Actionable tasks expose Complete and Claim/Unclaim. Completion needs no prior claim. Containers derive completion from descendants. Overflow exposes Edit, Split, Clarify, Snooze, Cancel, Delete, and relevant Reopen/Restore actions.
+An actionable task can be completed without a claim. Roots containing items derive completion from those items. Keep Edit, Split, Snooze, Cancel, Delete and applicable Reopen/Restore actions discoverable. No separate Clarify, dependency, area or notes workflow is required in v1.
 
-Manual subtasks use the same editor. Split previews editable children before acceptance. Clarify presents questions and editable suggestions. Keep original text available. Stale AI suggestions show current versus suggested fields and require explicit application. Rejected splits retain the proposal for recovery.
+Manual and AI split preview editable direct checklist items. Stale acceptance retains the draft and explains that the task changed. AI cleanup preserves human corrections and original text; ambiguous dates require an explicit choice.
 
-Due editing separates date-only from timed deadlines and displays timezone for timed values. Snooze offers later today, tomorrow, next week, custom, and unsnooze. Dependencies use searchable task selection and explain blockers or rejected cycles. Recurrence offers daily, weekly, selected weekdays, monthly day, every N periods, and optional end date. Show the next occurrence and distinguish this occurrence from future schedule edits. Notes have author/time and pending status. Areas have shared editable labels. V1 uses areas, not separate tags or effort scores.
+Due editing distinguishes date-only and timed values, with saved zone where relevant. Snooze has useful presets and a custom value. Simple repeat setup offers daily or one weekday, with the next due date and Stop repeating. Schedule edits require connectivity and affect future tasks, not the current task. Explain that the next occurrence appears after sync. No schedule-impact preview, skip-range editor or missed-slot catch-up UI is required.
 
-## Recovery, access, and progress
+## Access and recovery
 
-Sync and AI states remain independent. Show pending count in the top strip, item-specific conflict beside the task, and AI status in detail. Offline pending is neutral. Failed writes retain entered text and offer retry; no success animation precedes a local commit.
+Keep existing sign-in, household creation/join, matching-code invitation approval, owner transfer and member removal flows. Typing works before sign-in; importing anonymous drafts into a household is explicit. Model installation remains optional.
 
-Recovery lists affected tasks and explains the accepted shared state beside this phone's retained change. Offer domain-permitted reapply, copy, or dismiss actions. Claims show the accepted claimant. Deleted/conflicting tasks never silently return. Delete offers Undo; recovery offers Restore. Access removal locks shared actions and preserves recoverable local work without implying continued membership.
+Normal account screens show account/household identity and useful actions. Hide installation IDs, token validation, encryption internals and resolved warnings behind troubleshooting details. Settings includes language, appearance, speech storage, reminders, membership, task recovery and sign-out.
 
-Welcome contains the original mark, one sentence about shared tasks, sign-in, and create/join workspace. Invitation previews the workspace before acceptance. Model setup shows download/storage progress and typing access. Settings covers UI language, appearance, voice model/storage, reminders, workspace members/invites, areas, sync recovery, deleted tasks, and sign-out. Explain retained drafts before sign-out. Network failures expose retry without wiping local content.
+Keep the full recovery experience from [Issue 21](https://github.com/DrBushyTop/bun-do/issues/21): current shared state beside retained intent, explicit reapply/copy/dismiss, same-account export/import and interrupted/low-storage snapshot recovery. Pending text survives refresh. Claims, completion and deletion are never bulk-replayed across an expired identity or epoch. Technical state appears only when it explains a needed action.
 
-Activity is a dated list with actor, action, and task link. Together shows period selection, root completions, start-of-period clearance, queue trend, shared streak, and milestones. Provide chart text equivalents, metric explanations, and last-sync status. A zero denominator reads "No tasks at period start." No member comparison. Empty queue invites capture; empty activity explains when events appear; filtered emptiness offers Clear filters.
+Delete offers Undo and later Restore while retained. A purged task cannot be silently revived. Show actual recovery limitations without adding self-service workspace delete/undelete countdowns, which belong to V2. Account-switch callbacks cannot expose the previous account's content.
 
-## Review fixtures
+## Activity and Together
 
-Use synthetic household tasks, including "Järjestä varasto", an English multiline task, deep subtasks, multiple blockers, long member/area names, ambiguous dates, and simultaneous offline claims. Cover empty/loading/error/retry, process recreation, expired sign-in, removed membership, queued AI, stale suggestions, delete/restore, and recurrence boundaries. All copy, plurals, accessibility labels, notifications, and errors need Finnish and English resources. UI language changes never translate task content. Review actual rendered screens before declaring UI implementation complete.
+Activity is a dated actor/action list with task links when available. Together shows shared weekly/monthly first-completion counts, lifetime total and milestones, and the current weekly streak. Show zero counts as a normal empty state. No clearance percentage, exact midnight trend, rankings or historical finalization status.
 
-## Administration and recovery screens
+Metric details explain that a root counts once, checklist items do not inflate the total, and offline completions count when accepted by the server. The current unfinished week does not break a streak carried from last week. [Dates and progress](../architecture/dates-recurrence-progress.md) defines boundaries. Present numbers and any charts with accessible text equivalents; avoid guilt or loss notifications.
 
-Add pending invitation approval with the matching code, invitation expiry/cancel, owner transfer, and workspace deletion countdown with owner-only Restore. Explain unavailable owner-account recovery without suggesting another member can take ownership. Import and export show text previews, count, destination warning, progress, failure without deletion, and new-ID semantics.
+## Verification and copy
 
-Expired-device and restored-server recovery show old local text beside the current shared state. Copy/edit is explicit. Claims, completion, split, delete and membership actions require a new action; never provide bulk automatic replay. A purging deletion group explains that restore is no longer available. A response arriving after account switch cannot reveal the previous account's content.
+Check each flow during implementation, then walk the complete reduced v1 before final release verification. Remove routine technical success notices and stale warnings as screens are built. Finnish must read naturally; task content keeps its own language.
 
-Recurrence editing shows the activation date and retained future occurrences. Offline edits keep an impact preview and reject visibly if the shared schedule changed. Catch-up shows its oldest pending slot and explicit skips. Together distinguishes lifetime completion credit from period clearance and shows calculating states until boundary snapshots are ready.
+Use actual emulator views in light/dark themes and large text, with TalkBack labels, adequate touch targets, system Back, insets and reduced motion. Cover empty state, permission denial, interrupted recording, account change, simultaneous claims, AI finishing after an edit, delete/undo, snapshot recovery, a weekly boundary and a late synced completion. V2 screens are not release fixtures.

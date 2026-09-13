@@ -1,64 +1,39 @@
-# Durable AI work and safe result application
+# AI cleanup and checklist split
 
-Architecture decision, 2026-09-12. Resolves [Define durable AI work and safe patch application](https://github.com/DrBushyTop/bun-do/issues/7). It extends [task-domain.md](task-domain.md), [dates-recurrence-progress.md](dates-recurrence-progress.md), and the revisioned sync contract. This is the full v1 AI design. It does not create Azure resources or prove a model deployment.
+V1 uses one configured model for cleanup and split. [Clarify](https://github.com/DrBushyTop/bun-do/issues/29) and [optional placement, escalation and worker recovery](https://github.com/DrBushyTop/bun-do/issues/49) are V2 work. This replaces the earlier full AI job/accounting contract.
 
-## Boundary and provider
+## Boundary and useful result
 
-The Android client submits AI intent through the normal authenticated command path. The Function app owns prompts, model calls, validation, and every canonical write. Android never receives a Foundry credential.
+Android submits authenticated AI intent through the normal command path. The backend owns prompts, provider credentials, validation and canonical writes. A task and its original text exist before cleanup succeeds. AI failure never blocks manual task work.
 
-Luna is the default deployment. Terra is an optional configuration-driven escalation. The owner assumes all required models will be available in the new dedicated Bun Do resource group. That is a deployment assumption, not a quota, latency, schema, or invocation result.
+Cleanup may propose or update title, description and content language using the task's original language. Explicit deadlines use capture time; ambiguous deadlines require confirmation. V1 does not extract areas, reorder tasks, create repeat schedules or change claims, completion, membership, IDs or hierarchy. The date/details slice adds explicit due extraction after initial text cleanup. [Recurrence extraction](https://github.com/DrBushyTop/bun-do/issues/44) and [explicitly requested queue placement](https://github.com/DrBushyTop/bun-do/issues/49) are deferred to V2, with human confirmation for schedules and stale-result guards for moves.
 
-Use the Azure OpenAI v1 Responses API with `model` set to the deployment name, `text.format` set to one of the schemas in `contracts/ai/`, and `store: false`. Requests have no tools. Responses, strict-output limits, and provider model availability remain subject to the live deployment gate. [Responses API](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/responses), [structured outputs](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/structured-outputs).
+Use the chosen provider's structured-output contract and server-side semantic validation. Code and provider schemas own request shape and technical bounds. Trim deferred fields from active prompts/schemas when implementing this slice; existing unused schema files are not a requirement to expose V2 features. Refusal, invalid output and provider failure retain the task and offer retry or manual editing. No schema failure escalates to another model.
 
-## Durable job state
+## Durable requests and safe application
 
-One `ai-job:{id}` document lives in the workspace partition. It contains `kind` (`EXTRACT`, `CLARIFY`, `SPLIT`), requester member ID, target task ID, accepted workspace revision, prompt/schema versions, selected deployment policy, input hash, immutable private input snapshot reference, base versions, token reservation, attempt count, dispatch marker, status, lease fence, and result metadata. Do not retain prompt or model text in telemetry.
+Persist accepted AI intent with the task's visible pending state and normal operation receipt. Keep request identity, requester, input snapshot, expected task versions and enough status to resume or offer Retry after interruption. A worker must not lose accepted work or apply a result twice. Choose the smallest worker implementation that proves those behaviors; a generic job framework is unnecessary.
 
-A user command that requests AI writes the task's visible `aiState`, immutable job intent, private input snapshot, operation receipt, activity, change records, and workspace revision in **one** conditional transactional batch. Initial status is `ACCEPTED`. The server validates membership, size limits, target state, and job admission before that batch. The private snapshot is readable only inside the workspace partition, never telemetry. Terminal-job input snapshots are scrubbed after seven days. Terminal metadata lasts 30 days, then becomes compact aggregate counters. An accepted command survives a crash even if no worker runs.
+A request may be pending, running, ready, failed or superseded. Use conditional ownership and task-version checks when applying results. A late worker, cancelled request, deleted task, removed member or changed account/epoch cannot mutate the current task. A restarted worker can leave uncertain work retryable. Bounded retries may incur a duplicate provider charge; v1 promises one visible result application, not exactly-once billing.
 
-```text
-ACCEPTED -> READY -> RUNNING -> SUCCEEDED
-                     |          -> SUPERSEDED | CANCELLED | FAILED
-                     -> RETRY_WAIT -> READY
-                     -> UNKNOWN_OUTCOME
-```
+Keep input/output text out of telemetry and discard private AI input when no longer needed for active work or user recovery. Record operational timings, status and usage counts without prompt text. No token reservations, daily budgets, fairness quotas, durable SENT ledger or named UNKNOWN_OUTCOME state is required for v1. V2 may revisit worker handling using observed failures.
 
-A best-effort queue message may wake a worker, but it is only a hint. A timer sweep is authoritative: it finds `ACCEPTED`, due `RETRY_WAIT`, and expired `RUNNING` jobs, then advances them under the workspace revision CAS. It may reclaim an expired `RUNNING` job only before its dispatch marker is written; an expired job marked `SENT` becomes `UNKNOWN_OUTCOME`. A job cancellation, task deletion, membership removal, restore epoch change, or explicit newer request sets `CANCELLED` or `SUPERSEDED` in that same boundary.
+## Human edits and suggestions
 
-## Leases, retries, and call cost
+Preserve the existing field/human-version distinction. Automatic patches require the exact base field version plus relevant lifecycle, hierarchy and deletion guards. A pending human edit can override an AI-only change while a concurrent human edit remains a recoverable conflict. Never discard original text or silently replace a human correction.
 
-A worker claims `READY` with a new random lease ID, incremented integer `leaseFence`, a two-minute `leaseExpiresAt`, and `RUNNING` status in one revisioned write. It renews the same lease every 30 seconds through the workspace CAS. Immediately before the cloud call, it writes `dispatchMarker: SENT` with that lease fence. Only the worker holding that exact lease ID and fence may finish the job. A late callback loses its result rather than overwriting newer state.
+When a result is stale or ambiguous, keep the useful proposal available for explicit comparison/application while its task or local recovery record is retained. It cannot mutate the task automatically. V1 does not require a separate timed suggestion-archive service.
 
-The cloud call happens outside Cosmos transactions. Before it starts, the worker records the reserved input/output token ceilings and attempt. On return, it records provider request ID when supplied, usage, latency, and result class without task text. Every status transition and result application creates a workspace change and advances the revision.
+## Split
 
-Retry only failures known not to have produced a completion, such as admission throttling, a rejected request, or a pre-send transport failure. Use at most three total attempts with bounded backoff. A known configuration 4xx, including a schema rejection, is terminal and never retries or escalates to Terra. Timeout, dropped connection after `SENT`, an expired sent lease, and malformed provider response after a possible completion become `UNKNOWN_OUTCOME`; do not automatically make a duplicate paid call. A member may explicitly retry, creating a new job and a new budget reservation.
+Split produces an editable preview for direct checklist items and no immediate task mutation. Acceptance carries the final child list and relevant parent text/lifecycle/hierarchy/deletion versions. The normal manual split command validates the bounded list and atomically converts the root and creates children. A stale acceptance makes no partial change and preserves the draft for a fresh action. Model output cannot authorize a split itself.
 
-Per attempt, cap input at 8,000 tokens. Cap output at 1,200 tokens for extraction/clarify and 1,600 for split. Admit at most three live jobs and 20 new jobs per workspace per day. Reserve the full ceiling for each accepted attempt against a 100,000-token workspace daily budget. Replace the reservation with reported usage when it arrives. An `UNKNOWN_OUTCOME` reservation is not released, because its cost is uncertain. Charge known failed attempts too. A disabled AI kill switch leaves accepted jobs queued and does not affect task sync.
+## Usage policy
 
-## Safe patches and suggestions
+The owner wants no product AI quotas initially. [Usage-policy review](https://github.com/DrBushyTop/bun-do/issues/37) starts only after V2 and may conclude that no limits are needed. Do not introduce product recording-duration caps, per-day jobs, monthly tokens, account fairness limits or budget reservations in V1 or V2.
 
-The [command catalog](command-catalog.md) gives independently editable `title`, `description`, `contentLanguage`, and `area` fields plus atomic `due`, `recurrence` reference, `lifecycle`, `claim`, `hierarchy`, and `orderIntent` groups a `fieldVersion` and `humanVersion`. Every accepted server change advances affected `fieldVersion`. Only an explicit human command advances `humanVersion`; AI and derived writes do not.
+Keep authentication, provider constraints, bounded request/output sizes, memory limits and timeouts. These are technical failure controls, not household consumption policy. Preserve input when a technical bound prevents processing and explain the available action. Operational worker concurrency may protect the runtime without imposing a product usage allowance.
 
-An extraction patch records the base field and human versions for every requested group plus exact `lifecycleVersion`, `hierarchyVersion`, and `deletionVersion`. Apply a proposed group only when its `fieldVersion` still equals the recorded base and the task's lifecycle, hierarchy, and deletion versions still match. An AI order change also requires the recorded `orderIntent.fieldVersion` and `orderIntent.humanVersion`. The patch never changes claims, lifecycle, membership, dependencies, IDs, or task hierarchy.
+## Verification
 
-A pending local human edit replays in command order against canonical state. If an intervening AI-only patch changed the field but its `humanVersion` still matches the command base, the human edit applies and supersedes that AI value. If a remote human edit changed `humanVersion`, preserve the local edit as a conflict variant. Never silently choose between two human edits.
-
-Explicit AI placement becomes a normal `MoveTask` only when both recorded order-intent versions still match. It cannot replace a manual move. `needsReview: true`, or an ambiguity about due date, recurrence, or placement, blocks automatic application of that group. The server retains it as a suggestion rather than guessing. Recurrence is always a proposal: only an explicit human confirmation creates a template. That confirmation records the current ordinary task as `seedTaskId`, outside the canonical occurrence series, and starts the first slot strictly after its nominal local date. The task keeps its UUID; future occurrences use canonical occurrence IDs. Neither generator nor prediction recreates that seed date. The server verifies dates, workspace area IDs, task limits, and all domain rules after schema validation.
-
-Clarify is always non-destructive. Its result is a versioned suggestion document. The user may copy or edit its fields through an ordinary human edit command. Superseded or partially unapplied AI values remain as recoverable suggestions for 30 days; they do not disappear just because one patch group lost its CAS race.
-
-## Split preview and commit
-
-A split job records the exact parent `hierarchyVersion`, `lifecycleVersion`, `deletionVersion`, parent-leaf precondition, and `fieldVersion` for title, description, and content language. A valid result creates `ai-split-proposal:{id}` in the same revisioned batch as `SUCCEEDED`. The proposal has `proposalVersion: 1`, immutable generated children, a 24-hour `expiresAt`, and no task mutation.
-
-The preview is editable. `ACCEPT_SPLIT_PROPOSAL` carries proposal ID, proposal version, and the user's final child list. Before committing, the server requires that the proposal is unexpired, the parent still has the recorded hierarchy/lifecycle/deletion and title/description/content field versions, and the final list meets the normal manual split rules. It then atomically converts the parent and creates the edited children. The model's list is never committed by itself. A stale, expired, cancelled, or already accepted proposal fails without a partial split.
-
-## Validation and failure handling
-
-The JSON schemas only constrain shape. The server rejects empty or overlong text, invalid semantic dates/recurrence, unknown area IDs, duplicate or near-duplicate split children, a split child count outside 1–8, unsafe placement, disallowed language, and task/domain limits. It records `FAILED_SCHEMA`, `FAILED_VALIDATION`, `FAILED_CONFIGURATION`, `FAILED_PROVIDER`, `THROTTLED`, `UNKNOWN_OUTCOME`, or `SUPERSEDED` as machine-readable status. A schema configuration error is not retried or escalated to Terra.
-
-Refusal and incomplete Responses output are terminal job results with a localized client code. Preserve the original task and show retry or manual editing. Log correlation IDs, deployment, model version, schema/prompt version, token counts, latency, and status only. Never log household text, raw prompts/responses, audio, JWTs, or provider credentials.
-
-## Provider schemas
-
-The three files below use the strict-output subset: every object has `additionalProperties: false`; every property is required; nullable values carry `null` in their type. `mixed` preserves code-switched Finnish/English content. They intentionally omit `maxLength`, `maxItems`, `minItems`, `pattern`, and unsupported size constraints. The request wrapper supplies a stable schema name and `strict: true`; server validation enforces the real limits.
+Exercise representative Finnish, English and mixed-language tasks on the actual configured endpoint, including refusal, malformed output, ambiguity, human edits during inference, cancellation, duplicate delivery and interrupted requests. Use results to refine prompts; a fixed synthetic corpus count or an unused model deployment is not a release gate.

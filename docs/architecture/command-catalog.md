@@ -1,63 +1,46 @@
 # Commands and version groups
 
-This catalog is normative for wire protocol 1. Every mutable group has `fieldVersion` and `humanVersion`. Versions are workspace revision stamps, encoded as decimal strings. `expected` below means the exact field version unless the row explicitly allows human-only comparison. Derived and AI changes advance field version without inventing a human action.
-
-New entities initialize every group at their creation revision. Optional values still have a version when null. A command that sets the same value and has valid preconditions is an accepted no-op receipt, without changing that field's version. Receipt/revision bookkeeping still commits.
+The revised v1 retains the existing protocol, operation identities, receipts and field/human version rules. This catalog states domain preconditions; implementation types and serialization live in code. New entities initialize version groups at creation. A valid same-value edit is an accepted no-op with normal receipt bookkeeping.
 
 ## Task groups
 
-| Group | Values | Writer and rule |
-| --- | --- | --- |
-| `title`, `description`, `contentLanguage` | Each value separately | Human edit compares human version; AI compares field version. |
-| `due` | Kind, nominal local values, pinned zone, resolved instant and resolution | Atomic human edit or validated AI patch; uncertain AI is proposal-only. |
-| `area` | Nullable area ID | Human or AI; area must be active when assigning. |
-| `recurrence` | Template/occurrence reference | Explicit user confirmation or canonical materialization; AI only proposes. |
-| `lifecycle` | OPEN, COMPLETED, CANCELLED, actor/time and cancellation group | Exact expected version; container values derive from descendants. |
-| `claim` | Claimant and claim eligibility/version | Exact expected claim and lifecycle; inactive member's claim is ineligible. |
-| `snooze` | Nullable until-instant | Human; exact lifecycle and snooze. |
-| `dependencies` | Up to eight explicit prerequisite IDs | Human; exact dependencies, hierarchy and deletion, then combined graph validation. |
-| `hierarchy` | Kind, parent/root references and child membership | Parent/root immutable. Split/add changes parent and ancestor progress atomically. |
-| `deletion` | Deletion group, former leaf state, deleted time and purge state | Human delete/restore or maintenance; exact group versions. |
-| `orderIntent` | Last intentional placement request | Human or explicit AI placement; task version is separate from list rank data. |
-
-Container recomputation advances lifecycle when the derived value changes. It does not advance title or human lifecycle version. First-completion credit is immutable after assignment, outside editable groups. Completion events and current completer presentation are not the same as lifetime credit.
-
-## Task command preconditions
-
-| Command | Required observation and outcome |
+| Group | Values and rule |
 | --- | --- |
-| CreateTask | Device-derived new ID, active workspace, active area if supplied, all limits; no entity upsert. |
-| EditTask | Requested group's human versions plus exact deletion; cannot change lifecycle or hierarchy indirectly. |
-| MoveTask | Exact own order intent, expected parent and deletion; resolve live anchors without requiring list version. A remote move of another task does not reject it. |
-| ClaimTask | Exact claim/lifecycle/deletion, current availability; claimant must be actor. |
-| UnclaimTask | Exact claim/deletion, actor owns claim or is workspace owner. |
-| CompleteTask | Exact lifecycle/hierarchy/claim/deletion, current prerequisites and snooze eligibility. Completing another member's claim requires explicit `confirmOtherClaim`. |
-| ReopenTask | Exact lifecycle/hierarchy/deletion; recompute ancestors, never clear lifetime credit. |
-| CancelTask | Exact lifecycle/hierarchy/deletion; bounded descendants are evaluated canonically. |
-| SetSnooze/ClearSnooze | Exact lifecycle/snooze/deletion; clear current claim atomically. |
-| AddDependency/RemoveDependency | Exact dependencies/hierarchy/deletion; recompute validation from canonical graph. |
-| SplitTask/AddChildren | Exact parent hierarchy/lifecycle/deletion, bounded canonical root; new child IDs derive from this command. AI proposal additionally guards input text versions. |
-| DeleteTask | Exact selected deletion/hierarchy/lifecycle plus `subtreeVersion`, which advances on any descendant task mutation; no stale cascade over newly edited children. |
-| RestoreTask | Exact deletion group version, unpurged group and live ancestors; revalidate graph and root admission. |
-| AddNote | Task not deleted, expected deletion, device-derived new note ID. |
-| EditNote/DeleteNote/RestoreNote | Note text human version or exact deletion version as appropriate, task deletion guard, current membership. |
+| title, description, contentLanguage | Human edits compare human version; automatic AI patches compare exact field version. |
+| due | Date-only or timed values with saved zone; atomic edit, ambiguity requires confirmation. |
+| lifecycle | OPEN, COMPLETED or CANCELLED with actor/time; exact observation. Checklist roots derive state from items. |
+| claim | Claimant and eligibility; exact claim/lifecycle, claimant must be the actor. |
+| snooze | Nullable until-instant; exact lifecycle/snooze. Root snooze also covers checklist availability. |
+| hierarchy | Root/direct-item relationship and child membership; parent/root immutable in v1. |
+| deletion | Deletion group and retained state; explicit restore only. |
+| orderIntent | Last intentional placement, separate from list ranks; exact version for a move of the same task. |
+| recurrence | Optional simple-repeat/current-occurrence reference; explicit schedule actions or server generation only. |
 
-`subtreeVersion` lives on the root and advances on every descendant task mutation, including notes. Cascade delete/cancel/split previews carry it where the preview covers descendants. It is a conflict guard, not a field that a client can edit. Count that root write and snapshot in every batch. A leaf-only text edit still compares only its requested human groups.
+First-completion credit is immutable metadata outside editable groups. Derived checklist state advances lifecycle only when it changes. Deeper graph dependencies, note/area entities and offline recurrence predictions have no required v1 commands.
 
-Human MoveTask arriving after another move of that same task rejects on own `orderIntent`; moves of different tasks resolve by accepted server order. An AI move compares both order field and human versions. The command's anchors are intent, not authorization or evidence of a historic neighbor list.
+## Preconditions
 
-## Other entities
+| Command | Required behavior |
+| --- | --- |
+| CreateTask | Valid device-derived new ID, membership and technical bounds; never upsert a deleted ID. |
+| EditTask | Requested human versions and deletion guard; cannot change lifecycle or hierarchy indirectly. |
+| MoveTask | Own order version, expected parent and deletion guard; deterministic live-anchor resolution. |
+| ClaimTask / UnclaimTask | Current eligibility and claim/deletion guards; only claimant or owner may release. |
+| CompleteTask / ReopenTask | Exact lifecycle/hierarchy/claim as applicable and deletion; confirm another person's claim. Recompute checklist root and preserve first credit. |
+| CancelTask | Exact lifecycle/hierarchy/deletion; guard and atomically update any affected checklist items. |
+| SetSnooze / ClearSnooze | Exact lifecycle/snooze/deletion; clear affected claims atomically. |
+| SplitTask / AddChildren | Open parent and observed hierarchy/lifecycle/deletion; bounded direct items with command-derived IDs. AI acceptance also guards input text versions. |
+| DeleteTask | Exact deletion/lifecycle/hierarchy; root cascades guard observed subtree version. |
+| RestoreTask | Retained unpurged deletion group and live parent; preserve independent deletion groups and no claims. |
 
-An area has independent name human version and deletion version. A note has text human version and deletion version. Templates have `scheduleVersion` and `generation` for user schedule/blueprint edits, plus `materializationVersion` for the generator cursor and skips. Predictions guard schedule version/generation, not unrelated worker cursor advances. A skip also guards the impacted range and materialization version. Template edits with an impact preview guard both versions; stale offline edits stay recoverable.
+A root subtree version advances for mutations to direct items. Guard destructive cascades and confirmed previews with it; an independent text edit still compares only requested human fields. Root and item effects must fit one supported batch. Repeat-linked reopen/restore also checks that it cannot produce a second OPEN occurrence.
 
-Membership, workspace defaults, invitations and owner transfer use their exact canonical entity versions and the workspace revision CAS. Removed membership invalidates all command types. Changing defaults does not rewrite previously pinned task dates or statistics zone.
+## Other commands
 
-AI requests use stable device operation identities. Job lease fence, status and proposal version follow the AI contract. User cancellation requires current job version; server invalidation does not wait for a client. An internal effect key and expected phase prevent duplicate transition effects.
+Membership, invitations, owner transfer and workspace defaults keep their existing authorization and exact-version checks. All external commands carry the current epoch and registration; authorization and receipt handling happen before domain validation.
 
-All commands include the current state epoch and installation registration. Sync performs authorization, receipts and sequence checks before these domain rules. Conflict errors return a stable code, affected group, expected/current version and the client's recoverable intent reference.
+AI requests use normal stable operation identities. Results require current request ownership, membership and target versions; accepted split uses the manual split operation. The [AI contract](ai-processing.md) owns retry/application behavior.
 
-## Recurrence creation and prediction
+Simple repeat creation/edit/stop requires online confirmation and an observed schedule version. The server persists a stable identity for each generated occurrence and advances the current occurrence conditionally. Completion, cancellation or deletion records the repeat transition atomically with its task effect, or durable generation intent in that same boundary. See [dates and progress](dates-recurrence-progress.md). No client MaterializePredictedOccurrence, skip-range command or schedule-impact journal is required.
 
-`CreateRecurrenceTemplate` derives its UUIDv5 ID from device namespace and ASCII `template/{sequence}/0`. It carries the closed rule, anchor, zone, blueprint and optional `seedTaskId` with the task's expected recurrence/deletion versions. A seed remains an ordinary task and is not a canonical occurrence. Its date is excluded by choosing the first template slot strictly after that date. Ordinary standalone templates have no seed. The creation receipt returns schedule/materialization versions for later `AfterOperation` references, so a phone can calculate identities before reconnecting without submitting arbitrary template IDs.
-
-`MaterializePredictedOccurrence` carries the exact canonical key/ID, schedule version/generation and the rule-derived blueprint hash. It creates one eligible missing root, or finds the existing matching key; it never changes a found task. The result receipt returns its canonical version groups. A following edit/claim/complete depends on that receipt with `AfterOperation`, uses those output versions and undergoes the normal current-state checks. Store the user's action separately until materialization succeeds. This is intentionally two bounded commands, not an undefined nested action. If the occurrence was deleted/purged, skipped or superseded, preserve the dependent action as recovery rather than creating another root. The server's generation cursor and lifetime compact materialization ranges identify already-used slots even after a task is purged. Retain generation summaries until template purge; old-generation predictions never create after a schedule edit.
+Conflict responses identify the affected task/group and current state while retaining local intent. A new user correction creates a new command. Never change frozen submission bytes or silently advance a stale precondition to make a command succeed.

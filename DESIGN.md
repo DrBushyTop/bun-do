@@ -86,7 +86,7 @@ components:
 ---
 # Bun Do design direction
 
-Status: the anonymous Android capture/edit shell now includes offline voice capture and recording recovery. The full v1 direction below remains a plan where the shell has no matching feature. The owner-approved salute and its vector assets remain unchanged in `assets/brand/`. The frontmatter extracts the shell's Compose tokens; `.impeccable/design.json` records their extensions. Neither artifact claims owner approval of the rendered UI.
+Status: the anonymous Android capture/edit shell now includes offline voice capture and recording recovery. The direction below applies to the reduced v1 scope in shared-task-manager-architecture-v1.md; owning issues track implemented flows. The owner-approved salute and its vector assets remain unchanged in `assets/brand/`. The frontmatter extracts the shell's Compose tokens; `.impeccable/design.json` records their extensions. Neither artifact claims owner approval of the rendered UI.
 
 ## Identity
 

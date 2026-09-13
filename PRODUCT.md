@@ -8,47 +8,48 @@ android
 
 ## Stack
 
-The selected stack is Kotlin, Jetpack Compose, Room, WorkManager and an Azure .NET 10 backend, with Aspire for local backend composition and Bicep for deployment. The owner delegated architecture to the agent. A tested .NET typed-command and replica model now exists. The local Aspire/Functions health host runs through Podman with Azurite, loopback-only listeners and request telemetry. The native Android shell implements anonymous offline typed and voice capture, with task editing. Azure deployment is a separate slice. Resolved contracts live in docs/architecture; live deployment checks are implementation gates.
+Kotlin, Jetpack Compose, Room and WorkManager on Android. Azure .NET backend with Cosmos, Aspire for local development and Bicep for deployment. [Architecture contracts](docs/architecture/README.md) define boundaries. Current implementation and test evidence live in the owning GitHub issues.
 
 ## Users
 
-Two people sharing household tasks are the initial audience. The workspace model supports more members. The app should help them capture work and see what they are getting done together.
+Two people sharing household tasks. Capture work quickly, choose what to do, and see progress together without member rankings.
 
 ## Product purpose
 
-Bun Do is a shared task queue with local voice capture and durable offline task actions. A task exists locally before cloud AI processes it. Typing is a first-class alternative.
+Speak or type a task, make it actionable, share it, and finish it. Tasks and everyday edits commit locally before waiting for sync or AI. Typing is always available.
 
 ## Operating context
 
-Users dictate or type tasks, choose any available task, claim and complete work, reorder the queue, and synchronize after reconnecting. UI and task content support Finnish and English independently. Finnish is the fallback language.
+Users can claim, complete, reopen and reorder tasks offline. Finnish is the default UI language; English is supported throughout. UI language never translates task content. MAI is the selected online transcription path and installed Parakeet is the offline fallback. Transcription and later AI cleanup are separate steps.
 
 ## Capabilities and constraints
 
-The owner confirmed the full v1 scope on 2026-09-12, including offline collaboration, local speech, AI enrichment/split/clarify, nested subtasks, dependencies, recurrence, notes, areas, due dates, snooze, deletion/recovery, activity, and shared statistics. Build stages do not authorize feature removal. The detailed scope lives in [the architecture](shared-task-manager-architecture-v1.md).
+The owner reduced v1 on September 13, 2026. Keep shared task work, description, original text, due/snooze, delete/restore, cleanup and one-level manual/AI checklist split, simple daily/weekly repeats, reminders, activity, weekly/monthly completion counts, lifetime milestones and a weekly streak. The full in-progress stale-client recovery slice remains v1.
 
-Azure is the selected backend platform. New resources go into a dedicated Bun Do resource group through Bicep. The owner assumes Foundry model availability. Raw audio stays on the phone in the normal voice path. Cloud AI receives text. The target phones are the vivo X300 Ultra and OnePlus 13, confirmed by the owner. Device-specific performance remains unmeasured. Concurrency and recovery rules are specified in the [implementation contract](docs/architecture/README.md). Agents test functional behavior on two Android emulator profiles on this Mac.
+Deeper task graphs, notes/areas, AI clarify, advanced recurrence, exact historical statistics, FCM and expanded workspace operations move to [V2](https://github.com/DrBushyTop/bun-do/issues/42). [Product scope](shared-task-manager-architecture-v1.md) owns the release boundary.
 
-The owner chose to skip the separate speech feasibility experiment and proceed on the assumption that local Parakeet works on both phones. This is an accepted planning assumption, not measured evidence. Normal implementation testing still covers offline recording, transcription and recovery.
+AI product quotas are absent initially. Review usage policy only after V2 using measured household usage. Technical payload, memory, output and timeout bounds remain.
 
-The Android voice path installs and verifies the local Parakeet model, then records and transcribes without a network connection. Stopping a recording transcribes it and commits the task locally before opening its detail. Interrupted, canceled or unsuccessful recordings remain available for retry, explicit export or deletion. The app displays retention limits and expiry dates, explains microphone denial and silence, and keeps typing available without microphone permission or the model. Export uses the user's chosen destination and warns that it may be a cloud drive.
+Simple repeat generation and schedule changes need connectivity. Existing tasks remain usable offline. Shared statistics use server acceptance dates; a late offline completion counts when synced. The weekly streak has no penalties or neutral-week accounting.
 
-MAI is selected for a separate online speech path, but that path is not implemented in the app. [Prefer MAI online transcription with recoverable offline fallback](https://github.com/DrBushyTop/bun-do/issues/38) tracks it and requires authentication. It does not change the current local-only voice behavior.
+Audio sent online goes through the authenticated backend and stays out of logs and public storage. Preserve local recording recovery until text commits. Account switching never exposes another account's work. Recovery explains what happened and the available action, with technical diagnostics behind explicit details.
 
 ## Brand commitments
 
-The name is Bun Do, "the way of the bun." Bun means bunny. The owner supplied xkcd's King Bun as a reference and approved the refined martial-arts rabbit salute in `assets/brand/`, retaining its defined nose and the same drawing at small sizes. Preserve the small rabbit's dignity and dry humor. UI work must use Impeccable with native Android guidance.
+Bun Do means "the way of the bun." Preserve the owner-approved original rabbit salute in `assets/brand/`, including its defined nose and the same drawing at small sizes. Its humor is quiet and dignified. Use Impeccable with native Android guidance for UI work.
 
 ## Evidence on hand
 
-The repository contains the architecture proposal. The owner supplied an image of [xkcd's Bun comic](https://xkcd.com/1682/). This is a reference, not a completed app logo. The anonymous Android shell now has a Room-backed queue, typed capture/edit, local voice capture with recording recovery, task detail and bilingual appearance/language settings. It has no sign-in, online speech, shared commands or sync yet. No measured physical-device benchmark, tablet validation or owner approval of the rendered app is claimed.
+GitHub contains slice completion and rendered verification evidence. The owner approved the rabbit artwork, not every future rendered screen. The target phones are vivo X300 Ultra and OnePlus 13; agents verify functional behavior on two Android emulator profiles. The separate phone benchmark was skipped and physical-device performance remains unmeasured.
 
 ## Product principles
 
-- Commit task actions locally before waiting for the network.
-- Preserve user intent when devices disagree or AI finishes late.
-- Reward shared progress without comparing members.
-- Keep task content in its original language.
+- Commit everyday task actions locally before waiting for the network.
+- Preserve human text when devices disagree or AI finishes late.
+- Keep capture and completion easy to reach.
+- Show shared progress without comparing members.
+- Show warnings when the user needs to act, not as routine technical status.
 
 ## Accessibility and inclusion
 
-Typing must work without microphone access. Finnish and English need complete UI coverage and accessibility labels. The visual review must cover text scaling, contrast, touch targets, reduced motion, and understandable conflict/recovery states.
+Keep typing available without microphone permission or a speech model. Provide complete Finnish/English copy and accessibility labels, large-text layouts, sufficient contrast, accessible reorder controls and reduced motion. Review actual Android screens for each implemented flow.
