@@ -4,6 +4,7 @@
   "parameters": {
     "location": { "value": "swedencentral" },
     "resourceGroupName": { "value": "rg-bun-do-dev-swc" },
+    "identityAudience": { "value": "d33b7867-41ed-45c3-805a-b5e841323d20" },
     "lunaModel": { "value": "gpt-5.6-luna" },
     "lunaVersion": { "value": "2026-07-09" },
     "lunaSku": { "value": "DataZoneStandard" },

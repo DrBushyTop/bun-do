@@ -22,7 +22,37 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += "arm64-v8a" }
     }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
+    buildTypes {
+        create("local") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".local"
+            versionNameSuffix = "-local"
+            matchingFallbacks += "debug"
+        }
+        getByName("debug") {
+            val api = providers.gradleProperty("bundoApiBaseUrl").orElse("http://10.0.2.2:7275/api").get()
+            require(api == "http://10.0.2.2:7275/api" ||
+                api == "https://func-bun-do-dev-qrquvcgmhocc6.azurewebsites.net/api")
+            buildConfigField("String", "IDENTITY_API_BASE", "\"$api\"")
+        }
+        getByName("local") {
+            buildConfigField("String", "IDENTITY_API_BASE", "\"http://10.0.2.2:7275/api\"")
+        }
+        getByName("release") {
+            buildConfigField("String", "IDENTITY_API_BASE",
+                "\"https://func-bun-do-dev-qrquvcgmhocc6.azurewebsites.net/api\"")
+        }
+    }
+    for (variant in listOf("debug", "local")) {
+        sourceSets[variant].java.srcDir("src/authCheck/java")
+        sourceSets[variant].res.srcDir("src/authCheck/res")
+    }
+    sourceSets["release"].java.srcDir("src/authCheck/java")
+    for (variant in listOf("debug", "release")) {
+        sourceSets[variant].java.srcDir("src/microsoft/java")
+        sourceSets[variant].res.srcDir("src/microsoft/res")
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -83,6 +113,8 @@ val prepareSherpa by tasks.registering {
 val sherpaRuntime = files(sherpaArchive).builtBy(prepareSherpa)
 
 dependencies {
+    debugImplementation("com.microsoft.identity.client:msal:8.4.2")
+    releaseImplementation("com.microsoft.identity.client:msal:8.4.2")
     val composeBom = platform("androidx.compose:compose-bom:2025.12.00")
     implementation(composeBom)
     androidTestImplementation(composeBom)
@@ -98,6 +130,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
     implementation("androidx.room:room-runtime:2.8.4")
     implementation("androidx.room:room-ktx:2.8.4")
+    implementation("net.zetetic:sqlcipher-android:4.10.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("org.apache.commons:commons-compress:1.28.0")
     implementation("androidx.work:work-runtime-ktx:2.10.5")

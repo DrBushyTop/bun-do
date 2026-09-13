@@ -3,17 +3,21 @@ package fi.bundo.data
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import java.io.File
+import fi.bundo.BunDoApplication
 
 /** Best-effort background expiry. Opening/retrying/exporting also enforces the deadline. */
 class AudioExpiryWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
-        val database = InboxDatabase.open(applicationContext)
+        val accounts = (applicationContext as BunDoApplication).accounts
+        val account = accounts.matching(inputData.getString("owner"), inputData.getString("generation"))
+            ?: return Result.success()
         return try {
-            RecordingStore(database, File(applicationContext.noBackupFilesDir, "anonymous-audio")).prune()
+            account.recordings.prune()
+            Result.success()
+        } catch (_: kotlinx.coroutines.CancellationException) {
             Result.success()
         } catch (_: Exception) {
             Result.retry()
-        } finally { database.close() }
+        }
     }
 }

@@ -1,0 +1,9 @@
+<resources>
+    <string name="identity_cached">This local account is available offline. Refresh to check backend access.</string>
+    <string name="identity_browser">Requesting a local token…</string>
+    <string name="identity_refreshing">Requesting a fresh local token…</string>
+    <string name="identity_verifying">Checking local backend access…</string>
+    <string name="identity_verified">Sign-in verified. The backend accepted the local account.</string>
+    <string name="identity_failed">Local sign-in failed. Start the backend in Local identity mode, then try again.</string>
+    <string name="identity_signed_out">Signed out of the local account.</string>
+</resources>

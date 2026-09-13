@@ -101,7 +101,7 @@ class RecordingStoreTest {
         assertEquals(0, directory.listFiles()!!.size)
     }
 
-    @Test fun backgroundConnectionExpiryInvalidatesForegroundRecoveryList() = runBlocking {
+    @Test fun backgroundExpiryInvalidatesForegroundRecoveryList() = runBlocking {
         val now = System.currentTimeMillis()
         val row = store.begin(now)
         store.audio(row.id).writeBytes(byteArrayOf(0, 0))
@@ -114,14 +114,12 @@ class RecordingStoreTest {
             }
         }
         withTimeout(10_000) { observing.await() }
-        val background = InboxDatabase.open(context, name)
         try {
-            RecordingStore(background, directory).prune(now + RecordingStore.RETAIN_MILLIS)
-            background.close() // Match the worker's immediate finally-close.
+            // The account-aware worker now shares the active account's store.
+            kotlinx.coroutines.withContext(Dispatchers.IO) { store.prune(now + RecordingStore.RETAIN_MILLIS) }
             assertTrue(removal.await().isEmpty())
             assertFalse(store.audio(row.id).exists())
         } finally {
-            background.close()
             removal.cancel()
         }
     }

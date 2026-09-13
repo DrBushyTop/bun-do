@@ -51,6 +51,18 @@ class FoundationPlanTests(unittest.TestCase):
             with self.subTest(payload=payload), self.assertRaises(ValueError):
                 foundation.validate_changes(payload, "test")
 
+    def test_explicit_ignore_exception_does_not_allow_other_unsafe_changes(self):
+        ignored = "/subscriptions/test/resourceGroups/rg-bun-do-dev-swc/providers/Microsoft.CognitiveServices/accounts/speech-test"
+        foundation.validate_changes(self.plan(ignored, change="Ignore"), "test", [ignored.upper()])
+        for plan in (
+            self.plan(change="Ignore"),
+            self.plan(ignored, change="Delete"),
+            self.plan(ignored, change="Ignore", unsupportedReason="nested expansion failed"),
+            self.plan("/subscriptions/test/resourceGroups/other", change="Ignore"),
+        ):
+            with self.subTest(plan=plan), self.assertRaises(ValueError):
+                foundation.validate_changes(plan, "test", [ignored])
+
     def test_digest_covers_template_and_parameters_separately(self):
         self.assertNotEqual(foundation.digest(b"a", b"bc"), foundation.digest(b"ab", b"c"))
         self.assertNotEqual(foundation.digest(b"a", b"bc"), foundation.digest(b"a", b"bd"))

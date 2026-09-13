@@ -38,8 +38,13 @@ interface RecordingDao {
     suspend fun delete(id: String)
 }
 
-/** The caller serializes audio work. This store belongs to the anonymous inbox only. */
-class RecordingStore(private val database: InboxDatabase, private val directory: File) {
+/** The lease guards delayed speech results as well as foreground edits. */
+class RecordingStore(
+    private val database: InboxDatabase,
+    private val directory: File,
+    private val lease: DataLease = DataLease(),
+    private val encryptionKey: ByteArray? = null,
+) {
     private val dao = database.recordings()
     val recordings = dao.observe()
     init { directory.mkdirs() }
@@ -49,22 +54,26 @@ class RecordingStore(private val database: InboxDatabase, private val directory:
         return File(directory, "$id.pcm")
     }
 
+    fun output(id: String): java.io.OutputStream = AccountAudio.output(audio(id), encryptionKey, lease)
+    fun readAudio(id: String): ByteArray = AccountAudio.read(audio(id), encryptionKey, lease)
+    fun checkActive() = lease.check()
+
     @SuppressLint("UsableSpace") // Conservative preflight; do not count or evict reclaimable caches.
-    suspend fun begin(now: Long = System.currentTimeMillis()): VoiceRecording {
-        prune(now)
+    suspend fun begin(now: Long = System.currentTimeMillis()): VoiceRecording = lease.access {
+        pruneUnsafe(now)
         val existing = dao.all()
         if (existing.size >= MAX_RECORDINGS ||
             directory.listFiles().orEmpty().sumOf { it.length() } + MAX_AUDIO_BYTES > MAX_RETAINED_BYTES ||
             directory.usableSpace < MAX_AUDIO_BYTES + 8 * 1024 * 1024) throw RecordingStorageFull()
         val record = VoiceRecording(UUID.randomUUID().toString(), now, now + RETAIN_MILLIS, "RECORDING")
         dao.insert(record) // Persist intent before opening the microphone or creating audio.
-        return record
+        record
     }
 
-    suspend fun recover(now: Long = System.currentTimeMillis()) {
-        prune(now)
+    suspend fun recover(now: Long = System.currentTimeMillis()) = lease.access {
+        pruneUnsafe(now)
         dao.all().forEach {
-            if (it.state == "COMMITTED") delete(it.id)
+            if (it.state == "COMMITTED") deleteUnsafe(it.id)
             else if (it.state in setOf("RECORDING", "TRANSCRIBING"))
                 dao.update(it.id, "FAILED", "INTERRUPTED")
         }
@@ -73,27 +82,29 @@ class RecordingStore(private val database: InboxDatabase, private val directory:
             ?.forEach { it.delete() }
     }
 
-    suspend fun prune(now: Long = System.currentTimeMillis()) {
-        dao.all().filter { it.expiresAt <= now }.forEach { delete(it.id) }
+    suspend fun prune(now: Long = System.currentTimeMillis()) = lease.access { pruneUnsafe(now) }
+    private suspend fun pruneUnsafe(now: Long) {
+        dao.all().filter { it.expiresAt <= now }.forEach { deleteUnsafe(it.id) }
     }
 
-    suspend fun available(id: String): Boolean {
-        val record = dao.get(id) ?: return false
+    suspend fun available(id: String): Boolean = lease.access {
+        val record = dao.get(id) ?: return@access false
         if (record.expiresAt <= System.currentTimeMillis()) {
-            delete(id)
-            return false
+            deleteUnsafe(id)
+            return@access false
         }
-        return record.state != "COMMITTED"
+        record.state != "COMMITTED"
     }
 
-    suspend fun failed(id: String, reason: String) = dao.failUncommitted(id, reason)
-    suspend fun transcribing(id: String) = dao.update(id, "TRANSCRIBING")
+    suspend fun failed(id: String, reason: String) = lease.access { dao.failUncommitted(id, reason) }
+    suspend fun transcribing(id: String) = lease.access { dao.update(id, "TRANSCRIBING") }
 
-    suspend fun commit(id: String, transcript: String): String {
+    suspend fun commit(id: String, transcript: String): String = lease.access {
         val text = transcript.trim()
         require(text.isNotEmpty() && InboxLimits.length(text) <= InboxLimits.DESCRIPTION)
         val taskId = "voice-$id"
         database.withTransaction {
+            lease.check()
             val record = checkNotNull(dao.get(id))
             check(record.expiresAt > System.currentTimeMillis())
             if (record.state != "COMMITTED" && database.inbox().task(taskId) == null) {
@@ -110,11 +121,12 @@ class RecordingStore(private val database: InboxDatabase, private val directory:
             dao.update(id, "COMMITTED")
         }
         // A crash here is safe. Recovery cleans COMMITTED audio without transcribing twice.
-        delete(id)
-        return taskId
+        deleteUnsafe(id)
+        taskId
     }
 
-    suspend fun delete(id: String) {
+    suspend fun delete(id: String) = lease.access { deleteUnsafe(id) }
+    private suspend fun deleteUnsafe(id: String) {
         val file = audio(id)
         check(!file.exists() || file.delete()) { "Audio cleanup failed" }
         dao.delete(id)

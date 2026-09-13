@@ -15,9 +15,20 @@ if (!string.Equals(localProfile, "container-azurite", StringComparison.Ordinal))
 var hostStorage = builder.AddAzureStorage("host-storage")
     .RunAsEmulator();
 
-builder.AddAzureFunctionsProject<Projects.BunDo_Functions>("functions")
+var functions = builder.AddAzureFunctionsProject<Projects.BunDo_Functions>("functions")
     .WithHostStorage(hostStorage)
     .WithHttpHealthCheck("/api/health")
     .WaitFor(hostStorage);
+
+var identityMode = builder.Configuration["BunDoIdentity:Mode"] ?? "Microsoft";
+if (identityMode is not ("Microsoft" or "Local"))
+    throw new InvalidOperationException("Select Microsoft or Local identity explicitly.");
+functions.WithEnvironment("BunDoIdentity__Mode", identityMode);
+
+// Real Microsoft sign-in is an opt-in live gate. Ordinary local startup has no identity dependency.
+if (builder.Configuration["BunDoIdentity:Audience"] is { Length: > 0 } identityAudience)
+{
+    functions.WithEnvironment("BunDoIdentity__Audience", identityAudience);
+}
 
 builder.Build().Run();

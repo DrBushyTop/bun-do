@@ -1,0 +1,9 @@
+<resources>
+    <string name="identity_cached">Paikallinen tili on käytettävissä ilman yhteyttä. Uusi tunniste tarkistaaksesi palvelinyhteyden.</string>
+    <string name="identity_browser">Pyydetään paikallista tunnistetta…</string>
+    <string name="identity_refreshing">Pyydetään uutta paikallista tunnistetta…</string>
+    <string name="identity_verifying">Tarkistetaan paikallinen palvelinyhteys…</string>
+    <string name="identity_verified">Kirjautuminen tarkistettu. Palvelin hyväksyi paikallisen tilin.</string>
+    <string name="identity_failed">Paikallinen kirjautuminen epäonnistui. Käynnistä palvelin Local-kirjautumistilassa ja yritä uudelleen.</string>
+    <string name="identity_signed_out">Kirjauduttu ulos paikalliselta tililtä.</string>
+</resources>

@@ -33,6 +33,7 @@ results to the slice issue. File concrete deferred bugs with reasons, not vague 
 | [Restore workspaces and upgrade clients without replaying old commands](https://github.com/DrBushyTop/bun-do/issues/33) | [Delete and restore task groups with bounded content purge](https://github.com/DrBushyTop/bun-do/issues/25), [Join a household with approved invitations and ownership controls](https://github.com/DrBushyTop/bun-do/issues/19), [Show shared activity, clearance and lifetime milestones](https://github.com/DrBushyTop/bun-do/issues/32) |
 | [Finish the King Bun-inspired native interface and accessibility](https://github.com/DrBushyTop/bun-do/issues/34) | [Preview and commit AI task splits atomically](https://github.com/DrBushyTop/bun-do/issues/28), [Clarify tasks through non-destructive bilingual suggestions](https://github.com/DrBushyTop/bun-do/issues/29), [Deliver approximate reminders and independent FCM sync hints](https://github.com/DrBushyTop/bun-do/issues/31), [Show shared activity, clearance and lifetime milestones](https://github.com/DrBushyTop/bun-do/issues/32), [Restore workspaces and upgrade clients without replaying old commands](https://github.com/DrBushyTop/bun-do/issues/33) |
 | [Verify the complete v1 release across two offline emulator profiles](https://github.com/DrBushyTop/bun-do/issues/35) | [Finish the King Bun-inspired native interface and accessibility](https://github.com/DrBushyTop/bun-do/issues/34), [Prefer MAI online transcription with recoverable offline fallback](https://github.com/DrBushyTop/bun-do/issues/38) |
+| [Walk the finished v1 flows and remove technical UI clutter](https://github.com/DrBushyTop/bun-do/issues/40) | [Verify the complete v1 release across two offline emulator profiles](https://github.com/DrBushyTop/bun-do/issues/35) |
 
 ## Local orchestration addition
 
@@ -51,13 +52,16 @@ remain part of the slice.
 
 The owner selected [MAI online transcription with offline fallback](https://github.com/DrBushyTop/bun-do/issues/38)
 after the local and Azure comparisons. The [decision](adr/0002-cloud-first-speech-with-offline-fallback.md)
-explicitly replaces the earlier local-only audio boundary. This brings v1 to
-23 slices. The offline speech slice establishes the fallback and recovery
+explicitly replaces the earlier local-only audio boundary. The offline speech slice establishes the fallback and recovery
 behavior; it does not claim the authenticated cloud path is implemented.
 
 [AI length and usage-rate limits](https://github.com/DrBushyTop/bun-do/issues/37)
 wait until after the v1 parent is complete. They are not a v1 blocker. Preserve
 technical bounds, authentication and recovery while deferring product quotas.
+
+The final v1 pass walks the completed flows, removes routine technical notices
+and rewrites awkward Finnish. It follows release verification and reruns affected
+checks before the v1 parent closes.
 
 ## Scope coverage
 

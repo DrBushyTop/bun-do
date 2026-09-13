@@ -48,7 +48,7 @@ class VoiceController(
     private val context: Context,
     private val store: RecordingStore,
     private val installer: ModelInstaller = ModelInstaller(File(context.noBackupFilesDir, "speech-models"), loadSpeechManifest(context)),
-    private val transcribe: (File, File) -> String = LocalSpeech()::transcribe,
+    private val transcribe: (File, ByteArray) -> String = LocalSpeech()::transcribe,
 ) : AutoCloseable {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val mutable = MutableStateFlow(VoiceState())
@@ -122,8 +122,10 @@ class VoiceController(
             if (stopRequested) input.stop()
             try {
                 withContext(Dispatchers.IO) {
-                    input.record(store.audio(row.id)) { seconds, level ->
-                        mutable.update { it.copy(seconds = seconds, level = level) }
+                    store.output(row.id).use { output ->
+                        input.record(output) { seconds, level ->
+                            mutable.update { it.copy(seconds = seconds, level = level) }
+                        }
                     }
                 }
                 recorder = null
@@ -162,7 +164,8 @@ class VoiceController(
         withContext(Dispatchers.IO) {
             check(store.available(id))
             checkNotNull(context.contentResolver.openOutputStream(destination, "w")).use {
-                exportWave(store.audio(id), it)
+                val job = coroutineContext
+                exportWave(store.readAudio(id), it) { job.ensureActive(); store.checkActive() }
             }
         }
         mutable.update { it.copy(message = "EXPORTED") }
@@ -175,7 +178,7 @@ class VoiceController(
                 check(store.available(id))
                 store.transcribing(id)
                 val model = checkNotNull(verifiedModel)
-                val text = transcribe(model, store.audio(id))
+                val text = transcribe(model, store.readAudio(id))
                 coroutineContext.ensureActive() // A late JNI result cannot commit after cancel.
                 when {
                     text.isBlank() -> store.failed(id, "SILENCE")
@@ -194,7 +197,8 @@ class VoiceController(
         } catch (error: Throwable) {
             // JNI decode cannot be interrupted. Only its result is canceled; retain audio.
             withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
-                store.failed(id, if (error is CancellationException) "CANCELED" else "TRANSCRIPTION_FAILED")
+                try { store.failed(id, if (error is CancellationException) "CANCELED" else "TRANSCRIPTION_FAILED") }
+                catch (_: CancellationException) { /* Revoked accounts retain interrupted audio for recovery. */ }
             }
             throw error
         }

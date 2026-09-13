@@ -1,0 +1,13 @@
+{
+  "client_id": "dd1dff63-d345-423f-95a4-eac3937e8992",
+  "redirect_uri": "msauth://fi.bundo/JMd5dw0RAj%2FKIKcQy1gU4vBukKc%3D",
+  "account_mode": "SINGLE",
+  "authorization_user_agent": "BROWSER",
+  "broker_redirect_uri_registered": false,
+  "logging": { "pii_enabled": false, "log_level": "ERROR", "logcat_enabled": false },
+  "authorities": [{
+    "type": "AAD",
+    "audience": { "type": "PersonalMicrosoftAccount" },
+    "default": true
+  }]
+}

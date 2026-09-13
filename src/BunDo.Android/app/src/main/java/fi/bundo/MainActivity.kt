@@ -10,6 +10,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.key
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.material3.CircularProgressIndicator
+import fi.bundo.ui.AccountScreen
+import fi.bundo.identity.SignInModel
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.luminance
 import androidx.core.view.WindowCompat
@@ -27,7 +32,11 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val preferences = getSharedPreferences("appearance", MODE_PRIVATE)
+        val accounts = (application as BunDoApplication).accounts
         setContent {
+            val account by accounts.active.collectAsStateWithLifecycle()
+            var showAccount by remember { mutableStateOf(false) }
+            val signIn: SignInModel = viewModel()
             var appearance by remember { mutableStateOf(preferences.getString("theme", "system")!!) }
             BunDoTheme(appearance) {
                 val lightBars = MaterialTheme.colorScheme.surface.luminance() > 0.5f
@@ -37,11 +46,18 @@ class MainActivity : AppCompatActivity() {
                         isAppearanceLightNavigationBars = lightBars
                     }
                 }
-                val model: InboxViewModel = viewModel(factory = viewModelFactory {
+                if (showAccount) {
+                    AccountScreen(accounts, signIn) { showAccount = false }
+                } else if (account == null) {
+                    CircularProgressIndicator()
+                } else key(account!!.lease.generation) {
+                val data = account!!
+                val model: InboxViewModel = viewModel(key = data.lease.generation, factory = viewModelFactory {
                     initializer {
-                        InboxViewModel((application as BunDoApplication).inbox, createSavedStateHandle())
+                        InboxViewModel(data.inbox, createSavedStateHandle())
                     }
                 })
+                DisposableEffect(model) { onDispose { if (!data.lease.active) model.hide() } }
                 val state by model.state.collectAsStateWithLifecycle()
                 InboxApp(
                     state = state,
@@ -51,8 +67,10 @@ class MainActivity : AppCompatActivity() {
                         preferences.edit { putString("theme", it) }
                         appearance = it
                     },
-                    voice = (application as BunDoApplication).voice,
+                    voice = data.voice,
+                    onAccount = { showAccount = true },
                 )
+                }
             }
         }
     }

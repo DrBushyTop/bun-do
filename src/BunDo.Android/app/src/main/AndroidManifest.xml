@@ -16,6 +16,7 @@
         android:theme="@style/Theme.BunDo"
         android:localeConfig="@xml/locales_config"
         tools:targetApi="33">
+        <activity android:name=".identity.SignInActivity" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

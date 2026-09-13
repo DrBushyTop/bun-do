@@ -1,0 +1,20 @@
+<resources>
+    <string name="identity_loading">Preparing sign-in…</string>
+    <string name="identity_ready">Ready to sign in.</string>
+    <string name="identity_cached">A Microsoft session is saved. Verify it with a fresh token.</string>
+    <string name="identity_browser">Finish signing in through the Microsoft browser window.</string>
+    <string name="identity_refreshing">Requesting a fresh token from Microsoft…</string>
+    <string name="identity_verifying">Microsoft sign-in succeeded. Checking backend access…</string>
+    <string name="identity_verified">Sign-in verified. The backend accepted your Microsoft account.</string>
+    <string name="identity_refreshed">Token refresh verified. The backend accepted the fresh token.</string>
+    <string name="identity_cancelled">Sign-in cancelled. You can try again.</string>
+    <string name="identity_signed_out">Signed out of Bun Do. The browser may remember your Microsoft account.</string>
+    <string name="identity_failed">Microsoft sign-in failed. Try again, or close and reopen this check.</string>
+    <string name="identity_api_rejected">The backend rejected access. Check its identity configuration, then retry with a fresh token.</string>
+    <string name="identity_api_unavailable">Backend verification failed. Check that the local backend is running, then retry with a fresh token.</string>
+    <string name="identity_sign_in">Sign in with Microsoft</string>
+    <string name="identity_refresh">Verify token refresh</string>
+    <string name="identity_sign_out">Sign out</string>
+    <string name="identity_choose">Use %1$s</string>
+    <string name="identity_selected">Local account: %1$s</string>
+</resources>

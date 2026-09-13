@@ -12,6 +12,38 @@ using OpenTelemetry;
 
 var builder = FunctionsApplication.CreateBuilder(args);
 
+var identityMode = builder.Configuration["BunDoIdentity:Mode"] ?? "Microsoft";
+var cosmosEndpoint = builder.Configuration["WorkspaceStore:Endpoint"];
+if (!string.IsNullOrWhiteSpace(cosmosEndpoint))
+{
+    BunDo.Functions.Storage.Cosmos.IdentityRegistrations.Configure(builder.Services, builder.Configuration);
+}
+#if DEBUG
+else if (builder.Configuration["AZURE_FUNCTIONS_ENVIRONMENT"] == "Development"
+    && string.IsNullOrEmpty(builder.Configuration["WEBSITE_INSTANCE_ID"]))
+{
+    builder.Services.AddSingleton<BunDo.Functions.Identity.IRegistrationStore>(
+        new BunDo.Functions.Identity.Development.LocalRegistrationStore(
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "BunDo", "local-registrations")));
+}
+#endif
+#if DEBUG
+if (identityMode == "Local")
+{
+    var localIdentity = new BunDo.Functions.Identity.Development.LocalIdentity(builder.Configuration);
+    builder.Services.AddSingleton(localIdentity);
+    builder.Services.AddSingleton(localIdentity.Validator);
+}
+else
+#endif
+{
+    if (identityMode != "Microsoft")
+        throw new InvalidOperationException("This build does not support the selected identity mode.");
+    builder.Services.AddSingleton(BunDo.Functions.Identity.AccessTokens.Create(
+        builder.Configuration["BunDoIdentity:Audience"]));
+}
+
 builder.Services.AddSingleton<BackendTelemetry>();
 // Wrap the HTTP proxy too, including IActionResult execution/serialization.
 builder.UseMiddleware<FunctionTelemetryMiddleware>();

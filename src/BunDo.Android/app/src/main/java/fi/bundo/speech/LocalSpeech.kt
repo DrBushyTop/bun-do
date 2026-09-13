@@ -38,7 +38,10 @@ fun loadSpeechManifest(context: Context): ModelManifest {
 class LocalSpeech {
     fun transcribe(model: File, audio: File): String {
         require(audio.length() <= RecordingStore.MAX_AUDIO_BYTES)
-        val bytes = audio.readBytes()
+        return transcribe(model, audio.readBytes())
+    }
+    fun transcribe(model: File, bytes: ByteArray): String {
+        require(bytes.size <= RecordingStore.MAX_AUDIO_BYTES)
         val pcm = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
         val samples = FloatArray(pcm.remaining()) { pcm.get() / 32768f }
         if (samples.isEmpty() || samples.all { abs(it) < 0.001f }) return ""
@@ -71,20 +74,19 @@ class LocalRecorder {
     fun stop() { stopping = true }
 
     @SuppressLint("MissingPermission") // Caller requests permission; AudioRecord failure is still handled.
-    fun record(file: File, progress: (Int, Float) -> Unit) {
+    fun record(output: OutputStream, progress: (Int, Float) -> Unit) {
         val rate = RecordingStore.SAMPLE_RATE
         val size = maxOf(AudioRecord.getMinBufferSize(rate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT), 8192)
         val recorder = AudioRecord(MediaRecorder.AudioSource.MIC, rate,
             AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, size)
         try {
             check(recorder.state == AudioRecord.STATE_INITIALIZED)
-            FileOutputStream(file).use { output ->
+            output.use {
                 recorder.startRecording()
                 check(recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING)
                 val buffer = ShortArray(2048)
                 val bytes = ByteBuffer.allocate(buffer.size * 2).order(ByteOrder.LITTLE_ENDIAN)
                 var samples = 0L
-                var lastSync = 0
                 while (!stopping && samples < rate * RecordingStore.MAX_SECONDS) {
                     val count = recorder.read(buffer, 0, minOf(buffer.size, (rate * RecordingStore.MAX_SECONDS - samples).toInt()))
                     check(count > 0)
@@ -97,10 +99,9 @@ class LocalRecorder {
                     output.write(bytes.array(), 0, count * 2)
                     samples += count
                     val seconds = (samples / rate).toInt()
-                    if (seconds > lastSync) { output.fd.sync(); lastSync = seconds }
                     progress(seconds, peak)
                 }
-                output.fd.sync()
+                output.flush()
             }
         } finally {
             try {
@@ -111,18 +112,25 @@ class LocalRecorder {
 }
 
 fun exportWave(audio: File, output: OutputStream) {
-    val length = audio.length().let { it - it % 2 }
+    require(audio.length() <= RecordingStore.MAX_AUDIO_BYTES)
+    exportWave(audio.readBytes(), output)
+}
+
+fun exportWave(audio: ByteArray, output: OutputStream, checkActive: () -> Unit = {}) {
+    val length = audio.size.toLong().let { it - it % 2 }
     require(length <= RecordingStore.MAX_AUDIO_BYTES)
     val header = ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN)
     header.put("RIFF".toByteArray()).putInt((length + 36).toInt()).put("WAVEfmt ".toByteArray())
     header.putInt(16).putShort(1).putShort(1).putInt(RecordingStore.SAMPLE_RATE)
     header.putInt(RecordingStore.SAMPLE_RATE * 2).putShort(2).putShort(16)
     header.put("data".toByteArray()).putInt(length.toInt())
+    checkActive()
     output.write(header.array())
     audio.inputStream().use { input ->
         val buffer = ByteArray(8192)
         var remaining = length
         while (remaining > 0) {
+            checkActive()
             val read = input.read(buffer, 0, minOf(remaining, buffer.size.toLong()).toInt())
             check(read > 0)
             output.write(buffer, 0, read)

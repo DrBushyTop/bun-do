@@ -1,5 +1,7 @@
 targetScope = 'resourceGroup'
 
+param identityAudience string
+
 // Owns the Function runtime, its storage, identity and consumer-side grants.
 param appName string
 param runtimeStorageName string
@@ -188,6 +190,8 @@ resource app 'Microsoft.Web/sites@2024-04-01' = {
         { name: 'AzureWebJobsStorage__clientId', value: identity.properties.clientId }
         { name: 'AzureWebJobsStorage__accountName', value: runtimeStorage.name }
         { name: 'AZURE_CLIENT_ID', value: identity.properties.clientId }
+        { name: 'BunDoIdentity__Mode', value: 'Microsoft' }
+        { name: 'BunDoIdentity__Audience', value: identityAudience }
         { name: 'WorkspaceStore__Endpoint', value: cosmosEndpoint }
         { name: 'WorkspaceStore__DatabaseName', value: databaseName }
         { name: 'WorkspaceStore__ContainerName', value: containerName }

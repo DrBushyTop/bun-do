@@ -85,6 +85,7 @@ fun InboxApp(
     appearance: String,
     onAppearance: (String) -> Unit,
     voice: VoiceController? = null,
+    onAccount: (() -> Unit)? = null,
 ) {
     var settings by rememberSaveable { mutableStateOf(false) }
     var showVoice by rememberSaveable { mutableStateOf(false) }
@@ -129,6 +130,11 @@ fun InboxApp(
                         }
                     },
                     actions = {
+                        if (onAccount != null && editor == null) {
+                            TextButton(onClick = onAccount, modifier = Modifier.testTag("account")) {
+                                Text(stringResource(R.string.account_title))
+                            }
+                        }
                         if (editor != null) {
                             TextButton(
                                 onClick = { model.closeEditor(commit = true) },

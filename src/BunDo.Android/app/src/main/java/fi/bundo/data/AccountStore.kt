@@ -1,0 +1,288 @@
+package fi.bundo.data
+
+import android.app.NotificationManager
+import android.content.Context
+import androidx.room.withTransaction
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.workDataOf
+import fi.bundo.identity.ValidatedIdentity
+import fi.bundo.identity.VerifiedSession
+import fi.bundo.speech.VoiceController
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.io.File
+import java.security.MessageDigest
+import java.security.SecureRandom
+import java.util.Base64
+import java.util.UUID
+import java.util.concurrent.TimeUnit
+
+class AccountData internal constructor(
+    val identity: ValidatedIdentity?,
+    val lease: DataLease,
+    internal val database: InboxDatabase,
+    val recordings: RecordingStore,
+    internal val directory: File?,
+    val registrationId: String?,
+    private val context: Context,
+) {
+    val inbox = InboxRepository(database, lease)
+    private var controller: VoiceController? = null
+    val voice: VoiceController get() = controller ?: VoiceController(context, recordings).also { controller = it }
+    internal fun revoke() {
+        lease.revoke()
+        controller?.close()
+    }
+    internal suspend fun close() {
+        lease.drain()
+        database.close()
+    }
+}
+
+/** One active account. Opening any retained account requires a newly API-validated identity. */
+class AccountStore(private val context: Context, private val name: String = "accounts") {
+    private val transitions = Mutex()
+    private val activationGate = Any()
+    private var retiring: AccountData? = null
+    private val root = File(context.noBackupFilesDir, name)
+    private val master = KeystoreVault("bundo.$name.installation")
+    private val activeKey = KeystoreVault("bundo.$name.active")
+    private val activeFile get() = File(root, "active")
+    private val signOutMarker get() = File(root, "signed-out")
+    val credentialsNeedRemoval: Boolean get() = signOutMarker.exists()
+    private val mutable = MutableStateFlow<AccountData?>(null)
+    val active = mutable.asStateFlow()
+    val authentication = VerifiedSession()
+    val installationId: String
+    val unexpectedFiles: Boolean
+
+    init {
+        val proof = File(root, "installation")
+        val recovered = runCatching {
+            JSONObject(String(master.read(proof, name))).getString("installationId")
+                .also { UUID.fromString(it) }
+        }.getOrNull()
+        val needsQuarantine = recovered == null && (root.exists() ||
+            (name == "accounts" && context.getDatabasePath(InboxDatabase.FILE_NAME).exists()))
+        unexpectedFiles = needsQuarantine || retainedDirectories().isNotEmpty()
+        if (recovered == null) {
+            if (needsQuarantine) {
+                val retained = File(context.noBackupFilesDir, "$name-unexpected-${UUID.randomUUID()}")
+                if (root.exists()) check(root.renameTo(retained)) else retained.mkdirs()
+                if (name == "accounts") {
+                    for (suffix in listOf("", "-wal", "-shm", "-journal")) {
+                        val source = context.getDatabasePath(InboxDatabase.FILE_NAME + suffix)
+                        if (source.exists()) check(source.renameTo(File(retained, source.name)))
+                    }
+                    val audio = File(context.noBackupFilesDir, "anonymous-audio")
+                    if (audio.exists()) check(audio.renameTo(File(retained, "anonymous-audio")))
+                }
+            }
+            activeKey.destroy()
+            master.destroy()
+            master.create()
+            installationId = UUID.randomUUID().toString()
+            master.write(proof, name, JSONObject().put("installationId", installationId).toString().toByteArray())
+        } else installationId = recovered
+        val restored = runCatching {
+            check(!credentialsNeedRemoval)
+            val value = JSONObject(String(activeKey.read(activeFile, installationId)))
+            val identity = ValidatedIdentity(value.getString("issuer"), value.getString("subject"))
+            openAccount(identity, create = false, registrationId = null)
+        }.getOrNull()
+        mutable.value = restored ?: anonymous()
+        restored?.identity?.let { authentication.accept(authentication.beginSignIn(), it) }
+        schedule(mutable.value!!)
+    }
+
+    private fun retainedDirectories(): List<File> =
+        context.noBackupFilesDir.listFiles().orEmpty()
+            .filter { it.isDirectory && it.name.startsWith("$name-unexpected-") }
+            .sortedBy { it.name }
+
+    private fun accountKey(identity: ValidatedIdentity): String {
+        val bytes = JSONObject().put("issuer", identity.issuer).put("subject", identity.subject)
+            .toString().toByteArray(Charsets.UTF_8)
+        return MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+    }
+
+    /** A retired server registration needs explicit replacement, never replay of old commands. */
+    suspend fun registrationInstallation(identity: ValidatedIdentity, replace: Boolean = false): String =
+        transitions.withLock {
+            withContext(Dispatchers.IO) {
+                val key = accountKey(identity)
+                val file = File(root, "$key-registration-installation")
+                if (replace) {
+                    val next = UUID.randomUUID().toString()
+                    master.write(file, "$installationId:$key:registration", next.toByteArray())
+                    next
+                } else if (file.exists()) {
+                    String(master.read(file, "$installationId:$key:registration"))
+                        .also(UUID::fromString)
+                } else installationId
+            }
+        }
+
+    private fun anonymous(): AccountData {
+        val dbName = if (name == "accounts") InboxDatabase.FILE_NAME else "$name-anonymous.db"
+        val database = InboxDatabase.open(context, dbName)
+        val lease = DataLease("anonymous-$name")
+        return AccountData(null, lease, database,
+            RecordingStore(database, File(context.noBackupFilesDir, "$name-anonymous-audio"), lease),
+            null, null, context)
+    }
+
+    private fun openAccount(identity: ValidatedIdentity, create: Boolean, registrationId: String?): AccountData {
+        val key = accountKey(identity)
+        val directory = File(root, key)
+        val metadata = File(directory, "metadata")
+        val value = if (metadata.exists()) JSONObject(String(master.read(metadata, "$installationId:$key"))) else {
+            check(create)
+            JSONObject().put("issuer", identity.issuer).put("subject", identity.subject)
+                .put("key", Base64.getEncoder().encodeToString(ByteArray(32).also(SecureRandom()::nextBytes)))
+        }
+        check(value.getString("issuer") == identity.issuer && value.getString("subject") == identity.subject)
+        if (registrationId != null) value.put("registrationId", registrationId)
+        val registered = value.getString("registrationId")
+        UUID.fromString(registered)
+        master.write(metadata, "$installationId:$key", value.toString().toByteArray())
+        val secret = Base64.getDecoder().decode(value.getString("key"))
+        val database = InboxDatabase.open(context, File(directory, "inbox.db").absolutePath, secret.copyOf())
+        val lease = DataLease(key)
+        return AccountData(identity, lease, database,
+            RecordingStore(database, File(directory, "audio"), lease, secret),
+            directory, registered, context)
+    }
+
+    /** Caller must carry its authentication generation through both API calls. */
+    suspend fun unlock(identity: ValidatedIdentity, registrationId: String, allowed: () -> Boolean = { true }) = transitions.withLock {
+        check(allowed()) { "Authentication session ended" }
+        UUID.fromString(registrationId)
+        withContext(Dispatchers.IO) {
+            val next = openAccount(identity, create = true, registrationId)
+            try {
+                // Force decryption/schema validation before replacing the current account.
+                next.database.inbox().allDrafts()
+                retireCurrent()
+                synchronized(activationGate) {
+                    check(allowed()) { "Authentication session ended" }
+                    signOutMarker.delete()
+                    activeKey.create()
+                    activeKey.write(activeFile, installationId,
+                        JSONObject().put("issuer", identity.issuer).put("subject", identity.subject).toString().toByteArray())
+                    mutable.value = next
+                }
+                schedule(next)
+            } catch (error: Throwable) {
+                next.revoke()
+                next.close()
+                throw error
+            }
+        }
+    }
+
+    /** Revokes the persisted offline unlock before returning, even with no network. */
+    fun lockNow() = synchronized(activationGate) {
+        root.mkdirs()
+        check(signOutMarker.exists() || signOutMarker.createNewFile())
+        activeKey.destroy()
+        mutable.value?.let { it.revoke(); retiring = it }
+        mutable.value = null
+        context.getSystemService(NotificationManager::class.java).cancelAll()
+    }
+
+    fun credentialsRemoved() { check(!signOutMarker.exists() || signOutMarker.delete()) }
+
+    suspend fun signOut(delete: Boolean = false) = transitions.withLock {
+        lockNow()
+        withContext(Dispatchers.IO) {
+            val previous = mutable.value ?: retiring
+            retireCurrent()
+            if (delete && previous?.identity != null) {
+                check(previous.directory!!.deleteRecursively())
+            }
+            activeFile.delete()
+            mutable.value = anonymous()
+            schedule(mutable.value!!)
+        }
+    }
+
+    private suspend fun retireCurrent() {
+        val previous = mutable.value ?: retiring ?: return
+        previous.revoke()
+        mutable.value = null
+        WorkManager.getInstance(context).cancelAllWorkByTag("account:${previous.lease.owner}")
+        context.getSystemService(NotificationManager::class.java).cancelAll()
+        previous.close()
+        retiring = null
+    }
+
+    private fun schedule(data: AccountData) {
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            "audio-expiry:${data.lease.owner}", ExistingPeriodicWorkPolicy.UPDATE,
+            PeriodicWorkRequestBuilder<AudioExpiryWorker>(6, TimeUnit.HOURS)
+                .addTag("account:${data.lease.owner}")
+                .setInputData(workDataOf("owner" to data.lease.owner, "generation" to data.lease.generation))
+                .build())
+    }
+
+    fun matching(owner: String?, generation: String?): AccountData? =
+        active.value?.takeIf { it.lease.active && it.lease.owner == owner && it.lease.generation == generation }
+
+    suspend fun close() = transitions.withLock { withContext(Dispatchers.IO) { retireCurrent() } }
+
+    suspend fun recovery(data: AccountData): List<RecoveryText> = data.lease.access {
+        data.database.withTransaction {
+            data.database.inbox().allTasks().map {
+                RecoveryText("task:${it.id}", it.title, it.description, it.createdAt)
+            } + data.database.inbox().allDrafts().filter { it.title.isNotBlank() || it.description.isNotBlank() }.map {
+                RecoveryText("draft:${it.key}", it.title, it.description, it.savedAt)
+            }
+        }
+    }
+
+    suspend fun anonymousPreview(data: AccountData): List<RecoveryText> = data.lease.access {
+        check(data.identity != null)
+        val sources = mutableListOf((if (name == "accounts") InboxDatabase.FILE_NAME else "$name-anonymous.db") to "")
+        // The pre-identity shell had no account owner. Its quarantined plaintext inbox
+        // can be explicitly copied after sign-in, never attached or replayed automatically.
+        for (directory in retainedDirectories()) {
+            val legacy = File(directory, InboxDatabase.FILE_NAME)
+            if (legacy.exists()) sources += legacy.absolutePath to "${directory.name}:"
+        }
+        sources.flatMap { (path, prefix) ->
+            val database = InboxDatabase.open(context, path)
+            try {
+                database.inbox().allTasks().map { RecoveryText("${prefix}task:${it.id}", it.title, it.description, it.createdAt) } +
+                    database.inbox().allDrafts().filter { it.title.isNotBlank() || it.description.isNotBlank() }
+                        .map { RecoveryText("${prefix}draft:${it.key}", it.title, it.description, it.savedAt) }
+            } finally { database.close() }
+        }
+    }
+
+    /** Copy selected text only. Source stays intact; no old intent/sequence is replayed. */
+    suspend fun importAnonymous(data: AccountData, selected: Set<String>) {
+        val source = anonymousPreview(data).filter { it.source in selected }
+        data.lease.access {
+            data.database.withTransaction {
+                for (text in source) {
+                    require(InboxLimits.valid(text.title, text.description))
+                    val id = UUID.randomUUID().toString()
+                    data.database.inbox().insertTask(InboxTask(id, text.title, text.description,
+                        text.title, text.description, text.capturedAt, System.currentTimeMillis()))
+                    data.database.inbox().insertIntent(InboxIntent(taskId = id, kind = "CaptureInboxTask",
+                        title = text.title, description = text.description, createdAt = text.capturedAt))
+                }
+            }
+        }
+    }
+}
+
+data class RecoveryText(val source: String, val title: String, val description: String, val capturedAt: Long)

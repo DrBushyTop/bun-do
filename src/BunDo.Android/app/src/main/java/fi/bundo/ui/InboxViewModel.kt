@@ -31,6 +31,10 @@ class InboxViewModel(private val repository: InboxRepository, private val savedS
     ViewModel() {
     private val mutableState = MutableStateFlow(InboxUiState())
     val state = mutableState.asStateFlow()
+    fun hide() {
+        reads?.cancel()
+        mutableState.value = InboxUiState()
+    }
     private class Write(val perform: suspend () -> Unit, val failed: () -> Unit)
     private val writes = Channel<Write>(Channel.UNLIMITED)
     private var reads: Job? = null

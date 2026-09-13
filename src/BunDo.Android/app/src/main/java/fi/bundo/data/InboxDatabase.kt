@@ -62,6 +62,12 @@ interface InboxDao {
     @Query("SELECT * FROM inbox_intents ORDER BY sequence")
     suspend fun intents(): List<InboxIntent>
 
+    @Query("SELECT * FROM inbox_tasks ORDER BY createdAt, id")
+    suspend fun allTasks(): List<InboxTask>
+
+    @Query("SELECT * FROM editor_drafts ORDER BY savedAt, `key`")
+    suspend fun allDrafts(): List<EditorDraft>
+
     @Insert
     suspend fun insertTask(task: InboxTask)
 
@@ -103,12 +109,17 @@ abstract class InboxDatabase : RoomDatabase() {
             }
         }
 
-        fun open(context: Context, name: String = FILE_NAME): InboxDatabase =
-            Room.databaseBuilder(context, InboxDatabase::class.java, name)
+        fun open(context: Context, name: String = FILE_NAME, passphrase: ByteArray? = null): InboxDatabase {
+            val builder = Room.databaseBuilder(context, InboxDatabase::class.java, name)
                 .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
-                // The expiry worker owns a separate connection. Its removals must
-                // invalidate the foreground recovery list too.
-                .enableMultiInstanceInvalidation()
-                .build()
+                // AccountStore owns the connection used by both UI and workers.
+                // Workers cannot independently open a signed-out account.
+            if (passphrase != null) {
+                System.loadLibrary("sqlcipher")
+                net.zetetic.database.Logger.setTarget(net.zetetic.database.NoopTarget())
+                builder.openHelperFactory(net.zetetic.database.sqlcipher.SupportOpenHelperFactory(passphrase))
+            }
+            return builder.build()
+        }
     }
 }

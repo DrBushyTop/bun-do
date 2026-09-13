@@ -10,6 +10,9 @@ param location string = 'swedencentral'
 ])
 param resourceGroupName string = 'rg-bun-do-dev-swc'
 
+@description('Dedicated Bun Do API application ID for Microsoft access tokens.')
+param identityAudience string
+
 param lunaModel string
 param lunaVersion string
 @allowed(['DataZoneStandard', 'GlobalStandard'])
@@ -83,6 +86,7 @@ module backendHosting 'modules/backend-hosting.bicep' = {
   scope: development
   params: {
     appName: 'func-bun-do-dev-${uniqueString(subscription().subscriptionId, resourceGroupName)}'
+    identityAudience: identityAudience
     insightsName: observability.outputs.insightsName
     telemetryConnectionString: observability.outputs.connectionString
     runtimeStorageName: 'stbundohost${uniqueString(subscription().subscriptionId, resourceGroupName)}'

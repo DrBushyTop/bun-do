@@ -1,0 +1,26 @@
+<resources>
+    <string name="account_title">Account</string>
+    <string name="account_inbox">Account inbox</string>
+    <string name="account_signed_in">Your account on this device</string>
+    <string name="account_anonymous">Not signed in</string>
+    <string name="account_local_notice">Tasks stay on this device. Sign-in does not join a household. Sync is not available yet.</string>
+    <string name="account_installation_reset">The installation identity was missing or did not match. Unexpected files are quarantined. Sign in for a new device registration. Encrypted files cannot be opened without their original device key.</string>
+    <string name="account_pending">Text records: %1$d · Recordings: %2$d</string>
+    <string name="account_operation_failed">The operation failed. Source data is unchanged. Try again.</string>
+    <string name="account_export_warning">Exports contain private text. Choose the destination carefully. Export recordings separately from the voice menu.</string>
+    <string name="account_exported">Text exported. Original data is unchanged.</string>
+    <string name="account_export_json">Export JSON, part %1$d</string>
+    <string name="account_export_text">Export text, part %1$d</string>
+    <string name="account_import_preview">Choose anonymous drafts</string>
+    <string name="account_import_notice">Selected text is copied into new local tasks. Originals stay unchanged. Moving it into a household will require a separate selection.</string>
+    <string name="account_import_selected">Copy selected text</string>
+    <string name="account_delete_sign_out">Delete this account\'s local data and sign out</string>
+    <string name="account_revoke_registration">Revoke previous device registration: %1$d</string>
+    <string name="account_registration_retired">This registration expired or was revoked. Register again to unlock this account. Local text stays available for recovery and is not replayed to a household.</string>
+    <string name="account_register_again">Create a new device registration</string>
+    <string name="account_confirm_title">Review local work</string>
+    <string name="account_confirm_body">Cancel and export first if you need a backup. Sign-out locks retained data to the same account. If you chose deletion, local data is permanently deleted. Revoking a registration blocks that device\'s future mutations.</string>
+    <string name="account_continue">Continue selected action</string>
+    <string name="account_cancel">Cancel</string>
+    <string name="identity_registration_failed">Device registration failed. If the device limit was reached, choose an old registration to revoke.</string>
+</resources>
