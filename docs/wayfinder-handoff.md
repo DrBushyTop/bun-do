@@ -9,7 +9,7 @@ Recovered 2026-09-12 from the earlier Codex session `01a09576-4b82-7a80-bf6f-f6e
 - Use low or medium reasoning for subagents. Continue making architecture decisions while the owner is away.
 - Provision new Azure resources in Bun Do's own resource group with Bicep. Foundry model availability is an owner-supplied assumption, not a request to reuse unrelated resources.
 - Agents test through Android emulators on this Mac. Physical phones are unavailable.
-- After the map is complete, implementation may begin. Each slice requires a fresh adversarial subagent review; fix material issues and file concrete deferred bugs.
+- After the map is complete, implementation may begin. Run each slice's required fresh adversarial subagent review only after the whole slice is implemented and its planned verification has run. Follow the [completion-review workflow](agents/issue-tracker.md#completion-review); fix material issues and file concrete deferred bugs.
 
 ## What planning established
 

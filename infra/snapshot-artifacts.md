@@ -54,15 +54,16 @@ rebuilt from Cosmos; it does not need geo-replication or a backup policy. Blob
 capacity and operations have separate costs from Cosmos free tier. There is no
 paid-tier fallback, reservation or fixed capacity provisioned by this module.
 
-`python3 -m unittest discover -s tools -p 'test_snapshot_template.py'` compiles the module with Bicep
-and checks the security, retention, region, SKU and integration contract. These
-are template checks, not proof of live authorization or artifact cleanup.
+Compile `infra/main.bicep`; Bicep owns the resource settings. Do not add a second
+set of configuration assertions or a policy-readback checklist.
 
 Before serving snapshots, verify that anonymous and Shared Key reads fail, that
 the backend can read/write/delete only its container using managed identity,
 and that expired artifacts and removed members cannot read through the API.
 Exercise failed candidate cleanup and confirm that deletion leaves no retained
-version or soft-deleted copy. Runtime checks belong to the sync/recovery slices.
+version or soft-deleted copy. These future integration/e2e checks belong to the
+sync/recovery slices and must exercise their production adapters, not test-only
+clients. They are not a requirement to rebuild the removed infrastructure gates now.
 
 ## Microsoft references
 

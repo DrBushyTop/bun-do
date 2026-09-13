@@ -212,5 +212,7 @@ python3 -m unittest discover -s tools -p 'test_*.py'
 
 The comparison unit tests protect consent, immutable audio provenance, missing
 results, incompatible latency definitions, redirect rejection and scoring of
-negation/quantity changes. They make no cloud calls. Fresh adversarial review is
-required before declaring this work complete.
+negation/quantity changes. They make no cloud calls. Run the required fresh
+adversarial review only after implementation and planned verification for the
+whole slice are complete, following the
+[completion-review workflow](agents/issue-tracker.md#completion-review).

@@ -14,7 +14,7 @@ a spending cap.
 
 The account has an identity-authenticated public endpoint. Local key
 authentication is disabled. The model version uses `NoAutoUpgrade`; a version
-change requires a reviewed deployment and new schema checks. Default provider
+change requires a reviewed deployment. Default provider
 content filtering remains enabled. `store: false` prevents Responses history
 storage, but does not claim an exemption from Azure's abuse-monitoring policy.
 
@@ -25,16 +25,16 @@ exist. Provisioning the endpoint does not enable application AI.
 ## Verification
 
 Follow `docs/azure-development.md` for compilation, full what-if review and
-guarded deployment. Re-read the account's model catalog and actual deployment
-after provisioning. Confirm the identity grant, key-authentication setting and
-preservation of existing storage and backend resources.
+guarded deployment. Bicep owns the model configuration. Do not duplicate it in
+template assertions or a policy-readback tool.
 
-The model gate must run through the Function identity, with synthetic text,
-all three complete schemas from `contracts/ai/`, `text.format.strict: true`,
-`store: false` and no tools. Record only status, latency, deployment/model
-version, usage and result classification. Do not log prompts or output. A schema
-or configuration rejection blocks dependent AI work. Do not retry an ambiguous
-paid call merely to get a passing result.
+When the production AI adapter is implemented or its model is changed, integration
+tests should exercise that adapter through the deployed identity, with synthetic
+text and the complete schemas from `contracts/ai/`. Keep strict output validation,
+`store: false` and no tools. Record only status, latency, deployment/model version,
+usage and result classification. Do not log prompts or output, and do not retry
+an ambiguous paid call merely to get a passing result. This is future application
+coverage, not a reason to recreate temporary Function gates now.
 
 Useful primary references, checked September 12, 2026:
 

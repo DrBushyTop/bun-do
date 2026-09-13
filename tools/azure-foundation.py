@@ -61,10 +61,6 @@ def main():
             or group["location"] != REGION
         ):
             raise ValueError("Existing resource group is not the tagged Bun Do development group.")
-    accounts = run_json(azure_command(subscription, "cosmosdb", "list", "--output", "json"))
-    if any(account.get("enableFreeTier") and account["resourceGroup"].lower() != GROUP for account in accounts):
-        raise ValueError("Cosmos free tier is already allocated elsewhere. No paid fallback is permitted.")
-
     EVIDENCE.mkdir(parents=True, exist_ok=True)
     template = subprocess.check_output(["bicep", "build", str(ROOT / "infra/main.bicep"), "--stdout"])
     parameters = (ROOT / "infra/dev.parameters.json").read_bytes()

@@ -64,9 +64,33 @@ September 12, 2026: `https://developers.openai.com/codex/hooks`.
 
 ## Adding or changing steering checks
 
-This policy applies to `tools/invariants/`, infrastructure template assertions,
-and any new agent guardrail. The purpose is to stop costly mistakes before they
-reach users or Azure. It is not to reproduce the current implementation in tests.
+This policy applies to `tools/invariants/` and any new agent guardrail. The purpose
+is to stop costly mistakes, not reproduce the current implementation in tests.
+
+### Azure configuration is not a test suite
+
+Owner decision, September 13, 2026: Bicep owns Azure configuration. Do not add
+tests that repeat its SKUs, RU/s, capacity, retention, names, role assignments,
+authentication flags or other resource properties as expected values. This also
+rules out readback tools that compare deployed settings with a second policy
+table. Calling these checks security or cost invariants does not justify
+duplicating the configuration.
+
+Use Bicep compilation and review the deployment plan. Keep narrow deployment
+operation safeguards, such as refusing changes outside the authorized group,
+deletion, incomplete plans and stale or changed deployment artifacts. These
+control what a command may do; they do not restate resource configuration.
+Application boundaries, such as keeping the Cosmos SDK inside its adapter,
+remain valid source invariants.
+
+Do not recreate the temporary Function gates or another test-only cloud client.
+Real-environment integration/e2e tests are deferred until the relevant application
+slice needs them. Then exercise production paths and observable behavior, such
+as denied access, replay, concurrent updates or expiry. Scope any synthetic writes
+and paid calls explicitly. Removing configuration checks does not waive those
+future acceptance criteria or authorize changing deployed resources.
+
+### Application and command safeguards
 
 Before adding a check, name the failure it prevents and the owning contract or
 observed incident. If the only justification is "keep this convention consistent",
@@ -84,38 +108,36 @@ Every new rule must:
 - State what it cannot prove. Missing tools, failed reads and incomplete evidence
   must remain visible, never become a successful verification.
 
-Do not assert exact module names, resource totals, output-key sets, dependency
-arrays, API versions or serialized template bodies merely because they match
-today's files. Narrow assertions to the dangerous property. An exact identifier
-is justified when it is an authorization boundary, wire contract or persisted
-resource identity. Explain that reason beside the check. Removing a naming test
-does not authorize renaming deployed storage or replacing data.
+For application source checks, do not freeze file layout, type spelling or entire
+implementation bodies just because they match today's files. An exact application
+identifier needs a protocol or authorization reason, explained beside the check.
+Deployment-command tests may assert the authorized target scope. Neither allowance
+permits assertions on Azure resource identities or configuration fields; review
+those in Bicep. Removing a naming test does not authorize renaming deployed
+storage or replacing data.
 
 Do not build an ARM-expression evaluator, a second compiler or a generic policy
-framework to make these tests more comprehensive. Bicep compilation checks
-syntax and type relationships. A narrow compiled-template assertion may check
-the emitted expression when that is the smallest reliable way to guard a real
-boundary. Review its limits rather than pretending it proves runtime behavior.
+framework to make these tests more comprehensive. Do not turn Bicep compiler
+output into a snapshot test.
 
 Keep the kinds of evidence separate:
 
 | Check | What it establishes | What it does not establish |
 | --- | --- | --- |
-| Source invariant or compiled-template test | The source declares the checked boundary or setting. | Deployed policy, identity access, successful requests. |
-| Read-only live verification | Azure returned the checked settings at a recorded time. | Data-plane access, deletion completion, application correctness. |
+| Source invariant | Application code respects the checked boundary. | Deployed policy, identity access, successful requests. |
+| Bicep compilation | The template passes the compiler's checks. | Runtime behavior or a successful deployment. |
+| Deployment-operation safeguard | The command refuses an unauthorized scope or unsafe plan. | Application correctness or all effects of an allowed deployment. |
 | Behavioral test through a production adapter | The tested operation obeys its contract in that environment. | Untested failure modes or production capacity. |
-| One-off commissioning probe | The specific experiment ran successfully. | A reusable integration suite or a release-wide pass. |
 
 Do not solve a failing policy check by copying the new output into the expected
 value. Determine whether behavior changed, the check overreaches, or the owning
 contract needs an explicit decision. Preserve regression coverage for the actual
 mistake when removing a brittle assertion.
 
-Cloud scripts must keep read-only inspection separate from deployment and paid
-experiments. Commit repeatable readback commands instead of leaving the procedure
-only in ignored evidence files. Use synthetic, bounded writes only in explicitly
-authorized experiments. Do not put cloud calls in local invariant checks or Git
-hooks. Do not retry an ambiguous paid call to get a green test.
+Keep diagnostic inspection separate from deployment and paid experiments. Use
+ordinary Azure commands to investigate a specific problem instead of adding a
+resource-policy test suite. Do not put cloud calls in local invariant checks or
+Git hooks. Do not retry an ambiguous paid call to get a green test.
 
 ## Historical schema comparison
 

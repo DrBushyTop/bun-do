@@ -23,8 +23,5 @@ jobs:
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
       - name: Compile the subscription template
         run: bicep build infra/main.bicep --outfile "$RUNNER_TEMP/bun-do.json"
-      - name: Verify compiled infrastructure policies
-        run: python3 -m unittest discover -s tools/invariants -t tools -p 'test_*template.py' -v
-      - name: Test Azure tooling without cloud access
-        run: |
-          python3 -m unittest discover -s tools -p 'test_azure_*.py' -v
+      - name: Test deployment command safeguards without cloud access
+        run: python3 -m unittest discover -s tools -p 'test_azure_foundation.py' -v

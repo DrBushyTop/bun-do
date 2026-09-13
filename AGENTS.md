@@ -11,12 +11,17 @@
   `python3 -m unittest discover -s tools -p 'test_*.py'` after changes.
   Before adding steering checks, read [invariant test policy](docs/agents/invariants.md#adding-or-changing-steering-checks).
   Protect costly mistakes, not naming preferences or today's file layout.
+  Do not duplicate Azure configuration in tests or policy-readback tools.
+  Bicep owns those settings; defer real-environment integration/e2e tests until needed.
 - Use [local development](docs/local-development.md) for Aspire lifecycle and
   [README](README.md) for .NET checks. Android builds use `src/BunDo.Android/gradlew`.
   Use [Azure development](docs/azure-development.md) for scoped Bicep planning,
   deployment and live verification.
-- Every completed slice needs a fresh adversarial subagent review. Fix material
-  findings, file concrete deferred bugs, then continue to the next ready slice.
+- Run the required fresh adversarial subagent review only after the whole slice
+  is implemented and its planned verification has run, not after individual
+  edits, partial increments or intermediate test runs. Follow the
+  [completion-review workflow](docs/agents/issue-tracker.md#completion-review).
+  Fix material findings, file concrete deferred bugs, then continue to the next ready slice.
 - Record the review conclusion and test evidence in the slice's GitHub issue.
   Keep only durable decisions, operational procedures and deferred bugs in the
   repository; do not commit standalone review reports.

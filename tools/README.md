@@ -4,13 +4,11 @@ Choose by the evidence needed, not by the number of checks available.
 
 | Location or command | Purpose |
 | --- | --- |
-| `invariants/` | Source boundary checks, compiled Bicep policy tests, and tests of the checker and its hooks. Read the [test policy](../docs/agents/invariants.md#adding-or-changing-steering-checks) before adding rules. |
+| `invariants/` | Application source boundary checks and tests of the checker and its hooks. Read the [test policy](../docs/agents/invariants.md#adding-or-changing-steering-checks) before adding rules. |
 | `check_invariants.py` | Stable, offline entrypoint for `invariants/check.py`. Used by agents, Git and CI. |
 | `run_invariant_hook.py`, `ci_schema_base.py` | Git/Codex hook integration and schema-history baseline selection. |
 | `azure-foundation.py` | Guarded plan and deployment. Mutates Azure only with `deploy`. |
-| `azure-verify-storage.py` | Read-only deployed storage policy checks. No keys, data-plane requests, writes or paid model calls. |
-| `azure-gates.py`, `cloud-gates/` | Opt-in commissioning experiments that replace the dev Function package and make synthetic writes and paid AI calls. Not routine invariant checks. |
-| `test_azure_*.py` | Offline tests of cloud tooling's safety and recovery behavior. |
+| `test_azure_foundation.py` | Offline tests of deployment-operation safeguards, not Azure resource settings. |
 | `android-*` | Android setup and device smoke checks. |
 | `speech-compare.py` | Prepare private audio corpora, run offline emulator comparisons and score matching reports. See [speech comparison](../docs/android-speech-comparison.md). |
 | `speech-cloud-compare.py` | Explicit paid Azure audio experiments with private-audio consent, scoped account checks and no automatic retries. Never run from tests or hooks. |
@@ -22,13 +20,16 @@ python3 tools/check_invariants.py
 python3 -m unittest discover -s tools -p 'test_*.py' -v
 ```
 
-Discovery includes the `invariants` package. Bicep tests visibly skip when Bicep
-is unavailable; the Infrastructure CI job installs it and compiles first.
-That job explicitly discovers template tests under `tools/invariants/` and runs
-`test_azure_*.py` for offline deployment/readback safety tests. The Repository
-invariants job runs the complete offline tooling suite and the source checker
-against the selected schema-history baseline. Neither job logs into Azure or
-invokes live verification. An offline pass never means Azure was verified.
+Discovery includes the `invariants` package. Infrastructure CI installs Bicep,
+compiles `infra/main.bicep` and tests deployment-operation safeguards. The
+Repository invariants job runs the complete offline tooling suite and the source
+checker against the selected schema-history baseline. Neither job logs into
+Azure or invokes live verification. An offline pass never means Azure was verified.
+
+Bicep is the source of truth for Azure configuration. Do not recreate compiled
+template assertions, policy-readback checklists or temporary Function gates.
+Real-environment integration/e2e tests should later exercise production
+application paths when their slices need them, not duplicate resource settings.
 
 The current folder split keeps steering checks separate from operational tools.
 Do not add a folder per cloud service or wrap ordinary CLI commands without a

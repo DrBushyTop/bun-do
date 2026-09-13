@@ -42,14 +42,12 @@ connection configuration for the future adapters.
 
 ## Verification
 
-Compile `infra/main.bicep` and run
-`python3 -m unittest discover -s tools -p 'test_backend_template.py'` with the
-other infrastructure tests. Use the guarded plan/review/deploy process in
-[Azure development](../docs/azure-development.md). Read back runtime, scale,
-identity, app settings, publishing restrictions, storage controls and role
-scopes. Repeat the Cosmos RID/policy/400 RU/s and snapshot identity/policy
-comparisons. Publish the package, check health, then review another what-if and
-verify a controlled redeployment.
+Compile `infra/main.bicep` and use the guarded plan/review/deploy process in
+[Azure development](../docs/azure-development.md). Bicep owns the host settings;
+do not duplicate them in template assertions or policy-readback checks.
+After publishing application code, a health request can confirm host execution.
+Future integration/e2e tests should exercise the real application's identity
+and storage operations, not a temporary replacement Function package.
 
 ## Microsoft references
 

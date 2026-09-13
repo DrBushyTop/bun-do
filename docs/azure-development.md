@@ -72,7 +72,6 @@ subscription. Check it before planning.
 ```sh
 az account show --query '{subscription:name,state:state}'
 bicep build infra/main.bicep --outfile /tmp/bun-do-foundation.json
-python3 -m unittest discover -s tools -p 'test_*template.py' -v
 python3 -m unittest discover -s tools -p 'test_azure_foundation.py' -v
 python3 tools/azure-foundation.py plan
 ```
@@ -93,7 +92,7 @@ Deploy requires the same subscription, compiled template, parameter bytes and
 saved plan, less than an hour old. It consumes the plan stamp before deployment.
 A failed deployment needs a new plan and review before retry. The script
 refuses an existing group whose application/environment tags or region do not
-match, and refuses a free-tier allocation already used outside this group.
+match. Resource settings, including the free-tier request, belong to Bicep.
 
 Repeat plan after a successful deployment and inspect drift before redeploying.
 No script deletes the group or any data. Aspire startup still runs only the
@@ -101,37 +100,18 @@ local Functions/Azurite profile and does not call these scripts.
 
 ## Verification and remaining gates
 
-New template assertions and verification tools must follow the
+Owner decision, September 13, 2026: Bicep is the Azure configuration source.
+Compiled-template assertions, the storage-policy readback tool and temporary
+Function gates have been removed. Do not recreate checks that repeat SKUs, RU/s,
+retention, names, grants or other Bicep settings. Follow the
 [invariant test policy](agents/invariants.md#adding-or-changing-steering-checks).
-Test privacy, data preservation, scope and cost boundaries, not module naming
-or an exact copy of the current template.
 
-### Repeatable read-only storage verification
+CI compiles Bicep and tests the deployment command's scope, deletion and plan
+integrity safeguards. It does not verify the deployed environment. Use ordinary
+Azure commands for targeted diagnosis when needed, not another policy checklist.
+No live integration/e2e suite is being added at this stage.
 
-```sh
-python3 tools/azure-verify-storage.py --subscription SUBSCRIPTION_UUID
-```
-
-Supply the intended subscription explicitly. The command does not change Azure
-CLI defaults. It uses only management-plane reads, verifies the dedicated group's
-tags and region, and discovers storage resources from deployment outputs.
-It needs Azure CLI login and permission to read those resources, not their keys
-or application data. Bicep and a prior local plan are not required.
-
-The JSON report contains a timestamp and each checked resource/property with
-expected value, observed value and repair guidance. Exit zero means all listed
-checks passed. Drift returns `FAIL`; unavailable or malformed evidence returns
-`INCOMPLETE`. Both exit nonzero. Redirect stdout to a new ignored evidence file
-when retaining a run. Never replace an earlier report to imply it passed.
-
-This first readback command covers Cosmos consistency, keyless access, backup,
-database throughput, partition key and TTL, plus snapshot authentication,
-native retention and scoped orphan cleanup. It does not verify every Azure
-setting, resource identity preservation across deployments, backend grants,
-running build identity, health, telemetry ingestion, actual data access or
-30-minute snapshot expiry. Use it after relevant changes or to diagnose drift.
-Extend it only for a concrete repeated check, with a failing and valid fixture.
-Do not redeploy automatically when verification fails.
+### Historical foundation evidence
 
 On September 12, 2026, the Cosmos foundation deployed successfully and passed
 management-plane policy reads. A controlled redeployment after the application
@@ -151,8 +131,8 @@ This negative probe does not prove backend managed-identity access, Shared Key
 rejection with a valid key, runtime expiry or cleanup.
 
 The Infrastructure workflow installs the pinned Bicep binary with its SHA-256,
-compiles the subscription template, and tests compiled storage settings and
-deployment safeguards. CI does not authenticate to Azure or provision resources.
+compiles the subscription template and tests deployment-operation safeguards.
+CI does not authenticate to Azure or provision resources.
 
 Live provisioning results belong in the implementation ticket; compilation or
 what-if is not deployment.
@@ -188,36 +168,16 @@ on September 12, 2026.
 Refusal/throttling handling was fixture-tested, not forced against the provider.
 These gates do not prove the durable AI worker or downstream sync.
 
-## Opt-in data-plane and negative AI checks
+## Future integration and end-to-end coverage
 
-`tools/cloud-gates/` contains the temporary Function and its tested checks.
-It is not part of the normal application package. Read its README before use.
-These are commissioning experiments, not the default verification command.
-Future adapter tests should exercise production code rather than grow a second
-storage or AI implementation inside temporary Functions.
+Add real-environment tests when the relevant application slices need them.
+Exercise production endpoints, adapters and worker paths under their deployed
+identities. Useful assertions cover authorization failures, transaction/replay
+behavior, expiry, cleanup and validated AI outcomes. Do not replace the running
+application with a temporary test Function or maintain separate REST clients
+just for environment checks.
 
-```sh
-python3 tools/azure-gates.py build
-python3 tools/azure-gates.py run
-```
-
-The runner validates exact resource endpoints and identity against ARM in the
-dedicated group, checks package hashes, creates a no-repeat dispatch marker,
-then deploys the temporary package. It verifies synthetic Cosmos/Blob CRUD,
-denied Blob account listing, a rejected AI schema and token-limited incomplete
-output. The two AI calls incur model usage; neither has a retry loop.
-
-The runner keeps Function keys in memory and attempts to restore the normal package
-even when a gate fails. Success requires Health 200, gate 404 and the expected function list.
-Here "restore" means publishing the normal artifact built from the checkout;
-it is not rollback to the previously deployed build. Do not use this commissioning
-workflow when replacing the current dev package is unacceptable.
-If restoration fails, use only:
-
-```sh
-python3 tools/azure-gates.py restore
-```
-
-Do not delete the dispatch marker or rerun paid gates to recover deployment.
-Records and ZIPs stay in ignored `.azure/foundation-gates/`. Inspect full
-exported telemetry for private content, not just a projection of safe fields.
+Keep any writes synthetic, isolated and cleaned up. Paid calls need explicit
+authorization and bounded usage; never retry an ambiguous paid call to get a
+passing test. Record results and review conclusions in the owning GitHub issue.
+The historical experiments above do not substitute for that future coverage.
