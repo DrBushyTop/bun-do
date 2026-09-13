@@ -54,7 +54,8 @@ public sealed class HouseholdService(IHouseholdDocuments documents, TimeProvider
             var state = new WorkspaceState(workspace, Guid.NewGuid(), 0,
                 ImmutableDictionary<Guid, DeviceRegistration>.Empty,
                 ImmutableDictionary<string, TaskSnapshot>.Empty,
-                ImmutableDictionary<string, OperationReceipt>.Empty, [], HouseholdMembership.Create(actor, displayName: displayName), name);
+                ImmutableDictionary<string, OperationReceipt>.Empty, [], HouseholdMembership.Create(actor, displayName: displayName), name,
+                Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
             await documents.WriteAsync(Partition(workspace), "state", null, state, cancellationToken);
             current = await documents.ReadAsync<WorkspaceState>(Partition(workspace), "state", cancellationToken);
         }
@@ -104,7 +105,7 @@ public sealed class HouseholdService(IHouseholdDocuments documents, TimeProvider
             var next = state with { Revision = revision, Membership = decision.State,
                 Changes = state.Changes.Add(new(revision, [])) };
             if (!HouseholdDocumentLimits.Admits(next, command)) return new("STORAGE_FULL", View(state, actor));
-            if (await documents.WriteAsync(Partition(workspace), "state", stored.Version, next, cancellationToken))
+            if (await documents.CommitWorkspaceAsync(stored, next, cancellationToken))
                 return new(decision.Code, View(next, actor));
         }
         return new("BUSY");

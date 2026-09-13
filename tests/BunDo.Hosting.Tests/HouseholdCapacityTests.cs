@@ -82,7 +82,8 @@ public sealed class HouseholdCapacityTests
             Assert.Equal("ACCEPTED", (await service.ChangeAsync(Owner, state.WorkspaceId, state.StateEpoch,
                 new DeleteHousehold(1), default)).Code);
             Assert.False((await service.GetAsync(Owner, state.WorkspaceId, default))!.Active);
-            Assert.True(new FileInfo(Directory.GetFiles(directory).Single()).Length > HouseholdDocumentLimits.GrowthBytes);
+            var deleted = await documents.ReadAsync<WorkspaceState>(state.WorkspaceId.ToString("D"), "state", default);
+            Assert.True(JsonSerializer.SerializeToUtf8Bytes(deleted!.Value).Length > HouseholdDocumentLimits.GrowthBytes);
         }
         finally { Directory.Delete(directory, true); }
     }

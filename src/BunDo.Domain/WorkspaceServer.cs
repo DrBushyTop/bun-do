@@ -27,14 +27,26 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
                     : new("OPERATION_ID_REUSED");
             if (operation.Sequence <= device.LastTerminalSequence) return new("OUTCOME_EXPIRED");
             if (operation.Sequence - device.LastTerminalSequence != 1) return new("SEQUENCE_GAP");
+            if (state.Revision == ulong.MaxValue) return new("WORKSPACE_FULL");
             var revision = state.Revision + 1;
             var code = "ACCEPTED";
             TaskSnapshot? task;
             TaskSnapshot? changed = null;
-            if (operation.Command is CreateTask create)
+            if (operation.Command is not DiscardBlockedIntent && operation.Dependencies.Any(sequence =>
+                    !state.Receipts.TryGetValue($"{operation.DeviceId:D}:{sequence}", out var prerequisite) || !prerequisite.Accepted))
             {
-                task = new(create.TaskId, create.Title, create.Description, new(revision, revision), new(revision, revision));
-                if (create.TaskId != TaskIdentity.ForCreate(operation.DeviceId, operation.Sequence))
+                task = null;
+                code = "INVALID_DEPENDENCY";
+            }
+            else if (operation.Command is CreateTask create)
+            {
+                task = new(create.TaskId, create.Title, create.Description, new(revision, revision), new(revision, revision),
+                    revision, operation.CaptureContext is { } capture
+                        ? new(create.Title, create.Description, capture, clock.GetUtcNow()) : null);
+                if (state.TaskCount >= 1024) code = "TASK_LIMIT";
+                else if (state.Tasks.ContainsKey(create.TaskId))
+                    code = "ENTITY_EXISTS";
+                else if (create.TaskId != TaskIdentity.ForCreate(operation.DeviceId, operation.Sequence))
                     code = "INVALID_TASK_ID";
                 else
                     code = ValidateText(task);
@@ -55,6 +67,8 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
                 var edit = (EditTask)operation.Command;
                 state.Tasks.TryGetValue(edit.TaskId, out task);
                 if (task is null) code = "ENTITY_MISSING";
+                else if (edit.ExpectedDeletionVersion is { } deletion && deletion != task.DeletionVersion)
+                    code = "DELETION_CONFLICT";
                 else if (edit.Title is null && edit.Description is null) code = "EMPTY_EDIT";
                 else if (edit.Title is { } t && t.ExpectedHumanVersion != task.TitleVersion.Human ||
                     edit.Description is { } d && d.ExpectedHumanVersion != task.DescriptionVersion.Human)
@@ -79,6 +93,7 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
             var next = state with
             {
                 Revision = revision,
+                TaskCount = state.TaskCount + (changed is not null && operation.Command is CreateTask ? 1 : 0),
                 Tasks = changed is not null ? state.Tasks.SetItem(changed.Id, changed) : state.Tasks,
                 Receipts = state.Receipts.Add(operation.OperationId, receipt),
                 Devices = state.Devices.SetItem(operation.DeviceId,

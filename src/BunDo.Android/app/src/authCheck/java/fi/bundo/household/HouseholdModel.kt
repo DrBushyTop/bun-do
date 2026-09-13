@@ -30,6 +30,7 @@ internal class HouseholdModel(private val account: AccountData, private val sign
         val response = send(JSONObject().put("action", "list"))
         val array = response.getJSONArray("households")
         homes = (0 until array.length()).map { Household.read(array.getJSONObject(it)) }
+            .sortedWith(compareBy<Household> { it.deleted }.thenBy { !it.active }.thenBy { it.name })
         current = current?.let { old ->
             homes.find { it.id == old.id }.also { if (it == null && old.active) failure = "FORBIDDEN" }
         }
@@ -40,7 +41,9 @@ internal class HouseholdModel(private val account: AccountData, private val sign
 
     fun open(home: Household) { current = home; failure = ""; shareLink = null; refresh() }
     fun back() { current = null; shareLink = null; failure = "" }
-    fun select(home: Household) { if (home.active && !home.deleted) account.selectHousehold(home.id) }
+    fun select(home: Household) = run {
+        if (home.active && !home.deleted) account.selectHousehold(home.id, home.epoch, home.name)
+    }
     fun clearShare() { shareLink = null }
 
     fun create(name: String, displayName: String) = run {
@@ -72,7 +75,7 @@ internal class HouseholdModel(private val account: AccountData, private val sign
         endpoint.send(token, registration, body)
     }
 
-    private fun update(response: JSONObject) {
+    private suspend fun update(response: JSONObject) {
         current = response.optJSONObject("household")?.let(Household::read)
         current?.let { home ->
             homes = homes.filterNot { it.id == home.id } + home

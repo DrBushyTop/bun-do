@@ -7,10 +7,16 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
+import androidx.work.Constraints
+import androidx.work.NetworkType
 import fi.bundo.identity.ValidatedIdentity
 import fi.bundo.identity.VerifiedSession
 import fi.bundo.speech.VoiceController
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
@@ -34,17 +40,45 @@ class AccountData internal constructor(
     private val context: Context,
 ) {
     val inbox = InboxRepository(database, lease)
-    // Selection never imports local drafts. The sync slice owns workspace projections and persistence.
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val selectedHouseholdValue = MutableStateFlow<String?>(null)
     val selectedHousehold = selectedHouseholdValue.asStateFlow()
-    fun selectHousehold(id: String?) {
-        lease.check()
+    private val selectedWorkspaceValue = MutableStateFlow<SharedWorkspace?>(null)
+    val selectedWorkspace = selectedWorkspaceValue.asStateFlow()
+    init {
+        scope.launch {
+            try {
+                database.shared().selected(registrationId.orEmpty()).collect { value ->
+                    lease.check()
+                    selectedWorkspaceValue.value = value
+                    selectedHouseholdValue.value = value?.workspaceId
+                }
+            } catch (error: kotlinx.coroutines.CancellationException) { throw error }
+            catch (_: Exception) { /* The editor owns the recoverable database-read error state. */ }
+        }
+    }
+    suspend fun selectHousehold(id: String?, epoch: String? = null, name: String = "") = lease.access {
+        database.withTransaction {
+            database.shared().clearSelection()
+            if (id != null) {
+                val registration = checkNotNull(registrationId)
+                val stateEpoch = checkNotNull(epoch)
+                val key = "$id/$stateEpoch/$registration"
+                val previous = database.shared().workspace(key)
+                database.shared().quarantineOtherRegistrations(registration)
+                database.shared().saveWorkspace(previous?.copy(name = name, selected = true)
+                    ?: SharedWorkspace(key, id, stateEpoch, registration, name, selected = true))
+            }
+            lease.check()
+        }
         selectedHouseholdValue.value = id
+        SharedSyncWorker.request(context, this@AccountData)
     }
     private var controller: VoiceController? = null
     val voice: VoiceController get() = controller ?: VoiceController(context, recordings).also { controller = it }
     internal fun revoke() {
         lease.revoke()
+        scope.cancel()
         controller?.close()
     }
     internal suspend fun close() {
@@ -178,6 +212,9 @@ class AccountStore(private val context: Context, private val name: String = "acc
                 // Force decryption/schema validation before replacing the current account.
                 next.database.inbox().allDrafts()
                 retireCurrent()
+                next.database.withTransaction {
+                    next.database.shared().quarantineOtherRegistrations(registrationId)
+                }
                 synchronized(activationGate) {
                     check(allowed()) { "Authentication session ended" }
                     signOutMarker.delete()
@@ -238,6 +275,16 @@ class AccountStore(private val context: Context, private val name: String = "acc
                 .addTag("account:${data.lease.owner}")
                 .setInputData(workDataOf("owner" to data.lease.owner, "generation" to data.lease.generation))
                 .build())
+        if (data.identity != null) {
+            WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+                "shared-periodic:${data.lease.owner}", ExistingPeriodicWorkPolicy.UPDATE,
+                PeriodicWorkRequestBuilder<SharedSyncWorker>(15, TimeUnit.MINUTES)
+                    .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                    .addTag("account:${data.lease.owner}")
+                    .setInputData(workDataOf("owner" to data.lease.owner, "generation" to data.lease.generation))
+                    .build())
+            SharedSyncWorker.request(context, data)
+        }
     }
 
     fun matching(owner: String?, generation: String?): AccountData? =
@@ -251,9 +298,16 @@ class AccountStore(private val context: Context, private val name: String = "acc
                 RecoveryText("task:${it.id}", it.title, it.description, it.createdAt)
             } + data.database.inbox().allDrafts().filter { it.title.isNotBlank() || it.description.isNotBlank() }.map {
                 RecoveryText("draft:${it.key}", it.title, it.description, it.savedAt)
+            } + data.database.shared().recovery().map {
+                RecoveryText("shared:${it.scope}:${it.sequence}", it.title, it.description.orEmpty(), 0)
+            } + data.database.shared().allDrafts().filter { it.title.isNotBlank() || it.description.isNotBlank() }.map {
+                RecoveryText("shared-draft:${it.scope}:${it.key}", it.title, it.description, it.savedAt)
             }
         }
     }
+
+    /** Preview only. The UI must select text before a new household command is allocated. */
+    suspend fun sharedImportPreview(data: AccountData): List<RecoveryText> = recovery(data)
 
     suspend fun anonymousPreview(data: AccountData): List<RecoveryText> = data.lease.access {
         check(data.identity != null)

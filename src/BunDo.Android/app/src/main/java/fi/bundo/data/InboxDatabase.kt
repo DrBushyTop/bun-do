@@ -85,13 +85,15 @@ interface InboxDao {
 }
 
 @Database(
-    entities = [InboxTask::class, InboxIntent::class, EditorDraft::class, VoiceRecording::class],
-    version = 3,
+    entities = [InboxTask::class, InboxIntent::class, EditorDraft::class, VoiceRecording::class,
+        SharedWorkspace::class, SharedBase::class, SharedProjection::class, SharedIntent::class, SharedDraft::class],
+    version = 5,
     exportSchema = true,
 )
 abstract class InboxDatabase : RoomDatabase() {
     abstract fun inbox(): InboxDao
     abstract fun recordings(): RecordingDao
+    abstract fun shared(): SharedDao
 
     companion object {
         // Deliberately not derived from a future active account or workspace selection.
@@ -109,9 +111,27 @@ abstract class InboxDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS shared_workspaces (scope TEXT NOT NULL PRIMARY KEY, workspaceId TEXT NOT NULL, epoch TEXT NOT NULL, registration TEXT NOT NULL, name TEXT NOT NULL, selected INTEGER NOT NULL, nextSequence TEXT NOT NULL, revision TEXT NOT NULL, cursor TEXT, acknowledged TEXT NOT NULL, blocked TEXT, worker TEXT, workerUntil INTEGER NOT NULL, workerBoot INTEGER NOT NULL)")
+                for (table in listOf("shared_base", "shared_projection"))
+                    db.execSQL("CREATE TABLE IF NOT EXISTS $table (scope TEXT NOT NULL, id TEXT NOT NULL, snapshot TEXT NOT NULL, PRIMARY KEY(scope, id))")
+                db.execSQL("CREATE TABLE IF NOT EXISTS shared_intents (scope TEXT NOT NULL, sequence TEXT NOT NULL, taskId TEXT NOT NULL, kind TEXT NOT NULL, title TEXT NOT NULL, description TEXT, titleChanged INTEGER NOT NULL, descriptionChanged INTEGER NOT NULL, observedTitle TEXT NOT NULL, observedDescription TEXT NOT NULL, observedDeletion TEXT NOT NULL, afterSequence TEXT, captureContext TEXT NOT NULL, frozen TEXT, receipt TEXT, status TEXT NOT NULL, problem TEXT, PRIMARY KEY(scope, sequence))")
+                db.execSQL("CREATE TABLE IF NOT EXISTS shared_drafts (scope TEXT NOT NULL, `key` TEXT NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL, savedAt INTEGER NOT NULL, PRIMARY KEY(scope, `key`))")
+            }
+        }
+
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                for (column in listOf("titleAfterSequence", "descriptionAfterSequence", "deletionAfterSequence"))
+                    db.execSQL("ALTER TABLE shared_intents ADD COLUMN $column TEXT")
+                db.execSQL("ALTER TABLE shared_drafts ADD COLUMN basis TEXT")
+            }
+        }
+
         fun open(context: Context, name: String = FILE_NAME, passphrase: ByteArray? = null): InboxDatabase {
             val builder = Room.databaseBuilder(context, InboxDatabase::class.java, name)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 // AccountStore owns the connection used by both UI and workers.
                 // Workers cannot independently open a signed-out account.
             if (passphrase != null) {

@@ -1,0 +1,18 @@
+<resources>
+    <string name="shared_local">On this device</string>
+    <string name="shared_import">Add from this device</string>
+    <string name="shared_import_explanation">Choose what to copy into this household. The originals stay on this device.</string>
+    <string name="shared_no_local">Nothing to copy.</string>
+    <string name="shared_copy">Copy selected</string>
+    <string name="shared_copy_new">Copy as a new task</string>
+    <string name="shared_copy_failed">Could not copy the task. Your text is still saved. Try again.</string>
+    <string name="shared_review">Review edits (%1$d)</string>
+    <string name="shared_recovery_explanation">These edits could not be shared. Your text is saved here. You can copy it into a new task.</string>
+    <string name="shared_current">Shared title: %1$s</string>
+    <string name="shared_current_description">Shared description: %1$s</string>
+    <string name="shared_conflict_reason">Someone else changed this task. Your edit was kept separately.</string>
+    <string name="shared_limit_reason">This household has reached its task limit. Your text is saved here.</string>
+    <string name="shared_dependency_reason">An earlier change could not be shared, so this edit was kept here.</string>
+    <string name="shared_preserved_reason">Your text is saved here and has not replaced the shared task.</string>
+    <string name="shared_access_lost">This household is no longer available. Your unsent text is saved. Open your account to recover it or sign in again.</string>
+</resources>

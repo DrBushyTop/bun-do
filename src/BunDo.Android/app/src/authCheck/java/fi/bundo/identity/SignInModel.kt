@@ -25,7 +25,7 @@ class SignInModel internal constructor(
     private constructor(application: Application, provider: TokenProvider) :
         this(application, provider, IdentityEndpoint(provider.issuer)::verify, (application as BunDoApplication).accounts)
 
-    constructor(application: Application) : this(application, createTokenProvider(application))
+    constructor(application: Application) : this(application, (application as BunDoApplication).tokens)
 
     var status by mutableStateOf(R.string.identity_loading)
         private set

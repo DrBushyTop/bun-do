@@ -14,6 +14,7 @@ import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Rule
+import org.junit.rules.RuleChain
 import org.junit.Test
 import org.junit.Assert.assertTrue
 import org.junit.runner.RunWith
@@ -23,7 +24,8 @@ import java.util.UUID
 
 @RunWith(AndroidJUnit4::class)
 class InboxUiTest {
-    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    val compose = createAndroidComposeRule<MainActivity>()
+    @get:Rule val rules: RuleChain = RuleChain.outerRule(IsolatedUiAccountRule()).around(compose)
 
     @Test fun landscapeQueueUsesAvailableWidthBeforeSelectingTask() {
         val previousOrientation = compose.activity.requestedOrientation
@@ -55,21 +57,33 @@ class InboxUiTest {
             compose.onAllNodes(androidx.compose.ui.test.hasTestTag("capture")).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("capture").performClick()
+        waitForTag("title")
         compose.onNodeWithTag("title").performTextReplacement(title)
         compose.onNodeWithTag("description").performTextReplacement("Keep this English description")
         compose.waitUntil(10_000) {
             compose.onAllNodes(androidx.compose.ui.test.hasTestTag("draft-saved")).fetchSemanticsNodes().isNotEmpty()
         }
         compose.activityRule.scenario.recreate()
+        waitForTag("title")
         compose.onNodeWithTag("title").assertTextContains(title)
         compose.onNodeWithTag("back").performClick()
+        waitForTag("capture")
         compose.onNodeWithTag("capture").performClick()
+        waitForTag("title")
         compose.onNodeWithTag("title").assertTextContains(title)
         compose.onNodeWithTag("save").performClick()
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(androidx.compose.ui.test.hasText(title)).fetchSemanticsNodes().isNotEmpty() &&
+                compose.onAllNodes(androidx.compose.ui.test.hasTestTag("title")).fetchSemanticsNodes().isEmpty()
+        }
         compose.onNodeWithText(title).performClick()
         compose.onNodeWithTag("edit").performClick()
+        waitForTag("title")
         compose.onNodeWithTag("title").performTextReplacement("Järjestä varaston hyllyt")
         compose.onNodeWithTag("save").performClick()
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(androidx.compose.ui.test.hasTestTag("title")).fetchSemanticsNodes().isEmpty()
+        }
         compose.onNodeWithText("Järjestä varaston hyllyt").assertIsDisplayed()
         compose.onNodeWithText("Keep this English description").performScrollTo().assertIsDisplayed()
     }
@@ -87,5 +101,9 @@ class InboxUiTest {
         compose.onNodeWithTag("settings").performClick()
         compose.onNodeWithTag("back").performClick()
         compose.onNodeWithText(visible).assertIsDisplayed()
+    }
+
+    private fun waitForTag(tag: String) = compose.waitUntil(10_000) {
+        compose.onAllNodes(androidx.compose.ui.test.hasTestTag(tag)).fetchSemanticsNodes().isNotEmpty()
     }
 }

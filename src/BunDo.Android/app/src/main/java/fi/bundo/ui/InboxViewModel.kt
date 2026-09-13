@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import fi.bundo.data.EditorDraft
 import fi.bundo.data.InboxLimits
 import fi.bundo.data.InboxRepository
+import fi.bundo.data.TaskEditorRepository
 import fi.bundo.data.InboxTask
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -27,7 +28,7 @@ data class InboxUiState(
     val readFailed: Boolean = false,
 )
 
-class InboxViewModel(private val repository: InboxRepository, private val savedState: SavedStateHandle) :
+class InboxViewModel(private val repository: TaskEditorRepository, private val savedState: SavedStateHandle) :
     ViewModel() {
     private val mutableState = MutableStateFlow(InboxUiState())
     val state = mutableState.asStateFlow()

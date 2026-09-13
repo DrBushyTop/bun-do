@@ -8,10 +8,11 @@ namespace BunDo.Domain;
 public abstract record TaskCommand;
 public sealed record CreateTask(string TaskId, string Title, string? Description = null) : TaskCommand;
 public sealed record TextEdit(string? Value, ulong ExpectedHumanVersion);
-public sealed record EditTask(string TaskId, TextEdit? Title = null, TextEdit? Description = null) : TaskCommand;
+public sealed record EditTask(string TaskId, TextEdit? Title = null, TextEdit? Description = null,
+    ulong? ExpectedDeletionVersion = null) : TaskCommand;
 public sealed record DiscardBlockedIntent(ulong RejectedDependencySequence) : TaskCommand;
 
-/// <summary>A frozen model envelope. It is not yet the production HTTP wire parser.</summary>
+/// <summary>Validated command identity. Production fingerprints cover the original wire bytes.</summary>
 public sealed class FrozenOperation
 {
     public Guid WorkspaceId { get; }
@@ -22,10 +23,18 @@ public sealed class FrozenOperation
     public int ProtocolVersion { get; }
     public int CommandVersion { get; }
     public string Fingerprint { get; }
+    public IReadOnlyList<ulong> Dependencies { get; }
+    public JsonElement? CaptureContext { get; internal init; }
     public string OperationId => $"{DeviceId:D}:{Sequence.ToString(CultureInfo.InvariantCulture)}";
 
     public FrozenOperation(Guid workspaceId, Guid stateEpoch, Guid deviceId, ulong sequence, TaskCommand command,
         int protocolVersion = 1, int commandVersion = 1)
+        : this(workspaceId, stateEpoch, deviceId, sequence, command, protocolVersion, commandVersion, null, [])
+    {
+    }
+
+    internal FrozenOperation(Guid workspaceId, Guid stateEpoch, Guid deviceId, ulong sequence, TaskCommand command,
+        int protocolVersion, int commandVersion, byte[]? wireBytes, IReadOnlyList<ulong> dependencies)
     {
         ArgumentNullException.ThrowIfNull(command);
         WorkspaceId = workspaceId;
@@ -35,6 +44,7 @@ public sealed class FrozenOperation
         Command = command;
         ProtocolVersion = protocolVersion;
         CommandVersion = commandVersion;
+        Dependencies = dependencies.ToArray();
         var kind = command switch
         {
             CreateTask => "CreateTask",
@@ -54,7 +64,7 @@ public sealed class FrozenOperation
             kind,
             payload
         });
-        Fingerprint = Convert.ToHexStringLower(SHA256.HashData(bytes));
+        Fingerprint = Convert.ToHexStringLower(SHA256.HashData(wireBytes ?? bytes));
     }
 }
 

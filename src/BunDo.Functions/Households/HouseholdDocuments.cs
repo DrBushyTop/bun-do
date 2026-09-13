@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using BunDo.Functions.Identity;
+using BunDo.Domain;
 
 namespace BunDo.Functions.Households;
 
@@ -13,6 +14,8 @@ public interface IHouseholdDocuments
 {
     Task<StoredDocument<T>?> ReadAsync<T>(string partition, string id, CancellationToken cancellationToken);
     Task<bool> WriteAsync<T>(string partition, string id, string? version, T value, CancellationToken cancellationToken);
+    Task<bool> CommitWorkspaceAsync(StoredDocument<WorkspaceState> expected, WorkspaceState next,
+        CancellationToken cancellationToken);
 }
 
 public sealed record HouseholdDirectory(ImmutableHashSet<Guid> Workspaces, ImmutableArray<DateTimeOffset> Attempts)

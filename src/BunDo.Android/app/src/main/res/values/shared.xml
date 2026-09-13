@@ -1,0 +1,18 @@
+<resources>
+    <string name="shared_local">Tällä laitteella</string>
+    <string name="shared_import">Lisää tältä laitteelta</string>
+    <string name="shared_import_explanation">Valitse tähän talouteen kopioitavat tehtävät. Alkuperäiset säilyvät tällä laitteella.</string>
+    <string name="shared_no_local">Ei kopioitavaa.</string>
+    <string name="shared_copy">Kopioi valitut</string>
+    <string name="shared_copy_new">Kopioi uudeksi tehtäväksi</string>
+    <string name="shared_copy_failed">Tehtävää ei voitu kopioida. Tekstisi on tallessa. Yritä uudelleen.</string>
+    <string name="shared_review">Tarkista muokkaukset (%1$d)</string>
+    <string name="shared_recovery_explanation">Näitä muokkauksia ei voitu jakaa. Tekstisi on tallessa tässä. Voit kopioida sen uudeksi tehtäväksi.</string>
+    <string name="shared_current">Jaettu otsikko: %1$s</string>
+    <string name="shared_current_description">Jaettu kuvaus: %1$s</string>
+    <string name="shared_conflict_reason">Joku muu muutti tehtävää. Oma muokkauksesi säilytettiin erikseen.</string>
+    <string name="shared_limit_reason">Tämän talouden tehtävämäärä on täynnä. Tekstisi on tallessa tässä.</string>
+    <string name="shared_dependency_reason">Aiempaa muutosta ei voitu jakaa, joten tämä muokkaus säilytettiin tässä.</string>
+    <string name="shared_preserved_reason">Tekstisi on tallessa tässä. Se ei ole korvannut jaettua tehtävää.</string>
+    <string name="shared_access_lost">Tämä talous ei ole enää käytettävissä. Lähettämätön tekstisi on tallessa. Avaa tilisi palauttaaksesi sen tai kirjaudu uudelleen.</string>
+</resources>

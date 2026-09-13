@@ -29,6 +29,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import fi.bundo.ui.BunDoTheme
 import fi.bundo.ui.InboxApp
 import fi.bundo.ui.InboxViewModel
+import fi.bundo.ui.SharedWorkspaceScreen
 
 class MainActivity : AppCompatActivity() {
     private var invitation by mutableStateOf<String?>(null)
@@ -80,6 +81,13 @@ class MainActivity : AppCompatActivity() {
                     CircularProgressIndicator()
                 } else key(account!!.lease.generation) {
                 val data = account!!
+                val selected by data.selectedWorkspace.collectAsStateWithLifecycle()
+                if (selected != null) {
+                    SharedWorkspaceScreen(data, selected!!, appearance, {
+                        preferences.edit { putString("theme", it) }
+                        appearance = it
+                    }, { showAccount = true })
+                } else {
                 val model: InboxViewModel = viewModel(key = data.lease.generation, factory = viewModelFactory {
                     initializer {
                         InboxViewModel(data.inbox, createSavedStateHandle())
@@ -98,6 +106,7 @@ class MainActivity : AppCompatActivity() {
                     voice = data.voice,
                     onAccount = { showAccount = true },
                 )
+                }
                 }
             }
         }

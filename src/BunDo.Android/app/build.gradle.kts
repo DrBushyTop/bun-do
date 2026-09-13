@@ -11,6 +11,9 @@ plugins {
 }
 
 android {
+    testBuildType = providers.gradleProperty("bundoTestBuildType").orElse("debug").get().also {
+        require(it in setOf("debug", "local"))
+    }
     namespace = "fi.bundo"
     compileSdk = 36
     defaultConfig {

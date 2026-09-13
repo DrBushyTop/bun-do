@@ -86,6 +86,9 @@ fun InboxApp(
     onAppearance: (String) -> Unit,
     voice: VoiceController? = null,
     onAccount: (() -> Unit)? = null,
+    queueTitle: String? = null,
+    queueHeader: (@Composable () -> Unit)? = null,
+    canEdit: Boolean = true,
 ) {
     var settings by rememberSaveable { mutableStateOf(false) }
     var showVoice by rememberSaveable { mutableStateOf(false) }
@@ -110,7 +113,7 @@ fun InboxApp(
                 TopAppBar(
                     title = {
                         Text(
-                            stringResource(
+                            if (editor == null && !settings && (selected == null || wide) && queueTitle != null) queueTitle else stringResource(
                                 when {
                                     editor != null -> if (editor.key == InboxRepository.NEW_DRAFT) R.string.new_task else R.string.edit_task
                                     settings -> R.string.settings
@@ -138,7 +141,7 @@ fun InboxApp(
                         if (editor != null) {
                             TextButton(
                                 onClick = { model.closeEditor(commit = true) },
-                                enabled = !state.working && InboxLimits.valid(editor.title, editor.description),
+                                enabled = canEdit && !state.working && InboxLimits.valid(editor.title, editor.description),
                                 modifier = Modifier.testTag("save").padding(end = 8.dp).heightIn(min = 48.dp),
                             ) { Text(stringResource(R.string.save)) }
                         } else if (!settings) {
@@ -153,9 +156,9 @@ fun InboxApp(
             Box(Modifier.fillMaxSize().padding(insets).imePadding()) {
                 when {
                     editor != null -> Editor(state, model, Modifier.align(Alignment.TopCenter).widthIn(max = 640.dp).fillMaxWidth())
-                    settings -> Settings(appearance, onAppearance, Modifier.align(Alignment.TopCenter).widthIn(max = 640.dp).fillMaxWidth())
+                    settings -> Settings(appearance, onAppearance, Modifier.align(Alignment.TopCenter).widthIn(max = 640.dp).fillMaxWidth(), queueTitle == null)
                     selected != null && !wide -> TaskDetail(
-                        selected, { model.openEditor(selected.id) }, state, model::retry, Modifier.fillMaxSize(),
+                        selected, { model.openEditor(selected.id) }, state, model::retry, Modifier.fillMaxSize(), queueTitle == null,
                     )
                     else -> Row(Modifier.fillMaxSize()) {
                         Queue(
@@ -167,10 +170,12 @@ fun InboxApp(
                             scroll = queueScroll,
                             gutter = gutter,
                             compactNotice = short,
+                            header = queueHeader,
+                            canEdit = canEdit,
                             modifier = if (wide && selected != null) Modifier.width(360.dp) else Modifier.weight(1f),
                         )
                         if (wide && selected != null) {
-                            TaskDetail(selected, { model.openEditor(selected.id) }, state, model::retry, Modifier.weight(1f))
+                            TaskDetail(selected, { model.openEditor(selected.id) }, state, model::retry, Modifier.weight(1f), queueTitle == null)
                         }
                     }
                 }
@@ -197,6 +202,8 @@ private fun Queue(
     scroll: LazyListState,
     gutter: androidx.compose.ui.unit.Dp,
     compactNotice: Boolean,
+    header: (@Composable () -> Unit)?,
+    canEdit: Boolean,
     modifier: Modifier,
 ) {
     val hasDraft = state.drafts.any {
@@ -209,7 +216,7 @@ private fun Queue(
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
             item {
-                Surface(color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                if (header != null) header() else Surface(color = MaterialTheme.colorScheme.surfaceContainerLow) {
                     Column(Modifier.fillMaxWidth().padding(horizontal = gutter, vertical = 12.dp)) {
                         Text(stringResource(R.string.local_only), style = MaterialTheme.typography.labelLarge)
                         // Settings keeps the full explanation available on short screens.
@@ -288,7 +295,7 @@ private fun Queue(
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TextButton(
                 onClick = onType,
-                enabled = state.loaded && !state.working && !state.readFailed,
+                enabled = canEdit && state.loaded && !state.working && !state.readFailed,
                 modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("capture"),
             ) {
                 Icon(Icons.Outlined.Add, contentDescription = null)
@@ -360,7 +367,7 @@ private fun FieldCount(value: String, limit: Int) {
 
 @Composable
 private fun TaskDetail(
-    task: InboxTask, onEdit: () -> Unit, state: InboxUiState, onRetry: () -> Unit, modifier: Modifier,
+    task: InboxTask, onEdit: () -> Unit, state: InboxUiState, onRetry: () -> Unit, modifier: Modifier, localOnly: Boolean,
 ) {
     var original by rememberSaveable(task.id) { mutableStateOf(false) }
     Column(
@@ -369,7 +376,7 @@ private fun TaskDetail(
     ) {
         if (state.writeFailed) ErrorNotice(R.string.open_failed, onRetry)
         Text(task.title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
-        Text(stringResource(R.string.local_only), style = MaterialTheme.typography.labelLarge)
+        if (localOnly) Text(stringResource(R.string.local_only), style = MaterialTheme.typography.labelLarge)
         Text(task.description.ifEmpty { stringResource(R.string.no_description) }, style = MaterialTheme.typography.bodyLarge)
         Button(onClick = onEdit, enabled = !state.working, modifier = Modifier.heightIn(min = 48.dp).testTag("edit")) {
             Text(stringResource(R.string.edit_task))
@@ -395,7 +402,7 @@ private fun ErrorNotice(message: Int, retry: () -> Unit) {
 }
 
 @Composable
-private fun Settings(appearance: String, onAppearance: (String) -> Unit, modifier: Modifier) {
+private fun Settings(appearance: String, onAppearance: (String) -> Unit, modifier: Modifier, localOnly: Boolean) {
     val language = AppCompatDelegate.getApplicationLocales().toLanguageTags()
     Column(modifier.verticalScroll(rememberScrollState()).padding(16.dp)) {
         Text(stringResource(R.string.appearance), style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
@@ -411,9 +418,11 @@ private fun Settings(appearance: String, onAppearance: (String) -> Unit, modifie
             language,
             listOf("" to R.string.system_default, "fi" to R.string.finnish, "en" to R.string.english),
         ) { AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(it)) }
-        Spacer(Modifier.height(24.dp))
-        Text(stringResource(R.string.local_only), style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
-        Text(stringResource(R.string.local_explanation), Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodyLarge)
+        if (localOnly) {
+            Spacer(Modifier.height(24.dp))
+            Text(stringResource(R.string.local_only), style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
+            Text(stringResource(R.string.local_explanation), Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodyLarge)
+        }
     }
 }
 

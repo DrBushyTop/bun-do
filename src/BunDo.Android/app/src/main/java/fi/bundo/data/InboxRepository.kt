@@ -13,24 +13,24 @@ object InboxLimits {
         title.isNotBlank() && length(title) <= TITLE && length(description) <= DESCRIPTION
 }
 
-class InboxRepository(private val database: InboxDatabase, private val lease: DataLease = DataLease()) {
+class InboxRepository(private val database: InboxDatabase, private val lease: DataLease = DataLease()) : TaskEditorRepository {
     private val dao = database.inbox()
-    val tasks = dao.observeTasks()
-    val drafts = dao.observeDrafts()
+    override val tasks = dao.observeTasks()
+    override val drafts = dao.observeDrafts()
 
-    suspend fun draft(key: String): EditorDraft = lease.access { dao.draft(key) ?: if (key == NEW_DRAFT) {
+    override suspend fun draft(key: String): EditorDraft = lease.access { dao.draft(key) ?: if (key == NEW_DRAFT) {
         EditorDraft(key)
     } else {
         val task = checkNotNull(dao.task(key)) { "Inbox task does not exist" }
         EditorDraft(key, task.title, task.description)
     } }
 
-    suspend fun saveDraft(draft: EditorDraft) = lease.access {
+    override suspend fun saveDraft(draft: EditorDraft) = lease.access {
         // Invalid task content can still be recovered as a draft.
         dao.saveDraft(draft.copy(savedAt = System.currentTimeMillis()))
     }
 
-    suspend fun commit(draft: EditorDraft): String = lease.access {
+    override suspend fun commit(draft: EditorDraft): String = lease.access {
         require(InboxLimits.valid(draft.title, draft.description)) { "Invalid inbox task" }
         database.withTransaction {
             lease.check()

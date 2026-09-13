@@ -2,6 +2,8 @@ using System.Net;
 using System.Text.Json;
 using BunDo.Functions.Households;
 using Microsoft.Azure.Cosmos;
+using BunDo.Domain;
+using BunDo.Functions.Sync;
 
 namespace BunDo.Functions.Storage.Cosmos;
 
@@ -9,6 +11,33 @@ namespace BunDo.Functions.Storage.Cosmos;
 public sealed class HouseholdDocuments(Container container) : IHouseholdDocuments
 {
     private sealed record Document<T>(string id, string workspaceId, int SchemaVersion, T Value);
+
+    public async Task<bool> CommitWorkspaceAsync(StoredDocument<WorkspaceState> expected, WorkspaceState next,
+        CancellationToken cancellationToken)
+    {
+        var plan = WorkspaceCommit.Plan(expected.Value, next);
+        var partition = next.WorkspaceId.ToString("D");
+        var streams = new List<MemoryStream>();
+        try
+        {
+            var batch = container.CreateTransactionalBatch(new PartitionKey(partition))
+                .ReplaceItem("state", new Document<WorkspaceState>("state", partition, 1, plan.Metadata),
+                    new TransactionalBatchItemRequestOptions { IfMatchEtag = expected.Version });
+            foreach (var write in plan.Writes)
+            {
+                var stream = new MemoryStream(JsonSerializer.SerializeToUtf8Bytes(
+                    new Document<object>(write.Id, partition, 1, write.Value)));
+                streams.Add(stream);
+                if (write.CreateOnly) batch.CreateItemStream(stream);
+                else batch.UpsertItemStream(stream);
+            }
+            using var response = await batch.ExecuteAsync(cancellationToken);
+            if (response.IsSuccessStatusCode) return true;
+            if (response.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed) return false;
+            throw new InvalidOperationException($"Workspace transaction failed with status {(int)response.StatusCode}.");
+        }
+        finally { foreach (var stream in streams) stream.Dispose(); }
+    }
 
     public async Task<StoredDocument<T>?> ReadAsync<T>(string partition, string id, CancellationToken cancellationToken)
     {

@@ -3,9 +3,12 @@ using System.Collections.Immutable;
 namespace BunDo.Domain;
 
 public sealed record FieldVersion(ulong Server, ulong Human);
+public sealed record TaskCapture(string Title, string? Description, System.Text.Json.JsonElement Context, DateTimeOffset ReceivedAt);
 public sealed record TaskSnapshot(
-    string Id, string Title, string? Description, FieldVersion TitleVersion, FieldVersion DescriptionVersion);
-public sealed record DeviceRegistration(Guid DeviceId, Guid MemberId, ulong LastTerminalSequence = 0);
+    string Id, string Title, string? Description, FieldVersion TitleVersion, FieldVersion DescriptionVersion,
+    ulong DeletionVersion = 0, TaskCapture? Capture = null);
+public sealed record DeviceRegistration(Guid DeviceId, Guid MemberId, ulong LastTerminalSequence = 0,
+    ulong AcknowledgedThrough = 0);
 public sealed record OperationReceipt(
     string OperationId, string Fingerprint, string Code, ulong EffectRevision, TaskSnapshot? Task)
 {
@@ -25,7 +28,9 @@ public sealed record WorkspaceState(
     ImmutableDictionary<string, OperationReceipt> Receipts,
     ImmutableArray<ChangeGroup> Changes,
     HouseholdMembership Membership,
-    string Name = "Household");
+    string Name = "Household",
+    string? CursorSecret = null,
+    int TaskCount = 0);
 
 /// <summary>The transaction seam; a failed compare-and-swap must have no effects.</summary>
 public interface IWorkspaceStore
