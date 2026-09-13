@@ -26,6 +26,55 @@ public sealed class SyncTests : IDisposable
     private FrozenOperation Operation(Guid epoch, ulong sequence, string title = "Coffee") =>
         new(workspace, epoch, device, sequence, new CreateTask(TaskIdentity.ForCreate(device, sequence), title));
 
+    [Fact]
+    public async Task TaskActionsReadCanonicalDocumentsAndCommitCreditOrderAndReceiptsTogether()
+    {
+        var epoch = await Create();
+        var sync = new SyncService(documents);
+        var create = (await sync.SubmitAsync(member, Operation(epoch, 1), default)).Receipt!.Task!;
+        var second = (await sync.SubmitAsync(member, Operation(epoch, 2), default)).Receipt!.Task!;
+        var claim = (await sync.SubmitAsync(member, new(workspace, epoch, device, 3,
+            new ClaimTask(create.Id, new(1, 1, 1, 1))), default)).Receipt!;
+        Assert.Equal(member, claim.Task!.ClaimantId);
+        var operation = new FrozenOperation(workspace, epoch, device, 4, new CompleteTask(create.Id, new(1, 3, 1, 1)));
+        var complete = await sync.SubmitAsync(member, operation, default);
+        Assert.Equal("ACCEPTED", complete.Code);
+        Assert.Equal(complete, await new SyncService(new LocalHouseholdDocuments(path)).SubmitAsync(member, operation, default));
+        var credit = complete.Receipt!.Task!.FirstCompletion!;
+        Assert.Equal(complete.Receipt.RecordedAt, credit.AcceptedAt);
+        Assert.Equal(create.Id, credit.RootId);
+        var stored = (await documents.ReadAsync<TaskSnapshot>(workspace.ToString("D"), WorkspaceCommit.TaskId(create.Id), default))!.Value;
+        Assert.Equal(complete.Receipt.Task, stored);
+        Assert.Equal(new[] { second.Id }, (await documents.ReadAsync<WorkspaceState>(workspace.ToString("D"), "state", default))!.Value.RootOrder);
+        await sync.SubmitAsync(member, new(workspace, epoch, device, 5, new ReopenTask(create.Id, new(4, 4, 1, 1))), default);
+        var again = await sync.SubmitAsync(member, new(workspace, epoch, device, 6,
+            new CompleteTask(create.Id, new(5, 4, 1, 1))), default);
+        Assert.Equal(credit, again.Receipt!.Task!.FirstCompletion);
+        var page = await sync.PullAsync(member, workspace, epoch, null, [], "ACCEPTED", default);
+        Assert.Equal(member, page.Membership!.Me);
+        var entities = JsonDocument.Parse(page.Groups.Last().Parts[0].Payload).RootElement;
+        Assert.Equal("ROOT_ORDER", entities[1].GetProperty("entityType").GetString());
+        Assert.Equal(second.Id, entities[1].GetProperty("taskIds")[0].GetString());
+    }
+
+    [Fact]
+    public async Task CompetingHandlersCannotBothClaimTheSameObservedTask()
+    {
+        var epoch = await Create();
+        var other = Guid.NewGuid();
+        var meta = (await documents.ReadAsync<WorkspaceState>(workspace.ToString("D"), "state", default))!;
+        await documents.WriteAsync(workspace.ToString("D"), "state", meta.Version, meta.Value with {
+            Membership = meta.Value.Membership with { Members = meta.Value.Membership.Members.Add(other, new(other, 0, DisplayName: "Bob")) },
+        }, default);
+        await new SyncService(documents).SubmitAsync(member, Operation(epoch, 1), default);
+        var id = TaskIdentity.ForCreate(device, 1);
+        var results = await Task.WhenAll(
+            new SyncService(documents).SubmitAsync(member, new(workspace, epoch, device, 2, new ClaimTask(id, new(1, 1, 1, 1))), default),
+            new SyncService(documents).SubmitAsync(other, new(workspace, epoch, Guid.NewGuid(), 1, new ClaimTask(id, new(1, 1, 1, 1))), default));
+        Assert.Single(results, r => r.Code == "ACCEPTED");
+        Assert.Single(results, r => r.Code == "CLAIM_CONFLICT");
+    }
+
     [Theory]
     [InlineData("{}")][InlineData("[]")][InlineData("null")]
     [InlineData("{\"workspaceId\":0}")][InlineData("{\"envelopes\":null}")]

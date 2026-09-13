@@ -24,6 +24,8 @@ Snooze hides a leaf until its stored instant and clears its claim. A snoozed che
 
 Root and checklist-item orders are separate bounded lists. Keep the established anchor-based MoveTask behavior and exact version guard for moves of the same task. Moving different tasks resolves in server acceptance order. Missing anchors use the established deterministic fallback; accessible move actions and drag produce the same command. No task dependencies or graph traversal are required.
 
+Remove the moving task before resolving live anchors in its list. A surviving after-anchor wins, including when the anchors are inverted. Otherwise use a surviving before-anchor, or append if neither survives. Self-anchors are invalid. Active root order contains OPEN roots; completion/cancellation removes a root and reopening appends it. Keep placement separate from each task's intentional-move version.
+
 ## Delete and restore
 
 Delete hides a leaf or a checklist with its currently non-deleted items, using one deletion group. Already-deleted items keep their own groups. Clear claims and recompute checklist completion atomically. Guard a root cascade with its observed subtree version.

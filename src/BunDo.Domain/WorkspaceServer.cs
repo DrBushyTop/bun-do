@@ -56,7 +56,10 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
             if (operation.Sequence - device.LastTerminalSequence != 1) return new("SEQUENCE_GAP");
             if (state.Revision == ulong.MaxValue) return new("WORKSPACE_FULL");
             var revision = state.Revision + 1;
+            var acceptedAt = clock.GetUtcNow();
             var code = "ACCEPTED";
+            var originalOrder = RootOrdering.Current(state);
+            var order = originalOrder;
             TaskSnapshot? task;
             TaskSnapshot? changed = null;
             if (operation.Command is not DiscardBlockedIntent && operation.Dependencies.Any(sequence =>
@@ -69,7 +72,8 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
             {
                 task = new(create.TaskId, create.Title, create.Description, new(revision, revision), new(revision, revision),
                     revision, operation.CaptureContext is { } capture
-                        ? new(create.Title, create.Description, capture, clock.GetUtcNow()) : null);
+                        ? new(create.Title, create.Description, capture, acceptedAt) : null,
+                    LifecycleVersion: revision, ClaimVersion: revision, HierarchyVersion: revision, OrderIntentVersion: revision);
                 if (state.TaskCount >= 1024) code = "TASK_LIMIT";
                 else if (state.Tasks.ContainsKey(create.TaskId))
                     code = "ENTITY_EXISTS";
@@ -88,6 +92,27 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
                        state.Receipts.TryGetValue(dependencyId, out var dependency) && !dependency.Accepted
                     ? "BLOCKED_DEPENDENCY"
                     : "INVALID_DEPENDENCY";
+            }
+            else if (operation.Command is TaskTransition transition)
+            {
+                state.Tasks.TryGetValue(transition.TaskId, out task);
+                code = TaskLifecycle.Apply(task, transition, state.Membership, authenticatedMemberId, revision, acceptedAt, out var proposed);
+                if (code == "ACCEPTED" && proposed != task) { changed = proposed; task = proposed; }
+            }
+            else if (operation.Command is MoveTask move)
+            {
+                state.Tasks.TryGetValue(move.TaskId, out task);
+                if (task is null) code = "ENTITY_MISSING";
+                else if (move.ExpectedDeletionVersion != task.DeletionVersion) code = "DELETION_CONFLICT";
+                else if (move.ExpectedParentId is not null) code = "HIERARCHY_CONFLICT";
+                else if (move.ExpectedOrderVersion != task.OrderIntentVersion) code = "ORDER_CONFLICT";
+                else if (task.Lifecycle != "OPEN") code = "TASK_NOT_OPEN";
+                else if (move.AfterTaskId == task.Id || move.BeforeTaskId == task.Id) code = "INVALID_ANCHOR";
+                else
+                {
+                    order = RootOrdering.Place(order, task.Id, move.AfterTaskId, move.BeforeTaskId);
+                    changed = task = task with { OrderIntentVersion = revision };
+                }
             }
             else
             {
@@ -115,17 +140,24 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
                     }
                 }
             }
+            if (changed is not null)
+            {
+                if (changed.Lifecycle != "OPEN") order = order.Remove(changed.Id);
+                else if (!order.Contains(changed.Id)) order = order.Add(changed.Id);
+            }
             var receipt = new OperationReceipt(operation.OperationId, operation.Fingerprint, code, revision,
-                task, clock.GetUtcNow());
+                task, acceptedAt);
             var next = state with
             {
                 Revision = revision,
+                RootOrder = order,
                 TaskCount = state.TaskCount + (changed is not null && operation.Command is CreateTask ? 1 : 0),
                 Tasks = changed is not null ? state.Tasks.SetItem(changed.Id, changed) : state.Tasks,
                 Receipts = state.Receipts.Add(operation.OperationId, receipt),
                 Devices = state.Devices.SetItem(operation.DeviceId,
                     state.Devices[operation.DeviceId] with { LastTerminalSequence = operation.Sequence }),
-                Changes = state.Changes.Add(new(revision, changed is not null ? [changed] : [], clock.GetUtcNow(), operation.OperationId))
+                Changes = state.Changes.Add(new(revision, changed is not null ? [changed] : [], acceptedAt, operation.OperationId,
+                    state.RootOrder is null || !order.SequenceEqual(originalOrder) ? order : null))
             };
             if (store.TryCommit(state.Revision, next)) return new(code, receipt);
         }

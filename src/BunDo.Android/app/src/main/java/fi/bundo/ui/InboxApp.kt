@@ -89,6 +89,9 @@ fun InboxApp(
     queueTitle: String? = null,
     queueHeader: (@Composable () -> Unit)? = null,
     canEdit: Boolean = true,
+    queueTasks: List<InboxTask>? = null,
+    rowSummary: (@Composable (String) -> Unit)? = null,
+    taskControls: (@Composable (String) -> Unit)? = null,
 ) {
     var settings by rememberSaveable { mutableStateOf(false) }
     var showVoice by rememberSaveable { mutableStateOf(false) }
@@ -159,10 +162,11 @@ fun InboxApp(
                     settings -> Settings(appearance, onAppearance, Modifier.align(Alignment.TopCenter).widthIn(max = 640.dp).fillMaxWidth(), queueTitle == null)
                     selected != null && !wide -> TaskDetail(
                         selected, { model.openEditor(selected.id) }, state, model::retry, Modifier.fillMaxSize(), queueTitle == null,
+                        taskControls,
                     )
                     else -> Row(Modifier.fillMaxSize()) {
                         Queue(
-                            state = state,
+                            state = if (queueTasks == null) state else state.copy(tasks = queueTasks),
                             onOpen = { selectedId = it },
                             onType = { model.openEditor() },
                             onVoice = voice?.let { { voice.acknowledgeSaved(); showVoice = true } },
@@ -172,10 +176,11 @@ fun InboxApp(
                             compactNotice = short,
                             header = queueHeader,
                             canEdit = canEdit,
+                            summary = rowSummary,
                             modifier = if (wide && selected != null) Modifier.width(360.dp) else Modifier.weight(1f),
                         )
                         if (wide && selected != null) {
-                            TaskDetail(selected, { model.openEditor(selected.id) }, state, model::retry, Modifier.weight(1f), queueTitle == null)
+                            TaskDetail(selected, { model.openEditor(selected.id) }, state, model::retry, Modifier.weight(1f), queueTitle == null, taskControls)
                         }
                     }
                 }
@@ -204,6 +209,7 @@ private fun Queue(
     compactNotice: Boolean,
     header: (@Composable () -> Unit)?,
     canEdit: Boolean,
+    summary: (@Composable (String) -> Unit)?,
     modifier: Modifier,
 ) {
     val hasDraft = state.drafts.any {
@@ -280,6 +286,7 @@ private fun Queue(
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         Text(task.title, style = MaterialTheme.typography.titleMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                        summary?.invoke(task.id)
                         if (task.description.isNotEmpty()) {
                             Text(task.description, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
@@ -368,6 +375,7 @@ private fun FieldCount(value: String, limit: Int) {
 @Composable
 private fun TaskDetail(
     task: InboxTask, onEdit: () -> Unit, state: InboxUiState, onRetry: () -> Unit, modifier: Modifier, localOnly: Boolean,
+    controls: (@Composable (String) -> Unit)? = null,
 ) {
     var original by rememberSaveable(task.id) { mutableStateOf(false) }
     Column(
@@ -376,6 +384,7 @@ private fun TaskDetail(
     ) {
         if (state.writeFailed) ErrorNotice(R.string.open_failed, onRetry)
         Text(task.title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
+        controls?.invoke(task.id)
         if (localOnly) Text(stringResource(R.string.local_only), style = MaterialTheme.typography.labelLarge)
         Text(task.description.ifEmpty { stringResource(R.string.no_description) }, style = MaterialTheme.typography.bodyLarge)
         Button(onClick = onEdit, enabled = !state.working, modifier = Modifier.heightIn(min = 48.dp).testTag("edit")) {

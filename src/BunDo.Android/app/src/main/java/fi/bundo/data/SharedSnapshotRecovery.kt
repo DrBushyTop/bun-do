@@ -99,6 +99,10 @@ internal class SharedSnapshotRecovery(
                     } else transaction(request) {
                         state(request)
                         require(dao.baseCount(scope, recovery.snapshotId) == manifest.getInt("documentCount"))
+                        manifest.optJSONArray("rootOrder")?.let {
+                            val order = SharedTaskActions.orderEntity(it, manifest.getString("revision"))
+                            dao.saveBase(SharedBase(scope, SharedTaskActions.ORDER_ID, order.toString(), recovery.snapshotId))
+                        }
                         dao.saveRecovery(recovery.copy(phase = "OUTCOMES", afterId = "0"))
                     }
                 }
@@ -195,6 +199,9 @@ internal class SharedSnapshotRecovery(
             bytes += chunk.getInt("bytes"); documents += chunk.getInt("documents")
         }
         require(bytes <= 1024L * 1024 * 1024 && bytes == manifest.getLong("totalBytes") && documents == manifest.getLong("documentCount"))
+        manifest.optJSONArray("rootOrder")?.let {
+            SharedProtocol.validateTask(SharedTaskActions.orderEntity(it, manifest.getString("revision")), manifest.decimal("revision"))
+        }
     }
 
     private suspend fun reconcile(state: SharedWorkspace, intent: SharedIntent, reply: JSONObject) {
@@ -247,6 +254,7 @@ internal class SharedSnapshotRecovery(
     private suspend fun replay(id: String, generation: String, revision: ULong) {
         var task = dao.baseTask(scope, generation, id)?.snapshot?.let(::JSONObject)
         val intents = dao.taskIntents(scope, id)
+        val applied = mutableSetOf<String>()
         for (intent in intents) {
             if (intent.status in listOf("REJECTED", "BLOCKED_DEPENDENCY", "QUARANTINED", "DISMISSED")) continue
             if (intent.receipt?.let { JSONObject(it).decimal("effectRevision") <= revision } == true) continue
@@ -254,6 +262,7 @@ internal class SharedSnapshotRecovery(
             if (intent.kind == "CreateTask") {
                 if (task == null) task = SharedProtocol.optimistic(intent)
             } else if (task == null) problem = "ENTITY_MISSING"
+            else if (intent.taskAction != null) problem = SharedTaskActions.project(task, intent, intents, applied)
             else {
                 fun version(sequence: String?, field: String, observed: String) = sequence?.let { seq ->
                     intents.find { it.sequence == seq }?.receipt?.let(::JSONObject)?.optJSONObject("task")?.human(field)
@@ -273,6 +282,7 @@ internal class SharedSnapshotRecovery(
                     if (intent.descriptionChanged) task.put("description", intent.description ?: JSONObject.NULL)
                 }
             }
+            if (problem == null) applied += intent.sequence
             dao.saveIntent(intent.copy(problem = problem))
         }
         dao.deleteProjectionTask(scope, generation, id)

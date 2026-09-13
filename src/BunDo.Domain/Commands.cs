@@ -10,6 +10,16 @@ public sealed record CreateTask(string TaskId, string Title, string? Description
 public sealed record TextEdit(string? Value, ulong ExpectedHumanVersion);
 public sealed record EditTask(string TaskId, TextEdit? Title = null, TextEdit? Description = null,
     ulong? ExpectedDeletionVersion = null) : TaskCommand;
+public sealed record TaskStateVersions(ulong Lifecycle, ulong Claim, ulong Hierarchy, ulong Deletion);
+public abstract record TaskTransition(string TaskId, TaskStateVersions Expected) : TaskCommand;
+public sealed record ClaimTask(string TaskId, TaskStateVersions Expected) : TaskTransition(TaskId, Expected);
+public sealed record UnclaimTask(string TaskId, TaskStateVersions Expected) : TaskTransition(TaskId, Expected);
+public sealed record CompleteTask(string TaskId, TaskStateVersions Expected, Guid? ConfirmedClaimantId = null)
+    : TaskTransition(TaskId, Expected);
+public sealed record ReopenTask(string TaskId, TaskStateVersions Expected) : TaskTransition(TaskId, Expected);
+public sealed record CancelTask(string TaskId, TaskStateVersions Expected) : TaskTransition(TaskId, Expected);
+public sealed record MoveTask(string TaskId, ulong ExpectedOrderVersion, ulong ExpectedDeletionVersion,
+    string? ExpectedParentId = null, string? AfterTaskId = null, string? BeforeTaskId = null) : TaskCommand;
 public sealed record DiscardBlockedIntent(ulong RejectedDependencySequence) : TaskCommand;
 
 /// <summary>Validated command identity. Production fingerprints cover the original wire bytes.</summary>
@@ -49,6 +59,12 @@ public sealed class FrozenOperation
         {
             CreateTask => "CreateTask",
             EditTask => "EditTask",
+            ClaimTask => "ClaimTask",
+            UnclaimTask => "UnclaimTask",
+            CompleteTask => "CompleteTask",
+            ReopenTask => "ReopenTask",
+            CancelTask => "CancelTask",
+            MoveTask => "MoveTask",
             DiscardBlockedIntent => "DiscardBlockedIntent",
             _ => throw new ArgumentException("Unsupported model command.", nameof(command))
         };

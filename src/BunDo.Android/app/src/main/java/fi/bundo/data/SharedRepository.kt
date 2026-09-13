@@ -2,6 +2,7 @@ package fi.bundo.data
 
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import org.json.JSONObject
 import org.json.JSONArray
 import java.util.UUID
@@ -16,13 +17,44 @@ class SharedRepository(
     private val registration: String,
 ) : TaskEditorRepository {
     private val dao = database.shared()
-    override val tasks = dao.projection(scope).map { rows -> rows.map { SharedProtocol.inbox(JSONObject(it.snapshot)) }
-        .sortedWith(compareByDescending<InboxTask> { it.createdAt }.thenBy { it.id }) }
+    val taskStates = combine(dao.projection(scope), dao.observeAllIntents(), dao.observeWorkspace(scope)) { rows, intents, state ->
+        SharedTaskActions.ordered(rows, intents, state)
+    }
+    override val tasks = taskStates.map { rows -> rows.map(SharedProtocol::inbox) }
     override val drafts = dao.drafts(scope).map { rows -> rows.map { EditorDraft(it.key, it.title, it.description, it.savedAt) } }
     val workspace = dao.observeWorkspace(scope)
     val problems = dao.problems(scope)
     val recovery = dao.observeRecovery(scope)
     val canonical = dao.observeBase(scope).map { rows -> rows.associate { it.id to it.snapshot } }
+
+    /** The displayed snapshot binds confirmation and dependencies to what the user actually saw. */
+    suspend fun act(kind: String, displayed: String, confirmedClaimant: String? = null,
+        after: String? = null, before: String? = null) = lease.access {
+        require(kind in SharedTaskActions.kinds)
+        database.withTransaction {
+            val state = current()
+            check(state.blocked == null && dao.recoveryState(scope) == null)
+            val task = JSONObject(displayed)
+            val id = task.getString("id")
+            check(sameJson(task, JSONObject(checkNotNull(dao.task(scope, id)).snapshot))) { "Task changed" }
+            val me = JSONObject(checkNotNull(state.membership)).getString("me")
+            val sequence = state.nextSequence.toULong()
+            check(sequence < ULong.MAX_VALUE)
+            val prior = dao.taskIntents(scope, id).filter { SharedTaskActions.pending(it, state.revision) }
+            val payload = JSONObject().put("taskId", id)
+            if (kind == "CompleteTask") payload.put("confirmedClaimantId", confirmedClaimant ?: JSONObject.NULL)
+            if (kind == "MoveTask") payload.put("expectedParentId", JSONObject.NULL)
+                .put("afterTaskId", after ?: JSONObject.NULL).put("beforeTaskId", before ?: JSONObject.NULL)
+            val action = SharedTaskActions.capture(kind, task, prior, payload, me)
+            dao.saveIntent(SharedIntent(scope, sequence.toString(), id, kind, task.getString("title"), null,
+                false, false, task.human("title"), task.human("description"), task.decimal("deletionVersion").toString(),
+                prior.lastOrNull()?.sequence, SharedProtocol.context(), taskAction = action))
+            val next = state.copy(nextSequence = (sequence + 1u).toString(), journalVersion = state.journalVersion + 1)
+            dao.saveWorkspace(next)
+            rebuild(next)
+            lease.check()
+        }
+    }
 
     /** Only terminal variants can be dismissed. Pending identities must still obtain their outcome. */
     suspend fun dismiss(sequence: String) = lease.access {
@@ -290,7 +322,8 @@ class SharedRepository(
                 acknowledged++
             }
             val next = state.copy(revision = through.toString(), cursor = response.getString("cursor"),
-                acknowledged = acknowledged.toString(), worker = null, workerUntil = 0)
+                acknowledged = acknowledged.toString(), worker = null, workerUntil = 0,
+                membership = response.optJSONObject("membership")?.toString() ?: state.membership)
             dao.saveWorkspace(next)
             rebuild(next)
             lease.check()
@@ -304,6 +337,7 @@ class SharedRepository(
         val projected = dao.generationBase(scope, if (rebuilding) state.projectionGeneration else state.baseGeneration)
             .associate { it.id to JSONObject(it.snapshot) }.toMutableMap()
         val intents = dao.intents(scope)
+        val applied = mutableSetOf<String>()
         for (intent in intents) {
             if (intent.status in listOf("REJECTED", "BLOCKED_DEPENDENCY", "QUARANTINED", "DISMISSED")) continue
             if (intent.receipt != null && JSONObject(intent.receipt).decimal("effectRevision") <= state.revision.toULong()) continue
@@ -312,6 +346,7 @@ class SharedRepository(
             if (intent.kind == "CreateTask") {
                 if (task == null) { task = SharedProtocol.optimistic(intent); projected[intent.taskId] = task }
             } else if (task == null) problem = "ENTITY_MISSING"
+            else if (intent.taskAction != null) problem = SharedTaskActions.project(task, intent, intents, applied)
             else {
                 val prerequisite = intent.afterSequence?.let { seq -> intents.find { it.sequence == seq }?.receipt?.let(::JSONObject) }
                 fun version(sequence: String?, field: String, observed: String) = sequence?.let { seq ->
@@ -327,6 +362,7 @@ class SharedRepository(
                     if (intent.descriptionChanged) task.put("description", intent.description ?: JSONObject.NULL)
                 }
             }
+            if (problem == null) applied += intent.sequence
             if (intent.problem != problem) dao.saveIntent(intent.copy(problem = problem))
         }
         dao.clearProjectionGeneration(scope, state.projectionGeneration)

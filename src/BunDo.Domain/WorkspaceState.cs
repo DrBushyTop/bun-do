@@ -4,9 +4,13 @@ namespace BunDo.Domain;
 
 public sealed record FieldVersion(ulong Server, ulong Human);
 public sealed record TaskCapture(string Title, string? Description, System.Text.Json.JsonElement Context, DateTimeOffset ReceivedAt);
+public sealed record FirstCompletion(string RootId, Guid MemberId, DateTimeOffset AcceptedAt);
 public sealed record TaskSnapshot(
     string Id, string Title, string? Description, FieldVersion TitleVersion, FieldVersion DescriptionVersion,
-    ulong DeletionVersion = 0, TaskCapture? Capture = null);
+    ulong DeletionVersion = 0, TaskCapture? Capture = null,
+    string Lifecycle = "OPEN", ulong LifecycleVersion = 0, Guid? ClaimantId = null,
+    ulong ClaimVersion = 0, ulong HierarchyVersion = 0, Guid? LifecycleActorId = null,
+    DateTimeOffset? LifecycleAt = null, FirstCompletion? FirstCompletion = null, ulong OrderIntentVersion = 0);
 public sealed record DeviceRegistration(Guid DeviceId, Guid MemberId, ulong LastTerminalSequence = 0,
     ulong AcknowledgedThrough = 0, string? RegistryPartition = null);
 public sealed record OperationReceipt(
@@ -17,7 +21,7 @@ public sealed record OperationReceipt(
 }
 public sealed record SubmissionResult(string Code, OperationReceipt? Receipt = null);
 public sealed record ChangeGroup(ulong Revision, ImmutableArray<TaskSnapshot> Tasks,
-    DateTimeOffset? RecordedAt = null, string? OperationId = null);
+    DateTimeOffset? RecordedAt = null, string? OperationId = null, ImmutableArray<string>? RootOrder = null);
 public sealed record SnapshotPin(Guid Id, Guid MemberId, Guid DeviceId, Guid ArtifactId, ulong Revision,
     DateTimeOffset ExpiresAt, DateTimeOffset BuildUntil, string? ManifestHash = null);
 public sealed record ChangePage(
@@ -36,7 +40,7 @@ public sealed record WorkspaceState(
     string? CursorSecret = null,
     int TaskCount = 0,
     ulong PrunedThrough = 0,
-    ImmutableDictionary<Guid, SnapshotPin>? SnapshotPins = null);
+    ImmutableDictionary<Guid, SnapshotPin>? SnapshotPins = null, ImmutableArray<string>? RootOrder = null);
 
 /// <summary>The transaction seam; a failed compare-and-swap must have no effects.</summary>
 public interface IWorkspaceStore

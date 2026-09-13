@@ -12,7 +12,7 @@ namespace BunDo.Functions.Recovery;
 public sealed record SnapshotChunk(int Index, int Bytes, int Documents, string Digest);
 public sealed record SnapshotManifest(Guid SnapshotId, Guid WorkspaceId, Guid StateEpoch, ulong Revision,
     int SchemaVersion, DateTimeOffset ExpiresAt, long TotalBytes, int DocumentCount,
-    IReadOnlyList<SnapshotChunk> Chunks, string Cursor);
+    IReadOnlyList<SnapshotChunk> Chunks, string Cursor, IReadOnlyList<string>? RootOrder = null);
 public sealed class SnapshotException(string code) : Exception(code) { public string Code { get; } = code; }
 
 /// <summary>Revision-fenced private snapshots and bounded retention, using the same metadata CAS as commands.</summary>
@@ -120,7 +120,8 @@ public sealed class SnapshotService(IHouseholdDocuments documents, ISnapshotArti
             if (after.Value.Revision == pin.Revision)
             {
                 var manifest = new SnapshotManifest(id, workspace, epoch, pin.Revision, 1, pin.ExpiresAt, totalBytes,
-                    seen.Count, chunks, SyncCursor.Write(after.Value, new(pin.Revision, 0)));
+                    seen.Count, chunks, SyncCursor.Write(after.Value, new(pin.Revision, 0)),
+                    after.Value.RootOrder?.ToArray());
                 var bytes = JsonSerializer.SerializeToUtf8Bytes(manifest, SyncJson.Options);
                 await artifacts.PutAsync(key, -1, bytes, ct);
                 var next = Advance(after.Value) with { SnapshotPins = Pins(after.Value).SetItem(id, pin with { ManifestHash = Hash(bytes) }) };

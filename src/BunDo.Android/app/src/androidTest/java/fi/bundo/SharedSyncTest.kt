@@ -304,7 +304,7 @@ class SharedSyncTest {
         val id = client.repository.copyText("Old view", "")
         client.synchronize(server)
         server.aiTitle(id, "Current shared view")
-        val transport = SnapshotPeer(server)
+        val transport = SnapshotPeer(server).apply { rootOrder = listOf(id) }
         var recovery = SharedSnapshotRecovery(client.database, client.lease, client.state.scope)
         var request = client.prepare()
         recovery.begin(request)
@@ -322,6 +322,7 @@ class SharedSyncTest {
             }
         }
         assertTrue(finished)
+        assertNotNull(client.database.shared().base(client.state.scope).find { it.id == SharedTaskActions.ORDER_ID })
         assertEquals(setOf("Current shared view", "Written during download"), client.repository.tasks.first().map { it.title }.toSet())
         client.synchronize(server)
         assertEquals(2, server.tasks.size)
@@ -488,6 +489,7 @@ class SharedSyncTest {
         var schema = 1
         var corrupt = false
         var expiredOutcome = false
+        var rootOrder: List<String>? = null
         var onChunk: (suspend () -> Unit)? = null
         override suspend fun manifest(state: SharedWorkspace, id: String) = JSONObject()
             .put("snapshotId", id).put("workspaceId", server.workspace).put("stateEpoch", server.epoch)
@@ -495,6 +497,7 @@ class SharedSyncTest {
             .put("totalBytes", if (count == 0) 0 else bytes.size).put("documentCount", count)
             .put("cursor", revision).put("chunks", JSONArray().apply { if (count > 0) put(JSONObject().put("index", 0).put("bytes", bytes.size)
                 .put("documents", count).put("digest", SharedSnapshotRecovery.digest(bytes))) })
+            .apply { rootOrder?.let { put("rootOrder", JSONArray(it)) } }
         override suspend fun chunk(state: SharedWorkspace, id: String, index: Int): ByteArray {
             onChunk?.invoke(); onChunk = null
             return if (corrupt) "corrupt".toByteArray() else bytes

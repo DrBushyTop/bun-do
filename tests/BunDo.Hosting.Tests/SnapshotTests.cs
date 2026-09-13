@@ -38,6 +38,7 @@ public sealed class SnapshotTests : IDisposable
         var manifest = await module.CreateAsync(member, workspace, epoch, device, id, default);
         var chunk = await module.ChunkAsync(member, workspace, epoch, device, id, 0, default);
         Assert.Equal(1, manifest.DocumentCount);
+        Assert.Equal(new[] { receipt.Task!.Id }, manifest.RootOrder);
         Assert.Equal(chunk.Length, manifest.TotalBytes);
         Assert.Equal("Original private text", JsonDocument.Parse(chunk).RootElement.GetProperty("tasks")[0].GetProperty("title").GetString());
         await sync.SubmitAsync(member, new(workspace, epoch, device, 2,

@@ -1,0 +1,23 @@
+<resources>
+    <string name="task_claim">I will take this</string>
+    <string name="task_unclaim">Release task</string>
+    <string name="task_complete">Mark complete</string>
+    <string name="task_reopen">Reopen task</string>
+    <string name="task_cancel">Cancel task</string>
+    <string name="task_move">Move task</string>
+    <string name="task_earlier">Move earlier</string>
+    <string name="task_later">Move later</string>
+    <string name="task_claimed_you">You are working on this</string>
+    <string name="task_claimed_by">%1$s is working on this</string>
+    <string name="task_completed_by">Completed · %1$s</string>
+    <string name="task_cancelled_by">Cancelled · %1$s</string>
+    <string name="task_former_member">Former member</string>
+    <string name="task_household_member">Household member</string>
+    <string name="task_confirm_other">%1$s is working on this task. Mark it complete anyway?</string>
+    <string name="task_waiting_sync">Saved on this device</string>
+    <string name="task_changed_retry">The task changed or the action did not finish. Check its current state and try again.</string>
+    <string name="task_active_view">Tasks</string>
+    <string name="task_history_view">Completed and cancelled</string>
+    <string name="task_claim_conflict">The person working on this task changed. Check its current state before trying again.</string>
+    <string name="task_state_conflict">The task state or position changed. Your action was not repeated automatically.</string>
+</resources>

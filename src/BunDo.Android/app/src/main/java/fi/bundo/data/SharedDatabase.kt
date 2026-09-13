@@ -29,6 +29,7 @@ data class SharedWorkspace(
     @ColumnInfo(defaultValue = "'initial'") val projectionGeneration: String = "initial",
     @ColumnInfo(defaultValue = "'0'") val snapshotRevision: String = "0",
     @ColumnInfo(defaultValue = "0") val journalVersion: Long = 0,
+    val membership: String? = null,
 )
 
 @Entity(tableName = "shared_base", primaryKeys = ["scope", "generation", "id"])
@@ -63,6 +64,7 @@ data class SharedIntent(
     val problem: String? = null,
     val titleAfterSequence: String? = null, val descriptionAfterSequence: String? = null,
     val deletionAfterSequence: String? = null,
+    val taskAction: String? = null,
 )
 
 @Entity(tableName = "shared_drafts", primaryKeys = ["scope", "key"])

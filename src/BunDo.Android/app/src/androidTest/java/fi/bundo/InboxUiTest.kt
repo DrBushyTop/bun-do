@@ -54,7 +54,9 @@ class InboxUiTest {
         val suffix = UUID.randomUUID().toString().take(8)
         val title = "Järjestä varasto $suffix"
         compose.waitUntil(10_000) {
-            compose.onAllNodes(androidx.compose.ui.test.hasTestTag("capture")).fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodes(
+                androidx.compose.ui.test.hasTestTag("capture") and androidx.compose.ui.test.isEnabled(),
+            ).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("capture").performClick()
         waitForTag("title")

@@ -32,7 +32,7 @@ class LocalSyncDeviceTest {
         val name = "sync-device-$workspace.db"
         if (phase == "cleanup") {
             application.deleteDatabase(name)
-            prefs.edit().remove(workspace).commit()
+            prefs.edit().remove(workspace).remove("$workspace:lost").remove("$workspace:credit").commit()
             return@runBlocking
         }
         suspend fun token(): String {
@@ -70,18 +70,46 @@ class LocalSyncDeviceTest {
                     assertEquals("$person edited offline", repository.tasks.first().single().title)
                     assertEquals(2, database.shared().intents(key).size)
                 }
-                "sync", "verify" -> {
+                "action" -> {
+                    // A separate instrumentation process writes this action while the device is offline.
+                    val kind = checkNotNull(args.getString("action"))
+                    val target = args.getString("targetPerson") ?: "alice"
+                    val task = repository.taskStates.first().single { it.getString("title") == "$target edited offline" }
+                    val other = repository.taskStates.first().single { it.getString("title") != "$target edited offline" }
+                    repository.act(kind, task.toString(), confirmedClaimant = task.nullableString("claimantId"),
+                        before = if (kind == "MoveTask") other.getString("id") else null)
+                }
+                "sync", "verify", "syncConflict", "verifyComplete", "verifyOrder", "sendAndLose" -> {
                     val credential = token()
                     var finished = false
                     for (attempt in 0 until 30) {
-                        val request = checkNotNull(repository.prepare(android.os.SystemClock.elapsedRealtime(), 1))
+                        val request = checkNotNull(repository.prepare(
+                            if (phase == "sendAndLose") 0 else android.os.SystemClock.elapsedRealtime(),
+                            if (phase == "sendAndLose") 0 else 1))
+                        prefs.getString("$workspace:lost", null)?.let { assertEquals(it, request.envelope) }
                         val reply = SharedEndpoint().send(credential, request)
-                        assertEquals("ACCEPTED", reply.getString("code"))
+                        if (phase == "syncConflict") assertTrue(reply.getString("code") in listOf("ACCEPTED", "CLAIM_CONFLICT"))
+                        else assertEquals("ACCEPTED", reply.getString("code"))
+                        if (phase == "sendAndLose") {
+                            prefs.edit().putString("$workspace:lost", checkNotNull(request.envelope)).commit()
+                            return@runBlocking
+                        }
+                        prefs.edit().remove("$workspace:lost").commit()
                         if (!repository.apply(request, reply)) { finished = true; break }
                     }
                     assertTrue("Sync must finish its bounded fixture", finished)
                     if (phase == "verify")
                         assertEquals(setOf("alice edited offline", "bob edited offline"), repository.tasks.first().map { it.title }.toSet())
+                    if (phase == "verifyOrder") assertEquals(listOf("bob edited offline", "alice edited offline"),
+                        repository.tasks.first().map { it.title })
+                    if (phase == "syncConflict") assertTrue(repository.problems.first().any { it.problem == "CLAIM_CONFLICT" })
+                    if (phase == "verifyComplete") {
+                        val task = repository.taskStates.first().single { it.getString("title") == "alice edited offline" }
+                        assertEquals("COMPLETED", task.getString("lifecycle"))
+                        val credit = task.getJSONObject("firstCompletion").toString()
+                        prefs.getString("$workspace:credit", null)?.let { assertEquals(it, credit) }
+                        prefs.edit().putString("$workspace:credit", credit).commit()
+                    }
                 }
                 else -> error("Unknown phase")
             }

@@ -9,10 +9,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -50,6 +52,13 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
     val current by repository.workspace.collectAsStateWithLifecycle(selected)
     val recovery by repository.recovery.collectAsStateWithLifecycle(null)
     val canonical by repository.canonical.collectAsStateWithLifecycle(emptyMap())
+    val taskStates by repository.taskStates.collectAsStateWithLifecycle(emptyList())
+    val byId = taskStates.associateBy { it.getString("id") }
+    val membership = current?.membership?.let(::JSONObject)
+    var history by rememberSaveable(selected.scope) { mutableStateOf(false) }
+    val queueRows = taskStates.filter { (it.optString("lifecycle", "OPEN") != "OPEN") == history }
+        .let { rows -> if (history) rows.sortedByDescending { it.optString("lifecycleAt") } else rows }
+        .map(SharedProtocol::inbox)
     var imports by remember { mutableStateOf<List<RecoveryText>?>(null) }
     var chosen by remember { mutableStateOf(emptySet<String>()) }
     var showProblems by remember { mutableStateOf(false) }
@@ -79,8 +88,22 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
         onDispose { owner.lifecycle.removeObserver(observer); if (!data.lease.active) model.hide() }
     }
     InboxApp(state, model, appearance, onAppearance, onAccount = onAccount, queueTitle = selected.name,
-        canEdit = current?.blocked == null, queueHeader = {
+        canEdit = current?.blocked == null, queueTasks = queueRows,
+        rowSummary = { id -> byId[id]?.let { SharedTaskSummary(it, membership) } },
+        taskControls = { id -> byId[id]?.let { task ->
+            SharedTaskControls(task, taskStates, membership, !busy && current?.blocked == null && recovery == null, failed) { action ->
+                run {
+                    repository.act(action.kind, action.displayed, action.confirmedClaimant, action.after, action.before)
+                    SharedSyncWorker.request(context, data)
+                }
+            }
+        } },
+        queueHeader = {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+            FilterChip(selected = !history, onClick = { history = false }, modifier = Modifier.testTag("task-active-view"),
+                label = { Text(stringResource(R.string.task_active_view)) })
+            FilterChip(selected = history, onClick = { history = true }, modifier = Modifier.testTag("task-history-view"),
+                label = { Text(stringResource(R.string.task_history_view)) })
             recovery?.let { recovering ->
                 Text(stringResource(if (recovering.problem == "STORAGE_REQUIRED") R.string.shared_storage_required
                     else if (recovering.problem != null) R.string.shared_recovery_paused else R.string.shared_rebuilding))
@@ -143,7 +166,10 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
             Text(stringResource(R.string.shared_recovery_explanation))
             for (intent in problems) {
                 Text(intent.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp))
+                if (intent.taskAction != null) Text(stringResource(taskActionLabel(intent.kind)))
                 Text(stringResource(when (intent.problem) {
+                    "CLAIM_CONFLICT", "ALREADY_CLAIMED", "CLAIM_CONFIRMATION_REQUIRED", "CLAIM_NOT_YOURS" -> R.string.task_claim_conflict
+                    "LIFECYCLE_CONFLICT", "HIERARCHY_CONFLICT", "ORDER_CONFLICT", "TASK_NOT_OPEN" -> R.string.task_state_conflict
                     "FIELD_CONFLICT", "DELETION_CONFLICT" -> R.string.shared_conflict_reason
                     "TASK_LIMIT" -> R.string.shared_limit_reason
                     "BLOCKED_DEPENDENCY" -> R.string.shared_dependency_reason
@@ -155,6 +181,7 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
                     val task = JSONObject(shared)
                     Text(stringResource(R.string.shared_current, task.getString("title")))
                     Text(stringResource(R.string.shared_current_description, task.nullableString("description").orEmpty()))
+                    SharedTaskSummary(task, membership)
                 } else Text(stringResource(R.string.shared_missing))
                 val terminal = intent.status in listOf("REJECTED", "BLOCKED_DEPENDENCY", "QUARANTINED")
                 if (shared != null && intent.kind == "EditTask" && terminal) TextButton(
@@ -162,7 +189,7 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
                     onClick = { reapply = intent.sequence to shared }) {
                     Text(stringResource(R.string.shared_reapply))
                 }
-                TextButton(enabled = !busy && current?.blocked == null && terminal, onClick = { run {
+                if (intent.taskAction == null) TextButton(enabled = !busy && current?.blocked == null && terminal, onClick = { run {
                     repository.copyText(intent.title, intent.description.orEmpty())
                     showProblems = false
                     SharedSyncWorker.request(context, data)

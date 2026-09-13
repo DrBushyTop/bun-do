@@ -82,13 +82,28 @@ public sealed class SyncService(IHouseholdDocuments documents)
                     ?? metadata.Receipts.GetValueOrDefault(id);
                 if (receipt is not null) receipts = receipts.Add(id, receipt);
             }
-            var taskId = operation.Command switch { CreateTask c => c.TaskId, EditTask e => e.TaskId, _ => null };
+            var taskId = operation.Command switch {
+                CreateTask c => c.TaskId, EditTask e => e.TaskId, TaskTransition t => t.TaskId, MoveTask m => m.TaskId, _ => null,
+            };
             var tasks = ImmutableDictionary<string, TaskSnapshot>.Empty;
+            if (metadata.RootOrder is null && (metadata.TaskCount > 0 || metadata.Tasks.Count > 0))
+            {
+                // Upgrade the old text-only queue once, under the same metadata CAS as the command.
+                string? continuation = null;
+                do
+                {
+                    var page = await documents.ReadPageAsync<TaskSnapshot>(partition, "task:", continuation, 64, ct);
+                    foreach (var item in page.Items) tasks = tasks.SetItem(item.Value.Id, item.Value);
+                    continuation = page.Continuation;
+                } while (continuation is not null);
+                foreach (var item in metadata.Tasks.Values)
+                    if (!tasks.ContainsKey(item.Id)) tasks = tasks.Add(item.Id, item);
+            }
             if (taskId is not null)
             {
                 var task = (await documents.ReadAsync<TaskSnapshot>(partition, WorkspaceCommit.TaskId(taskId), ct))?.Value
                     ?? metadata.Tasks.GetValueOrDefault(taskId);
-                if (task is not null) tasks = tasks.Add(taskId, task);
+                if (task is not null) tasks = tasks.SetItem(taskId, task);
             }
             var staged = new StagedStore(metadata with { Devices = ImmutableDictionary<Guid, DeviceRegistration>.Empty.Add(device.DeviceId, device),
                 Tasks = tasks, Receipts = receipts, Changes = [] });
@@ -124,7 +139,8 @@ public sealed class SyncService(IHouseholdDocuments documents)
         var groups = new List<SyncGroup>();
         var through = position.After;
         SyncReply Reply() => new(code, workspace, epoch, position.After, through, state.Revision, target,
-            SyncCursor.Write(state, new(through, through == target ? 0 : target)), through < target, receipts, groups.ToArray());
+            SyncCursor.Write(state, new(through, through == target ? 0 : target)), through < target, receipts, groups.ToArray(),
+            new(member, state.Membership.OwnerId, state.Membership.Members.Values.OrderBy(x => x.Id).ToArray()));
         var responseBytes = JsonSerializer.SerializeToUtf8Bytes(Reply(), SyncJson.Options).Length;
         while (through < target && groups.Count < 100)
         {
@@ -168,14 +184,22 @@ public sealed class SyncService(IHouseholdDocuments documents)
 
 public sealed record SyncReply(string Code, Guid WorkspaceId, Guid StateEpoch, ulong AfterRevision,
     ulong ThroughRevision, ulong HeadRevision, ulong TargetRevision, string Cursor, bool HasMore,
-    IReadOnlyList<OperationReceipt> Receipts, IReadOnlyList<SyncGroup> Groups);
+    IReadOnlyList<OperationReceipt> Receipts, IReadOnlyList<SyncGroup> Groups, SyncMembership? Membership = null);
+public sealed record SyncMembership(Guid Me, Guid OwnerId, IReadOnlyList<HouseholdMember> Members);
 public sealed record SyncPart(int PartIndex, string[] EntityIds, string Payload);
 public sealed record SyncGroup(ulong Revision, int PartCount, SyncPart[] Parts, string Digest)
 {
     public static SyncGroup Encode(ChangeGroup group)
     {
-        var payload = JsonSerializer.Serialize(group.Tasks, SyncJson.Options);
-        var part = new SyncPart(0, group.Tasks.Select(t => t.Id).ToArray(), payload);
+        var entities = group.Tasks.Select(t => (object)t).ToList();
+        var ids = group.Tasks.Select(t => t.Id).ToList();
+        if (group.RootOrder is { } order)
+        {
+            entities.Add(new { id = "root-order", entityType = "ROOT_ORDER", taskIds = order, version = group.Revision });
+            ids.Add("root-order");
+        }
+        var payload = JsonSerializer.Serialize(entities, SyncJson.Options);
+        var part = new SyncPart(0, ids.ToArray(), payload);
         return new(group.Revision, 1, [part], Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(payload))));
     }
 }

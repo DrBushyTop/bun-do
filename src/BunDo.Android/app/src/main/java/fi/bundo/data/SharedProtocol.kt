@@ -55,7 +55,8 @@ internal object SharedProtocol {
     }
 
     fun dependencies(intent: SharedIntent): List<String> = listOfNotNull(intent.afterSequence,
-        intent.titleAfterSequence, intent.descriptionAfterSequence, intent.deletionAfterSequence).distinct()
+        intent.titleAfterSequence, intent.descriptionAfterSequence, intent.deletionAfterSequence)
+        .plus(SharedTaskActions.dependencies(intent)).distinct()
 
     fun freeze(workspace: SharedWorkspace, intent: SharedIntent, receipts: Map<String, JSONObject>): String {
         val required = dependencies(intent)
@@ -73,6 +74,10 @@ internal object SharedProtocol {
                 payload.put("taskId", intent.taskId).put("title", intent.title)
                     .put("description", intent.description ?: JSONObject.NULL)
                 "CreateTask"
+            }
+            intent.taskAction != null -> {
+                SharedTaskActions.freeze(intent, receipts, payload, observed)
+                intent.kind
             }
             else -> {
                 payload.put("taskId", intent.taskId)
@@ -105,6 +110,7 @@ internal object SharedProtocol {
         .put("descriptionVersion", JSONObject().put("fieldVersion", "0").put("humanVersion", "0"))
         .put("deletionVersion", "0").put("capture", JSONObject().put("title", intent.title)
             .put("description", intent.description ?: JSONObject.NULL).put("context", JSONObject(intent.captureContext)))
+        .put("lifecycle", "OPEN").put("claimantId", JSONObject.NULL)
 
     fun inbox(task: JSONObject): InboxTask {
         val capture = task.optJSONObject("capture")
@@ -115,6 +121,14 @@ internal object SharedProtocol {
     }
 
     fun validateTask(task: JSONObject, revision: ULong) {
+        if (task.optString("id") == SharedTaskActions.ORDER_ID) {
+            require(task.getString("entityType") == "ROOT_ORDER" && task.decimal("version") in 1uL..revision)
+            val ids = task.getJSONArray("taskIds")
+            require(ids.length() <= 1024)
+            val unique = mutableSetOf<String>()
+            for (i in 0 until ids.length()) require(UUID.fromString(ids.getString(i)).toString() == ids.getString(i) && unique.add(ids.getString(i)))
+            return
+        }
         require(UUID.fromString(task.getString("id")).toString() == task.getString("id"))
         require(InboxLimits.valid(task.getString("title"), task.nullableString("description").orEmpty()))
         for (group in listOf("title", "description")) {
@@ -123,11 +137,29 @@ internal object SharedProtocol {
             require(human > 0u && human <= field && field <= revision)
         }
         require(task.decimal("deletionVersion") in 1uL..revision)
+        for (group in SharedTaskActions.groups - "deletion")
+            require(SharedTaskActions.version(task, group).toULong() <= revision)
+        require(task.optString("lifecycle", "OPEN") in listOf("OPEN", "COMPLETED", "CANCELLED"))
+        task.optJSONObject("firstCompletion")?.let {
+            require(it.getString("rootId") == task.getString("id"))
+            require(UUID.fromString(it.getString("memberId")).toString() == it.getString("memberId"))
+            Instant.parse(it.getString("acceptedAt"))
+        }
     }
 
     fun containsEffect(current: JSONObject?, effect: JSONObject): Boolean = current != null &&
         listOf("title", "description").all { group ->
             current.field(group) >= effect.field(group) &&
                 (current.field(group) != effect.field(group) || current.nullableString(group) == effect.nullableString(group))
-        }
+        } && SharedTaskActions.groups.all { group ->
+            val actual = SharedTaskActions.version(current, group).toULong()
+            val expected = SharedTaskActions.version(effect, group).toULong()
+            val fields = when (group) {
+                "lifecycle" -> listOf("lifecycle", "lifecycleActorId", "lifecycleAt")
+                "claim" -> listOf("claimantId")
+                else -> emptyList()
+            }
+            actual >= expected && (actual > expected || fields.all { sameJson(current.opt(it), effect.opt(it)) })
+        } && (effect.optJSONObject("firstCompletion") == null ||
+            sameJson(current.optJSONObject("firstCompletion"), effect.getJSONObject("firstCompletion")))
 }

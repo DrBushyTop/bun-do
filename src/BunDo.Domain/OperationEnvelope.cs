@@ -63,6 +63,34 @@ public static class OperationEnvelope
                     if (!dependencies.Contains(rejected)) throw new EnvelopeException("INVALID_DEPENDENCY");
                     command = new DiscardBlockedIntent(rejected);
                     break;
+                case "ClaimTask":
+                case "UnclaimTask":
+                case "CompleteTask":
+                case "ReopenTask":
+                case "CancelTask":
+                    var kind = root.GetProperty("command").GetString();
+                    Fields(payload, kind == "CompleteTask" ? ["taskId", "confirmedClaimantId"] : ["taskId"]);
+                    Fields(observed, ["lifecycle", "claim", "hierarchy", "deletion"]);
+                    var taskId = Uuid(payload.GetProperty("taskId")).ToString("D");
+                    var expected = new TaskStateVersions(ExactVersion(observed, "lifecycle"), ExactVersion(observed, "claim"),
+                        ExactVersion(observed, "hierarchy"), ExactVersion(observed, "deletion"));
+                    command = kind switch {
+                        "ClaimTask" => new ClaimTask(taskId, expected),
+                        "UnclaimTask" => new UnclaimTask(taskId, expected),
+                        "CompleteTask" => new CompleteTask(taskId, expected,
+                            payload.GetProperty("confirmedClaimantId").ValueKind == JsonValueKind.Null ? null : Uuid(payload.GetProperty("confirmedClaimantId"))),
+                        "ReopenTask" => new ReopenTask(taskId, expected),
+                        _ => new CancelTask(taskId, expected),
+                    };
+                    break;
+                case "MoveTask":
+                    Fields(payload, ["taskId", "expectedParentId", "afterTaskId", "beforeTaskId"]);
+                    Fields(observed, ["orderIntent", "deletion"]);
+                    command = new MoveTask(Uuid(payload.GetProperty("taskId")).ToString("D"),
+                        ExactVersion(observed, "orderIntent"), ExactVersion(observed, "deletion"),
+                        NullableUuid(payload.GetProperty("expectedParentId")),
+                        NullableUuid(payload.GetProperty("afterTaskId")), NullableUuid(payload.GetProperty("beforeTaskId")));
+                    break;
                 default: throw new EnvelopeException("UNSUPPORTED_COMMAND");
             }
             return new(workspace, epoch, device, sequence, command, 1, 1, bytes.ToArray(), dependencies)
@@ -79,6 +107,13 @@ public static class OperationEnvelope
         var value = observed.GetProperty(group);
         Fields(value, ["humanVersion"]);
         return Decimal(value.GetProperty("humanVersion"));
+    }
+
+    private static ulong ExactVersion(JsonElement observed, string group)
+    {
+        var value = observed.GetProperty(group);
+        Fields(value, ["fieldVersion"]);
+        return Decimal(value.GetProperty("fieldVersion"));
     }
 
     private static ulong Dependency(JsonElement value, Guid device)
@@ -106,6 +141,7 @@ public static class OperationEnvelope
             throw new EnvelopeException("INVALID_ID");
         return result;
     }
+    private static string? NullableUuid(JsonElement value) => value.ValueKind == JsonValueKind.Null ? null : Uuid(value).ToString("D");
 
     private static string Text(JsonElement value) =>
         value.ValueKind == JsonValueKind.String ? value.GetString()! : throw new EnvelopeException("INVALID_ENVELOPE");

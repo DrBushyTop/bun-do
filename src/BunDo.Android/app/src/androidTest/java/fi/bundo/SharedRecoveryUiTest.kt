@@ -72,9 +72,12 @@ class SharedRecoveryUiTest {
 
     @Test fun lowStorageKeepsQueueAndOffersExportAndSystemCleanup() {
         fixture(true, "light")
-        compose.onNodeWithText(text(R.string.shared_storage_required)).assertIsDisplayed()
-        compose.onNodeWithText(text(R.string.shared_export_saved)).assertIsDisplayed()
-        compose.onNodeWithText(text(R.string.shared_manage_storage)).assertIsDisplayed()
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithText(text(R.string.shared_storage_required)).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText(text(R.string.shared_storage_required)).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.shared_export_saved)).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.shared_manage_storage)).performScrollTo().assertIsDisplayed()
         screenshot("recovery-storage-light.png")
     }
 
@@ -82,7 +85,9 @@ class SharedRecoveryUiTest {
         val (data, state) = fixture(false, "dark")
         compose.onNodeWithTag("shared-recovery").performClick()
         compose.onNodeWithText("Siivoa varaston alahylly").assertIsDisplayed()
-        compose.onNodeWithText(compose.activity.getString(R.string.shared_current, "Järjestä varaston hyllyt")).assertIsDisplayed()
+        val currentTitle = compose.activity.getString(R.string.shared_current, "Järjestä varaston hyllyt")
+        compose.waitUntil(10_000) { compose.onAllNodesWithText(currentTitle).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText(currentTitle).performScrollTo().assertIsDisplayed()
         compose.onNodeWithText(text(R.string.shared_reapply)).performScrollTo().assertIsDisplayed()
         screenshot("recovery-conflict-dark.png")
         compose.onNodeWithText(text(R.string.shared_dismiss)).performScrollTo().performClick()
