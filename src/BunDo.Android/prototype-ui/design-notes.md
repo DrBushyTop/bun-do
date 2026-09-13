@@ -39,3 +39,18 @@ complete checklist lifecycle or derived completion statistics.
 Fixed profile illustrations are in V1; profile editing and combo effects stay
 in V2. Browser checks do not validate native accessibility, physical touch
 behavior, Android font scaling or device performance.
+
+## Selected later refinements
+
+The illustration direction is light-only. Task headers use a continuous fade,
+not separate white text bands. Bun is now a calm royal martial-arts master in a
+gi, belt and restrained crown; the app logo is unchanged. Category words are
+removed from queue rows, and the filter is one compact selector.
+
+Append `?journey=1` to try the optional post-core/V3 world. Its background fills
+the whole top section, without route name, location caption or expansion UI.
+The illustrated quest entry remains at the bottom. Settings has sample mood
+controls and world visibility. Quests are canned groups referring to real demo
+tasks; accepting one does not change task order. No real quest AI or animated
+character rig is implemented. The supplied scenes are stills with small
+transitions. See `art/ARTWORK.md` for generation provenance and prompts.

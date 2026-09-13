@@ -9,6 +9,7 @@ for(const [id,paths] of Object.entries({
 
 const fixtureTimes=[['Jenny','2026-09-12T08:15:00+03:00','Jenny','2026-09-13T09:20:00+03:00'],['Pasi','2026-09-11T17:40:00+03:00','Jenny','2026-09-13T10:10:00+03:00'],['Pasi','2026-09-12T12:30:00+03:00','Pasi','2026-09-13T11:05:00+03:00'],['Jenny','2026-09-13T08:50:00+03:00','Jenny','2026-09-13T08:50:00+03:00']];
 tasks.forEach((t,i)=>{[t.createdBy,t.createdAt,t.modifiedBy,t.modifiedAt]=fixtureTimes[i]});
+function sceneForTask(t){const scene={home:'storage',bike:'bike',pet:'pet'}[classify(t.title)];return scene?'url(art/'+scene+'-royal.webp)':'none'}
 function expedited(t){
   if(t.urgent||t.date==='Tänään')return true;
   if(!t.date)return false;
@@ -97,3 +98,5 @@ window.addEventListener('blur',()=>finishDrag(false));
 $('#app').insertAdjacentHTML('beforeend','<p class="sr" id="reorder-help">Vedä ylös tai alas. Näppäimistöllä käytä nuolinäppäimiä. Escape peruu vetämisen.</p><p class="sr" id="order-status" role="status" aria-live="polite"></p>');
 $('.intro .note').innerHTML='Try Järjestä to drag tasks into priority order. Open a task for its creator and timestamps. Finish a task, claim one, or add a new one to try the animations.<br><br>Design reference for native V1. This demo uses sample data and resets on refresh. AI and recording are simulated. Profile editing and combo effects stay in V2.';
 render();
+
+$('.theme')?.remove();$('#app').classList.remove('dark');
