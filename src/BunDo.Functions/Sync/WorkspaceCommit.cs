@@ -7,7 +7,7 @@ namespace BunDo.Functions.Sync;
 public sealed record WorkspaceWrite(string Id, object Value, bool CreateOnly);
 
 /// <summary>Every writer replaces the same metadata ETag with its effects in one partition transaction.</summary>
-public sealed record WorkspaceCommit(WorkspaceState Metadata, IReadOnlyList<WorkspaceWrite> Writes)
+public sealed record WorkspaceCommit(WorkspaceState Metadata, IReadOnlyList<WorkspaceWrite> Writes, IReadOnlyList<string> Deletes)
 {
     public const int MaximumOperations = 90;
     public const int MaximumBytes = 1792 * 1024;
@@ -16,12 +16,16 @@ public sealed record WorkspaceCommit(WorkspaceState Metadata, IReadOnlyList<Work
     public static string TaskId(string task) => $"task:{task}";
     public static string GroupId(ulong revision) => $"change:{revision:D20}";
 
-    public static WorkspaceCommit Plan(WorkspaceState current, WorkspaceState next)
+    public static WorkspaceCommit Plan(WorkspaceState current, WorkspaceState next, IReadOnlyList<string>? deletes = null)
     {
         if (current.Revision == ulong.MaxValue || next.Revision != current.Revision + 1 ||
             current.WorkspaceId != next.WorkspaceId || current.StateEpoch != next.StateEpoch)
             throw new ArgumentException("Commit must advance one revision within its workspace epoch.");
         var group = next.Changes.Single(x => x.Revision == next.Revision);
+        group = group with { RecordedAt = group.RecordedAt ?? DateTimeOffset.UtcNow };
+        deletes ??= [];
+        if (deletes.Distinct().Count() != deletes.Count || deletes.Any(x => x == "state"))
+            throw new ArgumentException("Invalid maintenance deletion set.");
         var writes = new List<WorkspaceWrite> { new(GroupId(next.Revision), group, true) };
         foreach (var task in group.Tasks) writes.Add(new(TaskId(task.Id), task, false));
         foreach (var receipt in next.Receipts.Values.Where(x => x.EffectRevision == next.Revision))
@@ -34,10 +38,12 @@ public sealed record WorkspaceCommit(WorkspaceState Metadata, IReadOnlyList<Work
             Devices = current.Devices, Receipts = current.Receipts };
         var bytes = JsonSerializer.SerializeToUtf8Bytes(metadata).Length +
             writes.Sum(x => JsonSerializer.SerializeToUtf8Bytes(x.Value, x.Value.GetType()).Length + 512) + 512;
-        if (writes.Count + 1 > MaximumOperations || bytes > MaximumBytes)
+        bytes += deletes.Sum(x => System.Text.Encoding.UTF8.GetByteCount(x) + 512);
+        if (writes.Count + deletes.Count + 1 > MaximumOperations || bytes > MaximumBytes ||
+            writes.Any(x => deletes.Contains(x.Id)))
             throw new WorkspaceCommitTooLargeException();
         HouseholdDocumentLimits.CheckEncodedSize(metadata, JsonSerializer.SerializeToUtf8Bytes(metadata).Length + 256);
-        return new(metadata, writes);
+        return new(metadata, writes, deletes);
     }
 }
 

@@ -15,4 +15,16 @@
     <string name="shared_dependency_reason">Aiempaa muutosta ei voitu jakaa, joten tämä muokkaus säilytettiin tässä.</string>
     <string name="shared_preserved_reason">Tekstisi on tallessa tässä. Se ei ole korvannut jaettua tehtävää.</string>
     <string name="shared_access_lost">Tämä talous ei ole enää käytettävissä. Lähettämätön tekstisi on tallessa. Avaa tilisi palauttaaksesi sen tai kirjaudu uudelleen.</string>
+    <string name="shared_rebuilding">Päivitetään tehtäviä. Voit jatkaa kirjoittamista.</string>
+    <string name="shared_storage_required">Tallennustilaa tarvitaan lisää. Tehtäväsi ja muokkauksesi ovat tallessa.</string>
+    <string name="shared_recovery_paused">Tehtävien päivitys jäi kesken. Tekstisi on tallessa. Yritä uudelleen.</string>
+    <string name="shared_export_saved">Vie tallennetut tekstit</string>
+    <string name="shared_manage_storage">Vapauta tallennustilaa</string>
+    <string name="shared_missing">Tehtävää ei ole nykyisessä tehtävälistassa.</string>
+    <string name="shared_reapply">Käytä omaa muokkausta</string>
+    <string name="shared_reapply_confirm">Korvataanko tehtävän %1$s muokatut kentät omalla tekstilläsi? Muut kentät säilyvät.</string>
+    <string name="shared_dismiss">Ohita tämä muokkaus</string>
+    <string name="shared_action_failed">Muutos ei onnistunut. Tekstisi on tallessa. Tarkista tehtävän nykyinen sisältö ja yritä uudelleen.</string>
+    <string name="shared_registration_recovery">Vanhojen muokkausten tilaa ei voitu varmistaa. Yhdistä laite uudelleen ja valitse sitten itse kopioitavat tekstit.</string>
+    <string name="shared_import_file">Tuo palautustiedosto (JSON)</string>
 </resources>

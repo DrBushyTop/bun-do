@@ -7,6 +7,7 @@ import importlib.util
 import json
 from pathlib import Path
 import uuid
+from urllib.parse import urlencode
 
 spec = importlib.util.spec_from_file_location("identity_smoke", Path(__file__).with_name("local-identity-smoke.py"))
 identity = importlib.util.module_from_spec(spec)
@@ -82,7 +83,41 @@ def main():
         page = send(acknowledged=5)
         assert len(page["groups"]) == 6
         assert send(cursor=page["cursor"], acknowledged=5)["groups"] == []
+        status, outcomes, _ = identity.request("/devices/self/outcomes?" + urlencode({
+            "workspaceId": workspace, "stateEpoch": epoch, "registrationId": device,
+            "firstSequence": "1", "count": "6"}), token=token)
+        assert status == 200
+        assert outcomes["highWater"] == "5"
+        assert [item["state"] for item in outcomes["outcomes"]] == [
+            "ACCEPTED", "ACCEPTED", "REJECTED", "REJECTED", "ACCEPTED", "NOT_SEEN"]
+        assert outcomes["outcomes"][0]["fingerprint"] == hashlib.sha256(create).hexdigest()
+        assert outcomes["outcomes"][0]["receipt"] == first["receipts"][0]
         print("PASS Local HTTP: exact retry/hash, sequence gap, versioned edit, rejected create, blocked dependency, independent continuation, complete groups and acknowledgement")
+        print("PASS Local HTTP: bounded outcome lookup returns original receipts and hashes without replay")
+        snapshot_id = str(uuid.uuid4())
+        query = urlencode({"workspaceId": workspace, "stateEpoch": epoch, "registrationId": device})
+        route = f"/snapshots/{snapshot_id}/manifest?{query}"
+        status, manifest, headers = identity.request(route, token=token, method="POST")
+        assert status == 200, (status, manifest)
+        assert headers.get("Cache-Control") == "no-store"
+        assert manifest["documentCount"] == 2 and manifest["schemaVersion"] == 1
+        assert identity.request(route, token=token, method="POST")[1] == manifest
+        snapshots = []
+        for chunk in manifest["chunks"]:
+            # Read exact bytes, not reserialized JSON, for artifact digest verification.
+            import urllib.request
+            request = urllib.request.Request(identity.BASE + f"/snapshots/{snapshot_id}/{chunk['index']}?{query}",
+                headers={"Authorization": f"Bearer {token}"})
+            with urllib.request.urlopen(request) as response:
+                content = response.read()
+                assert response.headers.get("Cache-Control") == "no-store"
+            assert len(content) == chunk["bytes"] and hashlib.sha256(content).hexdigest() == chunk["digest"]
+            snapshots.extend(json.loads(content)["tasks"])
+        assert {item["title"] for item in snapshots} == {"Synthetic tea", "Independent"}
+        assert identity.request(route)[0] == 401
+        assert identity.request(f"/snapshots/{snapshot_id}/99?{query}", token=token)[0] == 409
+        assert send(cursor=manifest["cursor"])["throughRevision"] == str(int(manifest["revision"]) + 1)
+        print("PASS Local HTTP: immutable authenticated snapshot, retry, chunk digests, range rejection and delta continuation")
     finally:
         status, response, _ = identity.request("/households", token=token, method="POST", body={
             "action": "get", "registrationId": device, "workspaceId": workspace})

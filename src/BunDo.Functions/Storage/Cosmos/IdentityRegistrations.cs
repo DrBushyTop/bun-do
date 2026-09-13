@@ -36,6 +36,14 @@ public sealed class IdentityRegistrations(Container container) : IRegistrationSt
 
     private sealed record Registry(string id, string workspaceId, InstallationRegistration[] Records);
 
+    public async Task<InstallationRegistration?> ReadAsync(string partition, Guid registrationId, CancellationToken ct)
+    {
+        if (!partition.StartsWith("identity:", StringComparison.Ordinal)) throw new ArgumentException("Invalid registry partition.");
+        try { return (await container.ReadItemAsync<Registry>("registrations", new(partition), cancellationToken: ct))
+            .Resource.Records.SingleOrDefault(x => x.RegistrationId == registrationId); }
+        catch (CosmosException error) when (error.StatusCode == HttpStatusCode.NotFound) { return null; }
+    }
+
     public async Task<bool> IsActiveAsync(AccountIdentity identity, Guid registrationId, CancellationToken cancellationToken)
     {
         var partition = "identity:" + Convert.ToHexString(

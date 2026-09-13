@@ -15,4 +15,16 @@
     <string name="shared_dependency_reason">An earlier change could not be shared, so this edit was kept here.</string>
     <string name="shared_preserved_reason">Your text is saved here and has not replaced the shared task.</string>
     <string name="shared_access_lost">This household is no longer available. Your unsent text is saved. Open your account to recover it or sign in again.</string>
+    <string name="shared_rebuilding">Updating tasks. You can keep writing.</string>
+    <string name="shared_storage_required">More storage is needed. Your tasks and edits are safe.</string>
+    <string name="shared_recovery_paused">Task updates paused. Your text is safe. Try again.</string>
+    <string name="shared_export_saved">Export saved text</string>
+    <string name="shared_manage_storage">Free up storage</string>
+    <string name="shared_missing">This task is not in the current task list.</string>
+    <string name="shared_reapply">Use my edit</string>
+    <string name="shared_reapply_confirm">Replace the edited fields of %1$s with your text? Other fields will stay unchanged.</string>
+    <string name="shared_dismiss">Dismiss this edit</string>
+    <string name="shared_action_failed">The change did not go through. Your text is safe. Review the current task and try again.</string>
+    <string name="shared_registration_recovery">The status of older edits could not be confirmed. Reconnect this device, then choose which text to copy.</string>
+    <string name="shared_import_file">Import recovery file (JSON)</string>
 </resources>

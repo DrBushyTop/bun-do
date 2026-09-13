@@ -8,6 +8,8 @@ using BunDo.Domain;
 namespace BunDo.Functions.Households;
 
 public sealed record StoredDocument<T>(T Value, string Version);
+public sealed record NamedDocument<T>(string Id, T Value, string Version);
+public sealed record DocumentPage<T>(IReadOnlyList<NamedDocument<T>> Items, string? Continuation);
 
 /// <summary>A point-read and conditional-write boundary. Missing version means create only.</summary>
 public interface IHouseholdDocuments
@@ -15,7 +17,9 @@ public interface IHouseholdDocuments
     Task<StoredDocument<T>?> ReadAsync<T>(string partition, string id, CancellationToken cancellationToken);
     Task<bool> WriteAsync<T>(string partition, string id, string? version, T value, CancellationToken cancellationToken);
     Task<bool> CommitWorkspaceAsync(StoredDocument<WorkspaceState> expected, WorkspaceState next,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken, IReadOnlyList<string>? deletes = null);
+    Task<DocumentPage<T>> ReadPageAsync<T>(string partition, string prefix, string? continuation, int limit,
+        CancellationToken cancellationToken) => throw new NotSupportedException();
 }
 
 public sealed record HouseholdDirectory(ImmutableHashSet<Guid> Workspaces, ImmutableArray<DateTimeOffset> Attempts)

@@ -9,6 +9,19 @@ namespace BunDo.Functions.Identity.Development;
 public sealed class LocalRegistrationStore(string directory) : IRegistrationStore
 {
     private readonly SemaphoreSlim gate = new(1);
+    public async Task<InstallationRegistration?> ReadAsync(string partition, Guid registrationId, CancellationToken ct)
+    {
+        var key = partition.StartsWith("identity:", StringComparison.Ordinal) ? partition[9..] : "";
+        if (key.Length != 64 || key.Any(x => !Uri.IsHexDigit(x))) throw new ArgumentException("Invalid registry partition.");
+        await gate.WaitAsync(ct);
+        try
+        {
+            var file = Path.Combine(directory, key + ".json");
+            return File.Exists(file) ? JsonSerializer.Deserialize<InstallationRegistration[]>(
+                await File.ReadAllBytesAsync(file, ct))!.SingleOrDefault(x => x.RegistrationId == registrationId) : null;
+        }
+        finally { gate.Release(); }
+    }
     public async Task<bool> IsActiveAsync(AccountIdentity identity, Guid registrationId, CancellationToken cancellationToken)
     {
         await gate.WaitAsync(cancellationToken);

@@ -1,0 +1,61 @@
+using System.Diagnostics;
+using System.Globalization;
+using System.Text.Json;
+using BunDo.Functions.Households;
+using BunDo.Functions.Identity;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace BunDo.Functions.Sync;
+
+public sealed class OutcomesFunction(AccessTokens tokens, IServiceProvider services)
+{
+    [Function("DeviceOutcomes")]
+    public async Task<IActionResult> Run(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "api/devices/self/outcomes")] HttpRequest request)
+    {
+        request.HttpContext.Response.Headers.CacheControl = "no-store";
+        var ct = request.HttpContext.RequestAborted;
+        var headers = request.Headers.Authorization;
+        if (headers.Count != 1 || headers[0] is not { } header ||
+            !header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) || header[7..].Any(char.IsWhiteSpace))
+            return new UnauthorizedResult();
+        var auth = await tokens.ValidateAsync(header[7..], ct);
+        if (auth.Status != AuthenticationStatus.Accepted)
+            return new StatusCodeResult(auth.Status switch {
+                AuthenticationStatus.MissingScope => 403, AuthenticationStatus.Unavailable => 503, _ => 401 });
+        var registrations = services.GetService<IRegistrationStore>();
+        var documents = services.GetService<IHouseholdDocuments>();
+        if (registrations is null || documents is null) return new StatusCodeResult(503);
+        var query = request.Query;
+        if (query.Count != 5 || query.Any(x => x.Value.Count != 1) ||
+            !Guid.TryParseExact(query["workspaceId"], "D", out var workspace) ||
+            !Guid.TryParseExact(query["stateEpoch"], "D", out var epoch) ||
+            !Guid.TryParseExact(query["registrationId"], "D", out var registration) ||
+            !ulong.TryParse(query["firstSequence"], NumberStyles.None, CultureInfo.InvariantCulture, out var first) ||
+            first.ToString(CultureInfo.InvariantCulture) != query["firstSequence"] ||
+            !int.TryParse(query["count"], NumberStyles.None, CultureInfo.InvariantCulture, out var count))
+            return Failure("INVALID_RANGE", 400);
+        if (!await registrations.IsActiveAsync(auth.Identity!, registration, ct))
+            return Failure("REGISTRATION_RETIRED", 403);
+        try
+        {
+            Activity.Current?.SetTag("operation.stage", "outcome_lookup");
+            var page = await new SyncService(documents).OutcomesAsync(HouseholdIdentity.Member(auth.Identity!),
+                workspace, epoch, registration, first, count, ct);
+            Activity.Current?.SetTag("recovery.result", page.Code);
+            Activity.Current?.SetTag("recovery.outcomes", page.Outcomes.Count);
+            return new ContentResult { ContentType = "application/json", StatusCode = 200,
+                Content = JsonSerializer.Serialize(page, SyncJson.Options) };
+        }
+        catch (SyncException error) { return Failure(error.Code, error.Code == "FORBIDDEN" ? 403 : 409); }
+    }
+
+    private static ObjectResult Failure(string code, int status)
+    {
+        Activity.Current?.SetTag("recovery.result", code);
+        return new(new { code }) { StatusCode = status };
+    }
+}

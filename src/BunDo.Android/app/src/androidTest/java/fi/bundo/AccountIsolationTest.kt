@@ -86,6 +86,65 @@ class AccountIsolationTest {
         } finally { store.close(); clean(name) }
     }
 
+    @Test fun epochAndRegistrationReplacementRetainAcceptedTextWhoseEffectsHaveNotArrived() = runBlocking {
+        val name = "account-test-${UUID.randomUUID()}"
+        val store = AccountStore(context, name)
+        try {
+            val registration = registration()
+            store.unlock(alice, registration)
+            var data = store.active.value!!
+            val workspace = UUID.randomUUID().toString()
+            val oldEpoch = UUID.randomUUID().toString()
+            data.selectHousehold(workspace, oldEpoch, "Home")
+            val state = data.database.shared().workspaces(registration).single()
+            val intent = fi.bundo.data.SharedIntent(state.scope, "1", UUID.randomUUID().toString(), "CreateTask",
+                "Accepted but not installed", "Keep this", true, true, "0", "0", "0", null, "{}",
+                receipt = org.json.JSONObject().put("effectRevision", "9").toString(), status = "ACCEPTED")
+            data.database.shared().saveIntent(intent)
+            data.selectHousehold(workspace, UUID.randomUUID().toString(), "Home")
+            assertEquals("EPOCH_CHANGED", data.database.shared().intents(state.scope).single().problem)
+            val fresh = data.database.shared().workspaces(registration).single { it.epoch != oldEpoch }
+            data.database.shared().saveIntent(intent.copy(scope = fresh.scope))
+            store.unlock(alice, registration())
+            data = store.active.value!!
+            assertEquals("REGISTRATION_REPLACED", data.database.shared().intents(fresh.scope).single().problem)
+            assertEquals(2, store.recovery(data).count { it.title == "Accepted but not installed" })
+        } finally { store.close(); clean(name) }
+    }
+
+    @Test fun versionedRecoveryExportKeepsLabelsAndDatesAndImportsOnlyTextWithNewIds() = runBlocking {
+        val name = "account-test-${UUID.randomUUID()}"
+        val store = AccountStore(context, name)
+        try {
+            store.unlock(alice, registration())
+            val data = store.active.value!!
+            val source = fi.bundo.data.RecoveryText("ignored-old-identity", "Retained text", "Retained description",
+                1_700_000_000_000L, "Our household", "OUTCOME_EXPIRED")
+            val output = ByteArrayOutputStream()
+            RecoveryExport.write(output, listOf(source), "Fallback", false, data.lease)
+            val json = org.json.JSONObject(output.toString("UTF-8"))
+            val record = json.getJSONArray("records").getJSONObject(0)
+            assertEquals("Our household", record.getString("workspaceLabel"))
+            assertEquals("2023-11-14T22:13:20Z", record.getString("capturedAt"))
+            assertEquals("OUTCOME_EXPIRED", record.getJSONArray("variants").getJSONObject(0).getString("reason"))
+            record.put("taskId", "old-id").put("sequence", "999").put("frozen", "not a command")
+            val imported = RecoveryExport.read(json.toString().byteInputStream())
+            store.importText(data, imported)
+            val saved = data.database.inbox().allTasks().single()
+            assertNotEquals("old-id", saved.id)
+            assertEquals("Retained text", saved.title)
+            assertEquals(1L, data.database.inbox().intents().single().sequence)
+            assertTrue(data.database.shared().recovery().isEmpty())
+            json.put("formatVersion", 99)
+            try { RecoveryExport.read(json.toString().byteInputStream()); fail("Unknown recovery version") }
+            catch (_: IllegalArgumentException) { }
+            store.unlock(bob, registration())
+            try { store.importText(data, imported); fail("Late import must not cross accounts") }
+            catch (_: CancellationException) { }
+            assertTrue(store.recovery(store.active.value!!).isEmpty())
+        } finally { store.close(); clean(name) }
+    }
+
     @Test fun explicitAnonymousImportCreatesNewIdsAndDoesNotReplayIntents() = runBlocking {
         val name = "account-test-${UUID.randomUUID()}"
         val store = AccountStore(context, name)

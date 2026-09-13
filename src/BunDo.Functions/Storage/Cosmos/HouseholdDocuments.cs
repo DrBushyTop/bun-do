@@ -13,9 +13,9 @@ public sealed class HouseholdDocuments(Container container) : IHouseholdDocument
     private sealed record Document<T>(string id, string workspaceId, int SchemaVersion, T Value);
 
     public async Task<bool> CommitWorkspaceAsync(StoredDocument<WorkspaceState> expected, WorkspaceState next,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, IReadOnlyList<string>? deletes = null)
     {
-        var plan = WorkspaceCommit.Plan(expected.Value, next);
+        var plan = WorkspaceCommit.Plan(expected.Value, next, deletes);
         var partition = next.WorkspaceId.ToString("D");
         var streams = new List<MemoryStream>();
         try
@@ -31,12 +31,26 @@ public sealed class HouseholdDocuments(Container container) : IHouseholdDocument
                 if (write.CreateOnly) batch.CreateItemStream(stream);
                 else batch.UpsertItemStream(stream);
             }
+            foreach (var id in plan.Deletes) batch.DeleteItem(id);
             using var response = await batch.ExecuteAsync(cancellationToken);
             if (response.IsSuccessStatusCode) return true;
             if (response.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed) return false;
             throw new InvalidOperationException($"Workspace transaction failed with status {(int)response.StatusCode}.");
         }
         finally { foreach (var stream in streams) stream.Dispose(); }
+    }
+
+    private sealed record QueryDocument<T>(string id, T payload, string version);
+    public async Task<DocumentPage<T>> ReadPageAsync<T>(string partition, string prefix, string? continuation,
+        int limit, CancellationToken cancellationToken)
+    {
+        if (limit is < 1 or > 128) throw new ArgumentOutOfRangeException(nameof(limit));
+        using var iterator = container.GetItemQueryIterator<QueryDocument<T>>(
+            new QueryDefinition("SELECT c.id, c[\"Value\"] AS payload, c._etag AS version FROM c WHERE STARTSWITH(c.id, @prefix) ORDER BY c.id")
+                .WithParameter("@prefix", prefix), continuation,
+            new QueryRequestOptions { PartitionKey = new(partition), MaxItemCount = limit });
+        var page = await iterator.ReadNextAsync(cancellationToken);
+        return new(page.Select(x => new NamedDocument<T>(x.id, x.payload, x.version)).ToArray(), page.ContinuationToken);
     }
 
     public async Task<StoredDocument<T>?> ReadAsync<T>(string partition, string id, CancellationToken cancellationToken)

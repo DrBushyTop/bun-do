@@ -229,7 +229,7 @@ public sealed class HouseholdTests
     private sealed class MemoryDocuments : IHouseholdDocuments
     {
         public Task<bool> CommitWorkspaceAsync(StoredDocument<WorkspaceState> expected, WorkspaceState next,
-            CancellationToken cancellationToken) =>
+            CancellationToken cancellationToken, IReadOnlyList<string>? deletes = null) =>
             WriteAsync(next.WorkspaceId.ToString("D"), "state", expected.Version, next, cancellationToken);
         private readonly ConcurrentDictionary<string, (string Json, string Version)> values = new();
         private readonly object gate = new();

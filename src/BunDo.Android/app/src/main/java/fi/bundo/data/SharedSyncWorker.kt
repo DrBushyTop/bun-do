@@ -2,6 +2,7 @@ package fi.bundo.data
 
 import android.content.Context
 import android.os.SystemClock
+import android.os.StatFs
 import android.provider.Settings
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -25,6 +26,47 @@ import java.util.Base64
 internal class SyncFailure(val code: String) : Exception()
 
 internal class SharedEndpoint {
+    fun recovery(token: String): SnapshotTransport = object : SnapshotTransport {
+        override suspend fun manifest(state: SharedWorkspace, id: String): JSONObject =
+            JSONObject(String(read(token, "snapshots/$id/manifest?${query(state)}", "POST"), Charsets.UTF_8))
+        override suspend fun chunk(state: SharedWorkspace, id: String, index: Int): ByteArray =
+            read(token, "snapshots/$id/$index?${query(state)}", "GET")
+        override suspend fun outcomes(state: SharedWorkspace, first: String, count: Int): JSONObject =
+            JSONObject(String(read(token, "devices/self/outcomes?${query(state)}&firstSequence=$first&count=$count", "GET"), Charsets.UTF_8))
+    }
+
+    private fun query(state: SharedWorkspace): String {
+        // All query components are locally validated UUIDs, never arbitrary labels or text.
+        for (id in listOf(state.workspaceId, state.epoch, state.registration)) require(java.util.UUID.fromString(id).toString() == id)
+        return "workspaceId=${state.workspaceId}&stateEpoch=${state.epoch}&registrationId=${state.registration}"
+    }
+
+    private suspend fun read(token: String, path: String, method: String): ByteArray = withContext(Dispatchers.IO) {
+        val connection = URL("${BuildConfig.IDENTITY_API_BASE}/$path").openConnection() as HttpURLConnection
+        try {
+            connection.instanceFollowRedirects = false
+            connection.connectTimeout = 15_000
+            connection.readTimeout = 30_000
+            connection.requestMethod = method
+            connection.setRequestProperty("Authorization", "Bearer $token")
+            val status = connection.responseCode
+            val stream = if (status == 200) connection.inputStream else connection.errorStream
+            val bytes = stream?.use {
+                val buffer = ByteArray(4 * 1024 * 1024 + 1)
+                var count = 0
+                while (count < buffer.size) {
+                    val read = it.read(buffer, count, buffer.size - count)
+                    if (read < 0) break
+                    count += read
+                }
+                require(count < buffer.size)
+                buffer.copyOf(count)
+            } ?: ByteArray(0)
+            if (status != 200) throw SyncFailure(runCatching { JSONObject(String(bytes, Charsets.UTF_8)).getString("code") }.getOrDefault("UNAVAILABLE"))
+            bytes
+        } finally { connection.disconnect() }
+    }
+
     suspend fun send(token: String, request: SharedRequest): JSONObject = withContext(Dispatchers.IO) {
         val state = request.workspace
         val envelopes = JSONArray()
@@ -74,7 +116,8 @@ class SharedSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
             app.withAccountToken(data) { token ->
                 for (scope in scopes.filter { it.blocked == null }) {
                     val repository = SharedRepository(data.database, data.lease, scope.scope, data.registrationId)
-                    val finished = runScope(repository, token)
+                    val recovery = SharedSnapshotRecovery(data.database, data.lease, scope.scope)
+                    val finished = runScope(repository, recovery, checkNotNull(data.database.openHelper.writableDatabase.path), token)
                     if (!finished) return@withAccountToken false
                 }
                 true
@@ -83,11 +126,16 @@ class SharedSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
         catch (_: Exception) { Result.retry() }
     }
 
-    private suspend fun runScope(repository: SharedRepository, token: String): Boolean {
+    private suspend fun runScope(repository: SharedRepository, recovery: SharedSnapshotRecovery, databasePath: String, token: String): Boolean {
         repeat(40) {
             val request = repository.prepare(SystemClock.elapsedRealtime(),
                 Settings.Global.getInt(applicationContext.contentResolver, Settings.Global.BOOT_COUNT, 0)) ?: return true
             try {
+                if (recovery.pending()) {
+                    recovery.step(request, SharedEndpoint().recovery(token),
+                        StatFs(applicationContext.noBackupFilesDir.path).availableBytes, java.io.File(databasePath).length())
+                    return@repeat
+                }
                 val reply = SharedEndpoint().send(token, request)
                 val code = reply.getString("code")
                 if (code in listOf("REGISTRATION_RETIRED", "EPOCH_CHANGED", "OUTCOME_EXPIRED", "FORBIDDEN")) {
@@ -98,7 +146,11 @@ class SharedSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
                 if (code in listOf("BUSY", "SEQUENCE_GAP", "WORKSPACE_FULL")) return false
                 if (!more) return true
             } catch (error: SyncFailure) {
-                if (error.code in listOf("REGISTRATION_RETIRED", "EPOCH_CHANGED", "FORBIDDEN", "SNAPSHOT_REQUIRED")) {
+                if (error.code == "SNAPSHOT_REQUIRED") {
+                    recovery.begin(request)
+                    return@repeat
+                }
+                if (error.code in listOf("REGISTRATION_RETIRED", "EPOCH_CHANGED", "FORBIDDEN")) {
                     repository.block(request, error.code)
                     return true
                 }

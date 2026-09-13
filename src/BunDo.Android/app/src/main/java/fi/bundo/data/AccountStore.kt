@@ -65,7 +65,7 @@ class AccountData internal constructor(
                 val stateEpoch = checkNotNull(epoch)
                 val key = "$id/$stateEpoch/$registration"
                 val previous = database.shared().workspace(key)
-                database.shared().quarantineOtherRegistrations(registration)
+                database.shared().quarantineOtherRegistrations(registration, id, stateEpoch)
                 database.shared().saveWorkspace(previous?.copy(name = name, selected = true)
                     ?: SharedWorkspace(key, id, stateEpoch, registration, name, selected = true))
             }
@@ -299,9 +299,13 @@ class AccountStore(private val context: Context, private val name: String = "acc
             } + data.database.inbox().allDrafts().filter { it.title.isNotBlank() || it.description.isNotBlank() }.map {
                 RecoveryText("draft:${it.key}", it.title, it.description, it.savedAt)
             } + data.database.shared().recovery().map {
-                RecoveryText("shared:${it.scope}:${it.sequence}", it.title, it.description.orEmpty(), 0)
+                RecoveryText("shared:${it.scope}:${it.sequence}", it.title, it.description.orEmpty(),
+                    runCatching { java.time.Instant.parse(JSONObject(it.captureContext).getString("capturedInstant")).toEpochMilli() }.getOrDefault(0),
+                    workspaceLabel = data.database.shared().workspace(it.scope)?.name,
+                    reason = it.problem, captureContext = it.captureContext)
             } + data.database.shared().allDrafts().filter { it.title.isNotBlank() || it.description.isNotBlank() }.map {
-                RecoveryText("shared-draft:${it.scope}:${it.key}", it.title, it.description, it.savedAt)
+                RecoveryText("shared-draft:${it.scope}:${it.key}", it.title, it.description, it.savedAt,
+                    workspaceLabel = data.database.shared().workspace(it.scope)?.name)
             }
         }
     }
@@ -331,6 +335,10 @@ class AccountStore(private val context: Context, private val name: String = "acc
     /** Copy selected text only. Source stays intact; no old intent/sequence is replayed. */
     suspend fun importAnonymous(data: AccountData, selected: Set<String>) {
         val source = anonymousPreview(data).filter { it.source in selected }
+        importText(data, source)
+    }
+
+    suspend fun importText(data: AccountData, source: List<RecoveryText>) {
         data.lease.access {
             data.database.withTransaction {
                 for (text in source) {
@@ -341,9 +349,11 @@ class AccountStore(private val context: Context, private val name: String = "acc
                     data.database.inbox().insertIntent(InboxIntent(taskId = id, kind = "CaptureInboxTask",
                         title = text.title, description = text.description, createdAt = text.capturedAt))
                 }
+                data.lease.check()
             }
         }
     }
 }
 
-data class RecoveryText(val source: String, val title: String, val description: String, val capturedAt: Long)
+data class RecoveryText(val source: String, val title: String, val description: String, val capturedAt: Long,
+    val workspaceLabel: String? = null, val reason: String? = null, val captureContext: String? = null)

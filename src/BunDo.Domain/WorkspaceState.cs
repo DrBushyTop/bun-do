@@ -8,14 +8,18 @@ public sealed record TaskSnapshot(
     string Id, string Title, string? Description, FieldVersion TitleVersion, FieldVersion DescriptionVersion,
     ulong DeletionVersion = 0, TaskCapture? Capture = null);
 public sealed record DeviceRegistration(Guid DeviceId, Guid MemberId, ulong LastTerminalSequence = 0,
-    ulong AcknowledgedThrough = 0);
+    ulong AcknowledgedThrough = 0, string? RegistryPartition = null);
 public sealed record OperationReceipt(
-    string OperationId, string Fingerprint, string Code, ulong EffectRevision, TaskSnapshot? Task)
+    string OperationId, string Fingerprint, string Code, ulong EffectRevision, TaskSnapshot? Task,
+    DateTimeOffset? RecordedAt = null)
 {
     public bool Accepted => Code == "ACCEPTED";
 }
 public sealed record SubmissionResult(string Code, OperationReceipt? Receipt = null);
-public sealed record ChangeGroup(ulong Revision, ImmutableArray<TaskSnapshot> Tasks);
+public sealed record ChangeGroup(ulong Revision, ImmutableArray<TaskSnapshot> Tasks,
+    DateTimeOffset? RecordedAt = null, string? OperationId = null);
+public sealed record SnapshotPin(Guid Id, Guid MemberId, Guid DeviceId, Guid ArtifactId, ulong Revision,
+    DateTimeOffset ExpiresAt, DateTimeOffset BuildUntil, string? ManifestHash = null);
 public sealed record ChangePage(
     ulong AfterRevision, ulong ThroughRevision, ulong HeadRevision, ImmutableArray<ChangeGroup> Groups);
 
@@ -30,7 +34,9 @@ public sealed record WorkspaceState(
     HouseholdMembership Membership,
     string Name = "Household",
     string? CursorSecret = null,
-    int TaskCount = 0);
+    int TaskCount = 0,
+    ulong PrunedThrough = 0,
+    ImmutableDictionary<Guid, SnapshotPin>? SnapshotPins = null);
 
 /// <summary>The transaction seam; a failed compare-and-swap must have no effects.</summary>
 public interface IWorkspaceStore

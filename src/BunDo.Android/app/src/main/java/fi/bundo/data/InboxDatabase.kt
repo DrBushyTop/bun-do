@@ -86,8 +86,9 @@ interface InboxDao {
 
 @Database(
     entities = [InboxTask::class, InboxIntent::class, EditorDraft::class, VoiceRecording::class,
-        SharedWorkspace::class, SharedBase::class, SharedProjection::class, SharedIntent::class, SharedDraft::class],
-    version = 5,
+        SharedWorkspace::class, SharedBase::class, SharedProjection::class, SharedIntent::class, SharedDraft::class,
+        SharedRecovery::class],
+    version = 6,
     exportSchema = true,
 )
 abstract class InboxDatabase : RoomDatabase() {
@@ -129,9 +130,25 @@ abstract class InboxDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                for (column in listOf("baseGeneration", "projectionGeneration"))
+                    db.execSQL("ALTER TABLE shared_workspaces ADD COLUMN $column TEXT NOT NULL DEFAULT 'initial'")
+                db.execSQL("ALTER TABLE shared_workspaces ADD COLUMN snapshotRevision TEXT NOT NULL DEFAULT '0'")
+                db.execSQL("ALTER TABLE shared_workspaces ADD COLUMN journalVersion INTEGER NOT NULL DEFAULT 0")
+                for (table in listOf("shared_base", "shared_projection")) {
+                    db.execSQL("CREATE TABLE ${table}_new (scope TEXT NOT NULL, id TEXT NOT NULL, snapshot TEXT NOT NULL, generation TEXT NOT NULL DEFAULT 'initial', PRIMARY KEY(scope, generation, id))")
+                    db.execSQL("INSERT INTO ${table}_new (scope, id, snapshot) SELECT scope, id, snapshot FROM $table")
+                    db.execSQL("DROP TABLE $table")
+                    db.execSQL("ALTER TABLE ${table}_new RENAME TO $table")
+                }
+                db.execSQL("CREATE TABLE shared_recovery (scope TEXT NOT NULL PRIMARY KEY, snapshotId TEXT NOT NULL, manifest TEXT, nextChunk INTEGER NOT NULL, phase TEXT NOT NULL, afterId TEXT NOT NULL, replayVersion INTEGER NOT NULL, problem TEXT)")
+            }
+        }
+
         fun open(context: Context, name: String = FILE_NAME, passphrase: ByteArray? = null): InboxDatabase {
             val builder = Room.databaseBuilder(context, InboxDatabase::class.java, name)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 // AccountStore owns the connection used by both UI and workers.
                 // Workers cannot independently open a signed-out account.
             if (passphrase != null) {

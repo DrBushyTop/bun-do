@@ -36,6 +36,7 @@ fun AccountScreen(accounts: AccountStore, model: SignInModel, onHouseholds: () -
     val context = LocalContext.current
     val activity = context as Activity
     val data by accounts.active.collectAsState()
+    val selectedWorkspace = data?.selectedWorkspace?.collectAsState()?.value
     val scope = rememberCoroutineScope()
     var records by remember(data) { mutableStateOf<List<RecoveryText>>(emptyList()) }
     var recordings by remember(data) { mutableIntStateOf(0) }
@@ -48,6 +49,23 @@ fun AccountScreen(accounts: AccountStore, model: SignInModel, onHouseholds: () -
     var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var pendingExport by remember { mutableStateOf<Triple<AccountData, List<RecoveryText>, Boolean>?>(null) }
     val label = stringResource(R.string.account_inbox)
+    var importOwner by remember { mutableStateOf<AccountData?>(null) }
+    val openRecovery = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val owner = importOwner
+        importOwner = null
+        if (uri != null && owner != null) scope.launch {
+            working = true
+            try {
+                val texts = withContext(Dispatchers.IO) {
+                    owner.lease.access {
+                        checkNotNull(context.contentResolver.openInputStream(uri)).use(RecoveryExport::read)
+                    }
+                }
+                if (data === owner && owner.lease.active) { importPreview = texts; selected = emptySet() }
+            } catch (_: Exception) { failure = true }
+            finally { working = false }
+        }
+    }
     val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("*/*")) { uri ->
         val request = pendingExport
         pendingExport = null
@@ -70,13 +88,12 @@ fun AccountScreen(accounts: AccountStore, model: SignInModel, onHouseholds: () -
         pendingAction = null
         val current = data ?: return@LaunchedEffect
         try {
-            combine(current.inbox.tasks, current.inbox.drafts, current.recordings.recordings) { tasks, drafts, audio ->
-                Triple(tasks, drafts, audio)
-            }.collect { (tasks, drafts, audio) ->
+            combine(current.inbox.tasks, current.inbox.drafts, current.recordings.recordings,
+                current.database.shared().observeAllIntents(), current.database.shared().observeAllDrafts()) { _, _, audio, _, _ ->
+                audio
+            }.collect { audio ->
                 current.lease.check()
-                records = tasks.map { RecoveryText("task:${it.id}", it.title, it.description, it.createdAt) } +
-                    drafts.filter { it.title.isNotBlank() || it.description.isNotBlank() }
-                        .map { RecoveryText("draft:${it.key}", it.title, it.description, it.savedAt) }
+                records = withContext(Dispatchers.IO) { accounts.recovery(current) }
                 recordings = audio.size
                 ready = true
             }
@@ -127,6 +144,10 @@ fun AccountScreen(accounts: AccountStore, model: SignInModel, onHouseholds: () -
                 if (parts.isEmpty()) Text(stringResource(R.string.account_operation_failed))
             }
             if (signedIn) {
+                OutlinedButton(onClick = { importOwner = current; openRecovery.launch(arrayOf("application/json", "text/plain")) },
+                    enabled = !working && !model.busy, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.shared_import_file))
+                }
                 OutlinedButton(onClick = { model.refresh() }, enabled = !model.busy && !working,
                     modifier = Modifier.fillMaxWidth().testTag("account-refresh")) { Text(stringResource(R.string.identity_refresh)) }
                 OutlinedButton(onClick = {
@@ -158,7 +179,7 @@ fun AccountScreen(accounts: AccountStore, model: SignInModel, onHouseholds: () -
                         scope.launch {
                             working = true
                             try {
-                                withContext(Dispatchers.IO) { accounts.importAnonymous(current!!, selected) }
+                                withContext(Dispatchers.IO) { accounts.importText(current!!, preview.filter { it.source in selected }) }
                                 importPreview = null
                                 selected = emptySet()
                                 records = withContext(Dispatchers.IO) { accounts.recovery(current!!) }
@@ -193,6 +214,15 @@ fun AccountScreen(accounts: AccountStore, model: SignInModel, onHouseholds: () -
                 Text(stringResource(R.string.account_registration_retired))
                 OutlinedButton(onClick = { pendingAction = { model.refresh(replaceRetired = true) } },
                     enabled = !model.busy) {
+                    Text(stringResource(R.string.account_register_again))
+                }
+            }
+            if (selectedWorkspace?.blocked == "REGISTRATION_REPLACEMENT_REQUIRED") {
+                Text(stringResource(R.string.shared_registration_recovery))
+                OutlinedButton(onClick = {
+                    val oldRegistration = data?.registrationId
+                    pendingAction = { model.refresh(revokeRegistration = oldRegistration, replaceRetired = true) }
+                }, enabled = !model.busy && !working) {
                     Text(stringResource(R.string.account_register_again))
                 }
             }

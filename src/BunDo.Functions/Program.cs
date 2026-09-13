@@ -17,6 +17,11 @@ var cosmosEndpoint = builder.Configuration["WorkspaceStore:Endpoint"];
 if (!string.IsNullOrWhiteSpace(cosmosEndpoint))
 {
     BunDo.Functions.Storage.Cosmos.IdentityRegistrations.Configure(builder.Services, builder.Configuration);
+    builder.Services.AddSingleton<BunDo.Functions.Recovery.ISnapshotArtifacts>(_ =>
+        new BunDo.Functions.Storage.Blobs.SnapshotArtifacts(new Azure.Storage.Blobs.BlobServiceClient(
+            new Uri(builder.Configuration["Snapshots:BlobEndpoint"]!),
+            new ManagedIdentityCredential(ManagedIdentityId.FromUserAssignedClientId(builder.Configuration["AZURE_CLIENT_ID"]!)))
+            .GetBlobContainerClient(builder.Configuration["Snapshots:ContainerName"]!)));
 }
 #if DEBUG
 else if (builder.Configuration["AZURE_FUNCTIONS_ENVIRONMENT"] == "Development"
@@ -27,6 +32,9 @@ else if (builder.Configuration["AZURE_FUNCTIONS_ENVIRONMENT"] == "Development"
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "BunDo", "local-households")));
     builder.Services.AddSingleton<BunDo.Functions.Households.HouseholdService>();
+    builder.Services.AddSingleton<BunDo.Functions.Recovery.ISnapshotArtifacts>(
+        new BunDo.Functions.Identity.Development.LocalSnapshotArtifacts(
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BunDo", "local-snapshots")));
     builder.Services.AddSingleton<BunDo.Functions.Identity.IRegistrationStore>(
         new BunDo.Functions.Identity.Development.LocalRegistrationStore(
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

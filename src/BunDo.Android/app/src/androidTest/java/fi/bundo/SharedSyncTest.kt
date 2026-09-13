@@ -298,6 +298,220 @@ class SharedSyncTest {
         assertTrue("Expected response/lease validation failure", failed)
     }
 
+    @Test fun snapshotResumesAfterEveryBoundaryAndIncludesEditsDuringDownload() = runBlocking {
+        val server = Server()
+        var client = client(server)
+        val id = client.repository.copyText("Old view", "")
+        client.synchronize(server)
+        server.aiTitle(id, "Current shared view")
+        val transport = SnapshotPeer(server)
+        var recovery = SharedSnapshotRecovery(client.database, client.lease, client.state.scope)
+        var request = client.prepare()
+        recovery.begin(request)
+        client.repository.release(request)
+        transport.onChunk = { client.repository.copyText("Written during download", "Keep this too") }
+        var finished = false
+        repeat(20) {
+            if (!finished) {
+                request = client.prepare()
+                finished = !kotlinx.coroutines.withTimeout(5000) { recovery.step(request, transport, Long.MAX_VALUE, 0) }
+                client.repository.release(request)
+                client.database.close()
+                client = client(server, client.name, client.state.registration)
+                recovery = SharedSnapshotRecovery(client.database, client.lease, client.state.scope)
+            }
+        }
+        assertTrue(finished)
+        assertEquals(setOf("Current shared view", "Written during download"), client.repository.tasks.first().map { it.title }.toSet())
+        client.synchronize(server)
+        assertEquals(2, server.tasks.size)
+    }
+
+    @Test fun lostCreateResponseThenPurgedSnapshotDoesNotResurrectAcceptedCreate() = runBlocking {
+        val server = Server()
+        val client = client(server)
+        val oldId = client.repository.copyText("Keep as recovery only", "")
+        val request = client.prepare()
+        server.reply(request) // The response is lost, and later server state no longer contains the task.
+        server.tasks.clear()
+        val transport = SnapshotPeer(server)
+        val recovery = SharedSnapshotRecovery(client.database, client.lease, client.state.scope)
+        recovery.begin(request)
+        repeat(12) { if (recovery.pending()) recovery.step(request, transport, Long.MAX_VALUE, 0) }
+        client.repository.release(request)
+        assertFalse(recovery.pending())
+        assertTrue(client.repository.tasks.first().isEmpty())
+        assertEquals("ACCEPTED", client.database.shared().intents(client.state.scope).single().status)
+        client.synchronize(server)
+        assertTrue(client.repository.tasks.first().isEmpty())
+        assertNotEquals(oldId, client.repository.copyText("Explicit new copy", ""))
+    }
+
+    @Test fun snapshotStorageShortageCorruptionAndUnknownSchemaKeepOldViewAndJournal() = runBlocking {
+        val server = Server()
+        val client = client(server)
+        client.repository.copyText("Still here", "")
+        client.synchronize(server)
+        client.repository.copyText("Not uploaded", "")
+        val request = client.prepare()
+        val recovery = SharedSnapshotRecovery(client.database, client.lease, client.state.scope)
+        recovery.begin(request)
+        val transport = SnapshotPeer(server)
+        try { recovery.step(request, transport, 0, 0); fail("Must preserve storage reserve") }
+        catch (error: SyncFailure) { assertEquals("STORAGE_REQUIRED", error.code) }
+        assertEquals(2, client.repository.tasks.first().size)
+        transport.schema = 99
+        try { recovery.step(request, transport, Long.MAX_VALUE, 0); fail("Must reject unknown schema") }
+        catch (error: SyncFailure) { assertEquals("UNSUPPORTED_SNAPSHOT", error.code) }
+        transport.schema = 1
+        recovery.step(request, transport, Long.MAX_VALUE, 0)
+        transport.corrupt = true
+        assertFails { recovery.step(request, transport, Long.MAX_VALUE, 0) }
+        assertEquals(0, client.database.shared().recoveryState(client.state.scope)!!.nextChunk)
+        assertEquals(2, client.repository.tasks.first().size)
+        assertEquals(2, client.database.shared().intents(client.state.scope).size)
+        transport.corrupt = false
+        repeat(12) { if (recovery.pending()) recovery.step(request, transport, Long.MAX_VALUE, 0) }
+        assertFalse(recovery.pending())
+        assertEquals(2, client.repository.tasks.first().size)
+    }
+
+    @Test fun expiredOutcomeIsQuarantinedInsteadOfReplayingTheCreate() = runBlocking {
+        val server = Server()
+        val client = client(server)
+        client.repository.copyText("Do not recreate automatically", "")
+        val request = client.prepare()
+        server.reply(request)
+        server.tasks.clear()
+        val transport = SnapshotPeer(server).apply { expiredOutcome = true }
+        val recovery = SharedSnapshotRecovery(client.database, client.lease, client.state.scope)
+        recovery.begin(request)
+        repeat(12) { if (recovery.pending()) recovery.step(request, transport, Long.MAX_VALUE, 0) }
+        client.repository.release(request)
+        assertTrue(client.repository.tasks.first().isEmpty())
+        val intent = client.database.shared().intents(client.state.scope).single()
+        assertEquals("QUARANTINED", intent.status)
+        assertEquals("Do not recreate automatically", intent.title)
+        assertNull(client.prepare().envelope)
+    }
+
+    @Test fun snapshotLateChunkCannotApplyAfterWorkerReplacement() = runBlocking {
+        val server = Server()
+        val client = client(server)
+        client.repository.copyText("Original", "")
+        client.synchronize(server)
+        val old = client.prepare()
+        val recovery = SharedSnapshotRecovery(client.database, client.lease, client.state.scope)
+        recovery.begin(old)
+        val transport = SnapshotPeer(server)
+        recovery.step(old, transport, Long.MAX_VALUE, 0)
+        transport.onChunk = { client.prepare(100_000) }
+        assertFails { recovery.step(old, transport, Long.MAX_VALUE, 0) }
+        assertEquals(0, client.database.shared().recoveryState(client.state.scope)!!.nextChunk)
+        assertEquals("Original", client.repository.tasks.first().single().title)
+    }
+
+    @Test fun migrationToGenerationsPreservesExistingSharedRowsAndFrozenBytes() = runBlocking {
+        val name = "recovery-migrate-${UUID.randomUUID()}.db"
+        names += name
+        migrations.createDatabase(name, 5).apply {
+            execSQL("INSERT INTO shared_base VALUES ('scope', 'id', 'base bytes')")
+            execSQL("INSERT INTO shared_projection VALUES ('scope', 'id', 'projection bytes')")
+            close()
+        }
+        migrations.runMigrationsAndValidate(name, 6, true, InboxDatabase.MIGRATION_5_6).use { db ->
+            db.query("SELECT generation, snapshot FROM shared_base").use {
+                assertTrue(it.moveToFirst()); assertEquals("initial", it.getString(0)); assertEquals("base bytes", it.getString(1))
+            }
+            db.query("SELECT generation, snapshot FROM shared_projection").use {
+                assertTrue(it.moveToFirst()); assertEquals("initial", it.getString(0)); assertEquals("projection bytes", it.getString(1))
+            }
+        }
+    }
+
+    @Test fun recoveryReapplyUsesDisplayedCurrentVersionsAndDismissNeverRemovesText() = runBlocking {
+        val server = Server()
+        val alice = client(server)
+        val bob = client(server)
+        val id = alice.repository.copyText("Original", "Original description")
+        alice.synchronize(server); bob.synchronize(server)
+        alice.repository.draft(id)
+        bob.repository.commit(EditorDraft(id, "Other person", "Original description"))
+        bob.synchronize(server)
+        alice.repository.commit(EditorDraft(id, "My retained edit", "Original description"))
+        alice.synchronize(server)
+        val rejected = alice.repository.problems.first().single()
+        val displayed = alice.repository.canonical.first().getValue(id)
+        server.aiTitle(id, "Newer shared value")
+        alice.synchronize(server)
+        assertFails { alice.repository.reapply(rejected.sequence, displayed) }
+        val latest = alice.repository.canonical.first().getValue(id)
+        alice.repository.reapply(rejected.sequence, latest)
+        alice.synchronize(server)
+        assertEquals("My retained edit", server.tasks[id]!!.getString("title"))
+        assertEquals("Original description", server.tasks[id]!!.getString("description"))
+        val old = alice.database.shared().intents(alice.state.scope).find { it.sequence == rejected.sequence }!!
+        assertEquals("DISMISSED", old.status)
+        assertEquals("My retained edit", old.title)
+        assertTrue(alice.repository.problems.first().isEmpty())
+    }
+
+    @Test fun expiredOutcomeWithUnsentSuffixRequiresExplicitRegistrationReplacement() = runBlocking {
+        val server = Server()
+        val client = client(server)
+        val id = client.repository.copyText("Old create", "")
+        val request = client.prepare()
+        server.reply(request)
+        client.repository.commit(EditorDraft(id, "Unsent edit", ""))
+        val recovery = SharedSnapshotRecovery(client.database, client.lease, client.state.scope)
+        recovery.begin(request)
+        val transport = SnapshotPeer(server).apply { expiredOutcome = true }
+        repeat(12) {
+            if (recovery.pending()) {
+                recovery.step(request, transport, Long.MAX_VALUE, 0)
+                if (client.database.shared().intents(client.state.scope).any { it.sequence == "2" && it.status == "QUARANTINED" })
+                    client.repository.dismiss("2")
+            }
+        }
+        client.repository.release(request)
+        assertNull(client.repository.prepare(100_000, 1))
+        assertEquals("REGISTRATION_REPLACEMENT_REQUIRED", client.repository.workspace.first()!!.blocked)
+        assertTrue(client.database.shared().recovery().any { it.title == "Unsent edit" })
+    }
+
+    private class SnapshotPeer(val server: Server) : SnapshotTransport {
+        private val revision = server.revision.toString()
+        private val count = server.tasks.size
+        private val bytes = JSONObject().put("schemaVersion", 1).put("tasks", JSONArray().apply {
+            server.tasks.values.forEach { put(JSONObject(it.toString())) }
+        }).toString().toByteArray(Charsets.UTF_8)
+        var schema = 1
+        var corrupt = false
+        var expiredOutcome = false
+        var onChunk: (suspend () -> Unit)? = null
+        override suspend fun manifest(state: SharedWorkspace, id: String) = JSONObject()
+            .put("snapshotId", id).put("workspaceId", server.workspace).put("stateEpoch", server.epoch)
+            .put("revision", revision).put("schemaVersion", schema).put("expiresAt", java.time.Instant.now().plusSeconds(1800).toString())
+            .put("totalBytes", if (count == 0) 0 else bytes.size).put("documentCount", count)
+            .put("cursor", revision).put("chunks", JSONArray().apply { if (count > 0) put(JSONObject().put("index", 0).put("bytes", bytes.size)
+                .put("documents", count).put("digest", SharedSnapshotRecovery.digest(bytes))) })
+        override suspend fun chunk(state: SharedWorkspace, id: String, index: Int): ByteArray {
+            onChunk?.invoke(); onChunk = null
+            return if (corrupt) "corrupt".toByteArray() else bytes
+        }
+        override suspend fun outcomes(state: SharedWorkspace, first: String, count: Int): JSONObject {
+            val receipt = server.receipts["${state.registration}:$first"]
+            val outcome = JSONObject().put("sequence", first).put("state", when {
+                expiredOutcome -> "OUTCOME_EXPIRED"; receipt == null -> "NOT_SEEN"; receipt.getString("code") == "ACCEPTED" -> "ACCEPTED"; else -> "REJECTED"
+            })
+            if (receipt != null && !expiredOutcome) outcome.put("receipt", receipt).put("fingerprint", receipt.getString("fingerprint"))
+                .put("effectRevision", receipt.getString("effectRevision"))
+            val highWater = server.receipts.keys.filter { it.startsWith("${state.registration}:") }.maxOfOrNull { it.substringAfter(':').toULong() } ?: 0u
+            return JSONObject().put("code", "ACCEPTED").put("workspaceId", state.workspaceId).put("stateEpoch", state.epoch)
+                .put("deviceId", state.registration).put("highWater", highWater.toString()).put("outcomes", JSONArray().put(outcome))
+        }
+    }
+
     /** Deterministic wire peer. Live adapter checks are separate and use the same Android repository. */
     private class Server {
         val workspace = UUID.randomUUID().toString()
@@ -305,7 +519,7 @@ class SharedSyncTest {
         var revision = 0
         var rejectNextCreate = false
         val tasks = mutableMapOf<String, JSONObject>()
-        private val receipts = mutableMapOf<String, JSONObject>()
+        val receipts = mutableMapOf<String, JSONObject>()
         private val groups = mutableListOf<JSONObject>()
         fun aiTitle(id: String, title: String) {
             revision++

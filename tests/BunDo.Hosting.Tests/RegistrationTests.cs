@@ -22,7 +22,8 @@ public sealed class RegistrationTests
             var first = await store.RegisterAsync(alice, installation, null, default);
             var restarted = new LocalRegistrationStore(directory);
             var retry = await restarted.RegisterAsync(alice, installation, null, default);
-            Assert.Equal(first.Registration, retry.Registration);
+            Assert.Equal(first.Registration!.RegistrationId, retry.Registration!.RegistrationId);
+            Assert.True(retry.Registration.ExpiresAt >= first.Registration.ExpiresAt);
             Assert.True(await restarted.IsActiveAsync(alice, first.Registration!.RegistrationId, default));
             Assert.False(await restarted.IsActiveAsync(bob, first.Registration.RegistrationId, default));
             var other = await restarted.RegisterAsync(bob, installation, null, default);

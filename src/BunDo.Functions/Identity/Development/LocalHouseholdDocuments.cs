@@ -47,7 +47,7 @@ public sealed class LocalHouseholdDocuments(string directory) : IHouseholdDocume
     }
 
     public async Task<bool> CommitWorkspaceAsync(StoredDocument<WorkspaceState> expected, WorkspaceState next,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, IReadOnlyList<string>? deletes = null)
     {
         await gate.WaitAsync(cancellationToken);
         try
@@ -55,8 +55,10 @@ public sealed class LocalHouseholdDocuments(string directory) : IHouseholdDocume
             var partition = next.WorkspaceId.ToString("D");
             var current = await ReadDocument<WorkspaceState>(partition, "state", cancellationToken);
             if (current?.Version != expected.Version) return false;
-            var plan = WorkspaceCommit.Plan(expected.Value, next);
+            var plan = WorkspaceCommit.Plan(expected.Value, next, deletes);
             var records = await ReadTransaction(partition, cancellationToken);
+            foreach (var id in plan.Deletes)
+                if (!records.Remove(id)) throw new InvalidOperationException("Missing maintenance item.");
             foreach (var write in plan.Writes)
             {
                 if (write.CreateOnly && records.ContainsKey(write.Id)) return false;
@@ -67,6 +69,26 @@ public sealed class LocalHouseholdDocuments(string directory) : IHouseholdDocume
                 new StoredDocument<WorkspaceState>(plan.Metadata, Guid.NewGuid().ToString()));
             await ReplaceTransaction(partition, records, cancellationToken);
             return true;
+        }
+        finally { gate.Release(); }
+    }
+
+    public async Task<DocumentPage<T>> ReadPageAsync<T>(string partition, string prefix, string? continuation,
+        int limit, CancellationToken cancellationToken)
+    {
+        if (limit is < 1 or > 128) throw new ArgumentOutOfRangeException(nameof(limit));
+        await gate.WaitAsync(cancellationToken);
+        try
+        {
+            var records = await ReadTransaction(partition, cancellationToken);
+            var selected = records.Where(x => x.Key.StartsWith(prefix, StringComparison.Ordinal) &&
+                (continuation is null || string.CompareOrdinal(x.Key, continuation) > 0))
+                .OrderBy(x => x.Key, StringComparer.Ordinal).Take(limit + 1).ToArray();
+            var items = selected.Take(limit).Select(x => {
+                var value = x.Value.Deserialize<StoredDocument<T>>()!;
+                return new NamedDocument<T>(x.Key, value.Value, value.Version);
+            }).ToArray();
+            return new(items, selected.Length > limit ? items[^1].Id : null);
         }
         finally { gate.Release(); }
     }

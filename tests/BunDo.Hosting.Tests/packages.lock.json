@@ -67,6 +67,24 @@
           "OpenTelemetry.PersistentStorage.FileSystem": "1.1.1"
         }
       },
+      "Azure.Storage.Blobs": {
+        "type": "Transitive",
+        "resolved": "12.28.0",
+        "contentHash": "OK6slT3Hq3Yp2HWA0e23YHheHzKNbYjBZOwdT4fQ1iMH6I/8e6X8kAJLuKqVUeFBy160QSwhsynA3HxhVSHEcg==",
+        "dependencies": {
+          "Azure.Core": "1.51.1",
+          "Azure.Storage.Common": "12.27.0"
+        }
+      },
+      "Azure.Storage.Common": {
+        "type": "Transitive",
+        "resolved": "12.27.0",
+        "contentHash": "PBucMNzot6cYyN0isdte50iPCefJ4Ylg0B+KP4kxmqsc3ciOiDYh1MwVV6fPZPjoPnPvNRLN9TI6J5hgNf4huA==",
+        "dependencies": {
+          "Azure.Core": "1.51.1",
+          "System.IO.Hashing": "10.0.3"
+        }
+      },
       "Google.Protobuf": {
         "type": "Transitive",
         "resolved": "3.28.0",
@@ -699,6 +717,11 @@
           "Microsoft.IdentityModel.Tokens": "8.22.0"
         }
       },
+      "System.IO.Hashing": {
+        "type": "Transitive",
+        "resolved": "10.0.3",
+        "contentHash": "La6ICwsdTKhVX+LKN+pvFjQRR3LhLwq3uKdi2knjLzRyPYBSydF4cjXidYxIiTcDD6XVYdsBWQEI8ZxiZ/OdIg=="
+      },
       "System.Memory.Data": {
         "type": "Transitive",
         "resolved": "10.0.10",
@@ -773,6 +796,7 @@
         "dependencies": {
           "Azure.Identity": "[1.21.0, )",
           "Azure.Monitor.OpenTelemetry.Exporter": "[1.9.0, )",
+          "Azure.Storage.Blobs": "[12.28.0, )",
           "BunDo.Domain": "[1.0.0, )",
           "Microsoft.Azure.Cosmos": "[3.63.0, )",
           "Microsoft.Azure.Functions.Worker": "[2.52.0, )",

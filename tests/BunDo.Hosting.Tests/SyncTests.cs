@@ -70,7 +70,7 @@ public sealed class SyncTests : IDisposable
         }
         Assert.IsType<UnauthorizedResult>(await Send(null));
         Assert.Equal(403, Assert.IsType<ObjectResult>(await Send(local.Issue("bob", "valid"))).StatusCode);
-        await registrations.RegisterAsync(alice, registration.InstallationId, registration.RegistrationId, default);
+        await registrations.RegisterAsync(alice, Guid.NewGuid(), registration.RegistrationId, default);
         Assert.Equal(403, Assert.IsType<ObjectResult>(await Send(local.Issue("alice", "valid"))).StatusCode);
     }
 
@@ -161,6 +161,58 @@ public sealed class SyncTests : IDisposable
         Assert.Equal(102UL, third.ThroughRevision);
         Assert.Equal("INVALID_CURSOR", (await Assert.ThrowsAsync<SyncException>(() =>
             sync.PullAsync(member, workspace, epoch, first.Cursor + "x", [], "ACCEPTED", default))).Code);
+    }
+
+    [Fact]
+    public async Task OutcomeHttpBindsTheRegistrationToTheCallerAndRejectsUnboundedRanges()
+    {
+        using var local = new LocalIdentity(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> {
+            ["AZURE_FUNCTIONS_ENVIRONMENT"] = "Development", ["BunDoIdentity:Mode"] = "Local",
+        }).Build());
+        var registrations = new LocalRegistrationStore(Path.Combine(path, "registrations"));
+        var alice = new AccountIdentity(LocalIdentity.Issuer, "alice");
+        var registration = (await registrations.RegisterAsync(alice, Guid.NewGuid(), null, default)).Registration!;
+        var epoch = (await new HouseholdService(documents).CreateAsync(HouseholdIdentity.Member(alice), workspace, default)).Household!.StateEpoch;
+        using var services = new ServiceCollection().AddSingleton<IHouseholdDocuments>(documents)
+            .AddSingleton<IRegistrationStore>(registrations).BuildServiceProvider();
+        var function = new OutcomesFunction(local.Validator, services);
+        async Task<IActionResult> Send(string? account, string count = "2")
+        {
+            var http = new DefaultHttpContext();
+            if (account is not null) http.Request.Headers.Authorization = "Bearer " + local.Issue(account, "valid");
+            http.Request.QueryString = QueryString.Create(new Dictionary<string, string?> {
+                ["workspaceId"] = workspace.ToString("D"), ["stateEpoch"] = epoch.ToString("D"),
+                ["registrationId"] = registration.RegistrationId.ToString("D"), ["firstSequence"] = "1", ["count"] = count,
+            });
+            return await function.Run(http.Request);
+        }
+        Assert.IsType<UnauthorizedResult>(await Send(null));
+        Assert.Equal(403, Assert.IsType<ObjectResult>(await Send("bob")).StatusCode);
+        Assert.Equal(409, Assert.IsType<ObjectResult>(await Send("alice", "101")).StatusCode);
+        var response = Assert.IsType<ContentResult>(await Send("alice"));
+        var page = JsonDocument.Parse(response.Content!).RootElement;
+        Assert.Equal("0", page.GetProperty("highWater").GetString());
+        Assert.All(page.GetProperty("outcomes").EnumerateArray(), item => Assert.Equal("NOT_SEEN", item.GetProperty("state").GetString()));
+        await registrations.RegisterAsync(alice, Guid.NewGuid(), registration.RegistrationId, default);
+        Assert.Equal(403, Assert.IsType<ObjectResult>(await Send("alice")).StatusCode);
+    }
+
+    [Fact]
+    public async Task OutcomeLookupReturnsTheOriginalReceiptForReconciliationWithoutReplaying()
+    {
+        var epoch = await Create();
+        var sync = new SyncService(documents);
+        var receipt = (await sync.SubmitAsync(member, Operation(epoch, 1, "Private task text"), default)).Receipt!;
+        var page = await sync.OutcomesAsync(member, workspace, epoch, device, 1, 2, default);
+        Assert.Equal(1UL, page.HighWater);
+        Assert.Equal(["ACCEPTED", "NOT_SEEN"], page.Outcomes.Select(x => x.State));
+        Assert.Equal(receipt.Fingerprint, page.Outcomes[0].Fingerprint);
+        var encoded = JsonSerializer.Serialize(page, SyncJson.Options);
+        Assert.Equal(receipt, page.Outcomes[0].Receipt);
+        Assert.Equal("1", JsonDocument.Parse(encoded).RootElement.GetProperty("highWater").GetString());
+        Assert.Equal(1UL, (await documents.ReadAsync<WorkspaceState>(workspace.ToString("D"), "state", default))!.Value.Revision);
+        Assert.Equal("FORBIDDEN", (await Assert.ThrowsAsync<SyncException>(() =>
+            sync.OutcomesAsync(Guid.NewGuid(), workspace, epoch, device, 1, 2, default))).Code);
     }
 
     [Fact]

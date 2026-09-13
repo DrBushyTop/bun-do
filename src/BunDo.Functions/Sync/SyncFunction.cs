@@ -63,6 +63,9 @@ public sealed class SyncFunction(AccessTokens tokens, IServiceProvider services)
                 return Failure("REGISTRATION_RETIRED", 403);
             var member = HouseholdIdentity.Member(auth.Identity!);
             var sync = new SyncService(documents);
+            if (services.GetService<BunDo.Functions.Recovery.ISnapshotArtifacts>() is { } artifacts)
+                await new BunDo.Functions.Recovery.SnapshotService(documents, artifacts, registrations)
+                    .PruneAsync(member, workspace, epoch, ct);
             // Validate the cursor and membership before any submitted command can consume a sequence.
             await sync.PullAsync(member, workspace, epoch, cursor, [], "ACCEPTED", ct);
             await sync.AcknowledgeAsync(member, workspace, epoch, registration, acknowledged, ct);
@@ -71,7 +74,7 @@ public sealed class SyncFunction(AccessTokens tokens, IServiceProvider services)
             foreach (var operation in operations)
             {
                 // Base64 is transport framing only; the original decoded bytes define operation identity.
-                var result = await sync.SubmitAsync(member, operation, ct);
+                var result = await sync.SubmitAsync(member, operation, ct, RegistrationIdentity.Partition(auth.Identity!));
                 code = result.Code;
                 if (result.Receipt is { } receipt) receipts.Add(receipt);
                 else break;
@@ -86,6 +89,7 @@ public sealed class SyncFunction(AccessTokens tokens, IServiceProvider services)
         catch (EnvelopeException error) { return Failure(error.Code, 400); }
         catch (SyncException error) { return Failure(error.Code, error.Code == "FORBIDDEN" ? 403 :
             error.Code is "BUSY" or "CHANGE_UNAVAILABLE" ? 503 : 409); }
+        catch (BunDo.Functions.Recovery.SnapshotException error) { return Failure(error.Code, error.Code == "FORBIDDEN" ? 403 : 409); }
         catch (Exception error) when (error is JsonException or FormatException or InvalidOperationException or KeyNotFoundException)
         {
             // Storage errors are not malformed requests. Do not turn an ambiguous transaction into a terminal outcome.

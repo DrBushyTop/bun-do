@@ -48,11 +48,14 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
     val state by model.state.collectAsStateWithLifecycle()
     val problems by repository.problems.collectAsStateWithLifecycle(emptyList())
     val current by repository.workspace.collectAsStateWithLifecycle(selected)
+    val recovery by repository.recovery.collectAsStateWithLifecycle(null)
+    val canonical by repository.canonical.collectAsStateWithLifecycle(emptyMap())
     var imports by remember { mutableStateOf<List<RecoveryText>?>(null) }
     var chosen by remember { mutableStateOf(emptySet<String>()) }
     var showProblems by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
+    var reapply by remember { mutableStateOf<Pair<String, String>?>(null) }
     fun run(action: suspend () -> Unit) {
         if (busy) return
         busy = true
@@ -78,6 +81,16 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
     InboxApp(state, model, appearance, onAppearance, onAccount = onAccount, queueTitle = selected.name,
         canEdit = current?.blocked == null, queueHeader = {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+            recovery?.let { recovering ->
+                Text(stringResource(if (recovering.problem == "STORAGE_REQUIRED") R.string.shared_storage_required
+                    else if (recovering.problem != null) R.string.shared_recovery_paused else R.string.shared_rebuilding))
+                if (recovering.problem != null) {
+                    TextButton(onClick = onAccount) { Text(stringResource(R.string.shared_export_saved)) }
+                    if (recovering.problem == "STORAGE_REQUIRED") TextButton(onClick = {
+                        context.startActivity(android.content.Intent(android.provider.Settings.ACTION_INTERNAL_STORAGE_SETTINGS))
+                    }) { Text(stringResource(R.string.shared_manage_storage)) }
+                }
+            }
             if (current?.blocked != null) Text(stringResource(R.string.shared_access_lost),
                 color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 8.dp).testTag("shared-blocked"))
             Row(Modifier.fillMaxWidth()) {
@@ -97,7 +110,7 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
                     Text(stringResource(R.string.shared_review, problems.size))
                 }
             }
-            if (failed) Text(stringResource(R.string.shared_copy_failed), color = MaterialTheme.colorScheme.error)
+            if (failed) Text(stringResource(R.string.shared_action_failed), color = MaterialTheme.colorScheme.error)
         }
     })
     imports?.let { texts ->
@@ -137,17 +150,37 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
                     else -> R.string.shared_preserved_reason
                 }))
                 if (!intent.description.isNullOrEmpty()) Text(intent.description)
-                intent.receipt?.let { receipt ->
-                    JSONObject(receipt).optJSONObject("task")?.let { task ->
-                        Text(stringResource(R.string.shared_current, task.getString("title")))
-                        Text(stringResource(R.string.shared_current_description, task.nullableString("description").orEmpty()))
-                    }
+                val shared = canonical[intent.taskId]
+                if (shared != null) {
+                    val task = JSONObject(shared)
+                    Text(stringResource(R.string.shared_current, task.getString("title")))
+                    Text(stringResource(R.string.shared_current_description, task.nullableString("description").orEmpty()))
+                } else Text(stringResource(R.string.shared_missing))
+                val terminal = intent.status in listOf("REJECTED", "BLOCKED_DEPENDENCY", "QUARANTINED")
+                if (shared != null && intent.kind == "EditTask" && terminal) TextButton(
+                    enabled = !busy && current?.blocked == null && recovery == null,
+                    onClick = { reapply = intent.sequence to shared }) {
+                    Text(stringResource(R.string.shared_reapply))
                 }
-                TextButton(enabled = !busy && current?.blocked == null, onClick = { run {
+                TextButton(enabled = !busy && current?.blocked == null && terminal, onClick = { run {
                     repository.copyText(intent.title, intent.description.orEmpty())
                     showProblems = false
                     SharedSyncWorker.request(context, data)
                 } }) { Text(stringResource(R.string.shared_copy_new)) }
+                if (terminal) TextButton(enabled = !busy, onClick = { run { repository.dismiss(intent.sequence) } }) {
+                    Text(stringResource(R.string.shared_dismiss))
+                }
             }
         } }, confirmButton = { TextButton(onClick = { showProblems = false }, enabled = !busy) { Text(stringResource(R.string.back)) } })
+    reapply?.let { confirmation ->
+        AlertDialog(onDismissRequest = { if (!busy) reapply = null },
+            title = { Text(stringResource(R.string.shared_reapply)) },
+            text = { Text(stringResource(R.string.shared_reapply_confirm, JSONObject(confirmation.second).getString("title"))) },
+            confirmButton = { TextButton(enabled = !busy, onClick = { run {
+                repository.reapply(confirmation.first, confirmation.second)
+                reapply = null
+                SharedSyncWorker.request(context, data)
+            } }) { Text(stringResource(R.string.shared_reapply)) } },
+            dismissButton = { TextButton(enabled = !busy, onClick = { reapply = null }) { Text(stringResource(R.string.back)) } })
+    }
 }

@@ -12,6 +12,32 @@ namespace BunDo.Functions.Sync;
 /// <summary>Adapts authenticated transport and point storage to the sole domain command handler.</summary>
 public sealed class SyncService(IHouseholdDocuments documents)
 {
+    public async Task<OutcomePage> OutcomesAsync(Guid member, Guid workspace, Guid epoch, Guid registration,
+        ulong first, int count, CancellationToken ct)
+    {
+        if (!WorkspaceServer.ValidOutcomeRange(first, count)) throw new SyncException("INVALID_RANGE");
+        var stored = await Metadata(member, workspace, epoch, ct);
+        var partition = workspace.ToString("D");
+        var device = (await documents.ReadAsync<DeviceRegistration>(partition,
+            WorkspaceCommit.DeviceId(registration), ct))?.Value
+            ?? stored.Value.Devices.GetValueOrDefault(registration) ?? new(registration, member);
+        if (device.MemberId != member) throw new SyncException("FORBIDDEN");
+        var receipts = ImmutableDictionary<string, OperationReceipt>.Empty;
+        for (var offset = 0; offset < count; offset++)
+        {
+            var sequence = first + (ulong)offset;
+            if (sequence > device.LastTerminalSequence) break;
+            var id = $"{registration:D}:{sequence}";
+            var receipt = (await documents.ReadAsync<OperationReceipt>(partition,
+                WorkspaceCommit.ReceiptId(id), ct))?.Value ?? stored.Value.Receipts.GetValueOrDefault(id);
+            if (receipt is not null) receipts = receipts.Add(id, receipt);
+        }
+        return new WorkspaceServer(new StagedStore(stored.Value with {
+            Devices = ImmutableDictionary<Guid, DeviceRegistration>.Empty.Add(registration, device),
+            Receipts = receipts,
+        })).Outcomes(member, epoch, registration, first, count);
+    }
+
     public async Task AcknowledgeAsync(Guid member, Guid workspace, Guid epoch, Guid registration, ulong through, CancellationToken ct)
     {
         if (through == 0) return;
@@ -33,7 +59,8 @@ public sealed class SyncService(IHouseholdDocuments documents)
         throw new SyncException("BUSY");
     }
 
-    public async Task<SubmissionResult> SubmitAsync(Guid member, FrozenOperation operation, CancellationToken ct)
+    public async Task<SubmissionResult> SubmitAsync(Guid member, FrozenOperation operation, CancellationToken ct,
+        string? registryPartition = null)
     {
         for (var attempt = 0; attempt < 5; attempt++)
         {
@@ -46,6 +73,7 @@ public sealed class SyncService(IHouseholdDocuments documents)
                 WorkspaceCommit.DeviceId(operation.DeviceId), ct))?.Value
                 ?? metadata.Devices.GetValueOrDefault(operation.DeviceId)
                 ?? new DeviceRegistration(operation.DeviceId, member);
+            if (registryPartition is not null) device = device with { RegistryPartition = registryPartition };
             var receipts = ImmutableDictionary<string, OperationReceipt>.Empty;
             foreach (var sequence in operation.Dependencies.Append(operation.Sequence).Distinct())
             {
@@ -90,6 +118,7 @@ public sealed class SyncService(IHouseholdDocuments documents)
             state = next;
         }
         var position = cursor is null ? new CursorPosition(0, 0) : SyncCursor.Read(state, cursor);
+        if (position.After < state.PrunedThrough) throw new SyncException("SNAPSHOT_REQUIRED");
         var target = position.Target == 0 ? state.Revision : position.Target;
         if (position.After > target || target > state.Revision) throw new SyncException("INVALID_CURSOR");
         var groups = new List<SyncGroup>();
@@ -175,8 +204,11 @@ public static class SyncJson
     }
     private sealed class DecimalVersionConverter : JsonConverter<ulong>
     {
-        public override ulong Read(ref Utf8JsonReader reader, Type type, JsonSerializerOptions options) =>
-            throw new NotSupportedException("Use the strict envelope parser for untrusted versions.");
+        public override ulong Read(ref Utf8JsonReader reader, Type type, JsonSerializerOptions options)
+        {
+            using var document = JsonDocument.ParseValue(ref reader);
+            return OperationEnvelope.Decimal(document.RootElement);
+        }
         public override void Write(Utf8JsonWriter writer, ulong value, JsonSerializerOptions options) =>
             writer.WriteStringValue(value.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }

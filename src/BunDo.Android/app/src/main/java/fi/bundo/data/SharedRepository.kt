@@ -21,6 +21,45 @@ class SharedRepository(
     override val drafts = dao.drafts(scope).map { rows -> rows.map { EditorDraft(it.key, it.title, it.description, it.savedAt) } }
     val workspace = dao.observeWorkspace(scope)
     val problems = dao.problems(scope)
+    val recovery = dao.observeRecovery(scope)
+    val canonical = dao.observeBase(scope).map { rows -> rows.associate { it.id to it.snapshot } }
+
+    /** Only terminal variants can be dismissed. Pending identities must still obtain their outcome. */
+    suspend fun dismiss(sequence: String) = lease.access {
+        database.withTransaction {
+            current()
+            val intent = checkNotNull(dao.intents(scope).find { it.sequence == sequence })
+            check(intent.status in listOf("REJECTED", "BLOCKED_DEPENDENCY", "QUARANTINED"))
+            dao.saveIntent(intent.copy(status = "DISMISSED"))
+        }
+    }
+
+    /** Confirmation is bound to the exact canonical state displayed, not a receipt's old conflict value. */
+    suspend fun reapply(sequence: String, displayed: String) = lease.access {
+        database.withTransaction {
+            val state = current()
+            check(state.blocked == null && dao.recoveryState(scope) == null)
+            val intents = dao.intents(scope)
+            val retained = checkNotNull(intents.find { it.sequence == sequence })
+            check(retained.status in listOf("REJECTED", "BLOCKED_DEPENDENCY", "QUARANTINED"))
+            check(retained.kind == "EditTask")
+            check(intents.none { it.taskId == retained.taskId && it.status in listOf("PENDING", "SUBMITTED") })
+            val task = JSONObject(checkNotNull(dao.baseTask(scope, state.baseGeneration, retained.taskId)).snapshot)
+            check(sameJson(task, JSONObject(displayed)))
+            val next = state.nextSequence.toULong()
+            check(next < ULong.MAX_VALUE)
+            val intent = SharedIntent(scope, next.toString(), retained.taskId, "EditTask",
+                if (retained.titleChanged) retained.title else task.getString("title"),
+                if (retained.descriptionChanged) retained.description else task.nullableString("description"),
+                retained.titleChanged, retained.descriptionChanged, task.human("title"), task.human("description"),
+                task.decimal("deletionVersion").toString(), null, SharedProtocol.context())
+            dao.saveIntent(intent)
+            dao.saveIntent(retained.copy(status = "DISMISSED"))
+            dao.saveWorkspace(state.copy(nextSequence = (next + 1u).toString(), journalVersion = state.journalVersion + 1))
+            rebuild(state)
+            lease.check()
+        }
+    }
 
     private suspend fun current(): SharedWorkspace = checkNotNull(dao.workspace(scope)).also {
         lease.check()
@@ -93,9 +132,15 @@ class SharedRepository(
                 descriptionAfterSequence = basis?.nullableString("descriptionAfterSequence"),
                 deletionAfterSequence = basis?.nullableString("deletionAfterSequence"))
             dao.saveIntent(intent)
-            dao.saveWorkspace(state.copy(nextSequence = (sequence + 1u).toString()))
+            dao.saveWorkspace(state.copy(nextSequence = (sequence + 1u).toString(), journalVersion = state.journalVersion + 1))
             if (removeDraft) dao.deleteDraft(scope, draft.key)
-            rebuild(state)
+            if (dao.recoveryState(scope) == null) rebuild(state)
+            else {
+                val visible = if (creating) SharedProtocol.optimistic(intent)
+                    else JSONObject(checkNotNull(dao.task(scope, id)).snapshot)
+                        .put("title", draft.title).put("description", draft.description)
+                dao.saveProjection(SharedProjection(scope, id, visible.toString(), state.projectionGeneration))
+            }
             lease.check()
             id
         }
@@ -112,6 +157,7 @@ class SharedRepository(
                 return@withTransaction null
             val intents = dao.intents(scope)
             var next = intents.firstOrNull { it.status in listOf("PENDING", "SUBMITTED") }
+            if (dao.recoveryState(scope) != null) next = null
             if (next != null && next.frozen == null) {
                 val receipts = intents.filter { it.receipt != null }.associate { it.sequence to JSONObject(it.receipt!!) }
                 if (SharedProtocol.dependencies(next).all { it in receipts }) {
@@ -156,6 +202,7 @@ class SharedRepository(
             }
             if (reason == "FORBIDDEN") {
                 dao.clearBase(scope)
+                dao.deleteRecovery(scope)
                 // Draft baselines can include remote values, while their edited text remains recoverable.
                 for (draft in dao.allDrafts().filter { it.scope == scope }) {
                     val original = draft.basis?.let(::JSONObject)?.getJSONObject("task")
@@ -202,7 +249,7 @@ class SharedRepository(
                     SharedProtocol.validateTask(task, expected + 1u)
                     val id = task.getString("id")
                     require(id == ids.getString(t) && seen.add(id))
-                    dao.saveBase(SharedBase(scope, id, task.toString()))
+                    dao.saveBase(SharedBase(scope, id, task.toString(), state.baseGeneration))
                 }
                 expected++
             }
@@ -233,7 +280,7 @@ class SharedRepository(
             val updated = dao.intents(scope)
             for (intent in updated.filter { it.status == "ACCEPTED" }) {
                 val receipt = JSONObject(checkNotNull(intent.receipt))
-                if (receipt.decimal("effectRevision") <= through)
+                if (receipt.decimal("effectRevision") <= through && receipt.decimal("effectRevision") > state.snapshotRevision.toULong())
                     require(SharedProtocol.containsEffect(base[intent.taskId], receipt.getJSONObject("task")))
             }
             var acknowledged = state.acknowledged.toULong()
@@ -253,10 +300,12 @@ class SharedRepository(
     }
 
     private suspend fun rebuild(state: SharedWorkspace) {
-        val projected = dao.base(scope).associate { it.id to JSONObject(it.snapshot) }.toMutableMap()
+        val rebuilding = dao.recoveryState(scope) != null
+        val projected = dao.generationBase(scope, if (rebuilding) state.projectionGeneration else state.baseGeneration)
+            .associate { it.id to JSONObject(it.snapshot) }.toMutableMap()
         val intents = dao.intents(scope)
         for (intent in intents) {
-            if (intent.status in listOf("REJECTED", "BLOCKED_DEPENDENCY", "QUARANTINED")) continue
+            if (intent.status in listOf("REJECTED", "BLOCKED_DEPENDENCY", "QUARANTINED", "DISMISSED")) continue
             if (intent.receipt != null && JSONObject(intent.receipt).decimal("effectRevision") <= state.revision.toULong()) continue
             var task = projected[intent.taskId]
             var problem: String? = null
@@ -280,7 +329,8 @@ class SharedRepository(
             }
             if (intent.problem != problem) dao.saveIntent(intent.copy(problem = problem))
         }
-        dao.clearProjection(scope)
-        if (state.blocked == null) for ((id, task) in projected) dao.saveProjection(SharedProjection(scope, id, task.toString()))
+        dao.clearProjectionGeneration(scope, state.projectionGeneration)
+        if (state.blocked == null) for ((id, task) in projected)
+            dao.saveProjection(SharedProjection(scope, id, task.toString(), state.projectionGeneration))
     }
 }

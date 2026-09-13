@@ -7,6 +7,33 @@ namespace BunDo.Domain;
 public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timeProvider = null)
 {
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
+
+    public OutcomePage Outcomes(Guid member, Guid epoch, Guid deviceId, ulong first, int count)
+    {
+        var state = store.Read();
+        OutcomePage Failure(string code) => new(code, state.WorkspaceId, state.StateEpoch, deviceId, 0, []);
+        if (!state.Membership.CanRead(member)) return Failure("FORBIDDEN");
+        if (state.StateEpoch != epoch) return Failure("EPOCH_CHANGED");
+        if (!state.Devices.TryGetValue(deviceId, out var device)) return Failure("DEVICE_UNKNOWN");
+        if (device.MemberId != member) return Failure("FORBIDDEN");
+        if (!ValidOutcomeRange(first, count)) return Failure("INVALID_RANGE");
+        var outcomes = new List<SequenceOutcome>();
+        for (var offset = 0; offset < count; offset++)
+        {
+            var sequence = first + (ulong)offset;
+            if (sequence > device.LastTerminalSequence)
+                outcomes.Add(new(sequence, "NOT_SEEN"));
+            else if (state.Receipts.TryGetValue($"{deviceId:D}:{sequence}", out var receipt))
+                outcomes.Add(new(sequence, receipt.Accepted ? "ACCEPTED" : "REJECTED",
+                    receipt.Fingerprint, receipt.EffectRevision, receipt.Code, receipt));
+            else outcomes.Add(new(sequence, "OUTCOME_EXPIRED"));
+        }
+        return new("ACCEPTED", state.WorkspaceId, epoch, deviceId, device.LastTerminalSequence, outcomes);
+    }
+
+    public static bool ValidOutcomeRange(ulong first, int count) =>
+        first != 0 && count is >= 1 and <= 100 && first <= ulong.MaxValue - (ulong)(count - 1);
+
     public SubmissionResult Handle(Guid authenticatedMemberId, FrozenOperation operation)
     {
         for (var attempt = 0; attempt < 5; attempt++)
@@ -89,7 +116,7 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
                 }
             }
             var receipt = new OperationReceipt(operation.OperationId, operation.Fingerprint, code, revision,
-                task);
+                task, clock.GetUtcNow());
             var next = state with
             {
                 Revision = revision,
@@ -98,7 +125,7 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
                 Receipts = state.Receipts.Add(operation.OperationId, receipt),
                 Devices = state.Devices.SetItem(operation.DeviceId,
                     state.Devices[operation.DeviceId] with { LastTerminalSequence = operation.Sequence }),
-                Changes = state.Changes.Add(new(revision, changed is not null ? [changed] : []))
+                Changes = state.Changes.Add(new(revision, changed is not null ? [changed] : [], clock.GetUtcNow(), operation.OperationId))
             };
             if (store.TryCommit(state.Revision, next)) return new(code, receipt);
         }
@@ -119,7 +146,7 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
             var next = state with {
                 Revision = revision,
                 Membership = decision.State,
-                Changes = state.Changes.Add(new(revision, [])),
+                Changes = state.Changes.Add(new(revision, [], clock.GetUtcNow())),
             };
             if (store.TryCommit(state.Revision, next)) return new(decision.Code, decision.Invitation);
         }
@@ -148,3 +175,7 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
 }
 
 public sealed record MembershipResult(string Code, HouseholdInvitation? Invitation = null);
+public sealed record SequenceOutcome(ulong Sequence, string State, string? Fingerprint = null,
+    ulong? EffectRevision = null, string? Code = null, OperationReceipt? Receipt = null);
+public sealed record OutcomePage(string Code, Guid WorkspaceId, Guid StateEpoch, Guid DeviceId, ulong HighWater,
+    IReadOnlyList<SequenceOutcome> Outcomes);
