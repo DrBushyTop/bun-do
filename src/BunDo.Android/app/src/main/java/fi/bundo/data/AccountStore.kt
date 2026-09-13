@@ -89,6 +89,7 @@ class AccountData internal constructor(
 
 /** One active account. Opening any retained account requires a newly API-validated identity. */
 class AccountStore(private val context: Context, private val name: String = "accounts") {
+    val legacyAudio by lazy { LegacyRecordingRecovery(context, name) }
     private val transitions = Mutex()
     private val activationGate = Any()
     private var retiring: AccountData? = null

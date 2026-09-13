@@ -84,7 +84,49 @@ class RecordingStore(
 
     suspend fun prune(now: Long = System.currentTimeMillis()) = lease.access { pruneUnsafe(now) }
     private suspend fun pruneUnsafe(now: Long) {
+        directory.listFiles()?.filter { it.isDirectory && it.name.matches(Regex("\\.import-[a-f0-9-]{36}")) }
+            ?.forEach { check(it.deleteRecursively()) { "Interrupted import cleanup failed" } }
         dao.all().filter { it.expiresAt <= now }.forEach { deleteUnsafe(it.id) }
+    }
+
+    /** Explicit migration copy, with a stable local ID so a lost response cannot duplicate a transcript. */
+    @SuppressLint("UsableSpace")
+    suspend fun importLegacy(id: String, createdAt: Long, expiresAt: Long, pcm: ByteArray) = lease.access {
+        val target = audio(id)
+        val now = System.currentTimeMillis()
+        require(pcm.size.toLong() in 2..MAX_AUDIO_BYTES && pcm.size % 2 == 0)
+        require(expiresAt > now && expiresAt <= createdAt + RETAIN_MILLIS)
+        if (database.inbox().task("voice-$id") != null) return@access
+        val previous = dao.get(id)
+        if (previous != null) {
+            check(previous.createdAt == createdAt && previous.expiresAt == expiresAt)
+            check(readAudio(id).contentEquals(pcm))
+            return@access
+        }
+        pruneUnsafe(now)
+        if (dao.all().size >= MAX_RECORDINGS ||
+            directory.listFiles().orEmpty().sumOf { it.length() } + pcm.size * 2L > MAX_RETAINED_BYTES ||
+            directory.usableSpace < pcm.size * 2L + 8 * 1024 * 1024) throw RecordingStorageFull()
+        val staging = File(directory, ".import-$id").apply { mkdirs() }
+        val temporary = File(staging, "$id.pcm")
+        try {
+            AccountAudio.output(temporary, encryptionKey, lease).use { output ->
+                var offset = 0
+                while (offset < pcm.size) {
+                    val count = minOf(8192, pcm.size - offset)
+                    output.write(pcm, offset, count)
+                    offset += count
+                }
+            }
+            lease.check()
+            java.nio.file.Files.move(temporary.toPath(), target.toPath(),
+                java.nio.file.StandardCopyOption.ATOMIC_MOVE, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            database.withTransaction {
+                lease.check()
+                dao.insert(VoiceRecording(id, createdAt, expiresAt, "FAILED", "INTERRUPTED"))
+                lease.check()
+            }
+        } finally { staging.deleteRecursively() }
     }
 
     suspend fun available(id: String): Boolean = lease.access {

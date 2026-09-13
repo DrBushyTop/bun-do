@@ -9,6 +9,7 @@ import androidx.core.content.edit
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.key
@@ -54,8 +55,8 @@ class MainActivity : AppCompatActivity() {
         val accounts = (application as BunDoApplication).accounts
         setContent {
             val account by accounts.active.collectAsStateWithLifecycle()
-            var showAccount by remember { mutableStateOf(invitation != null) }
-            var showHouseholds by remember { mutableStateOf(invitation != null) }
+            var showAccount by rememberSaveable { mutableStateOf(invitation != null) }
+            var showHouseholds by rememberSaveable { mutableStateOf(invitation != null) }
             androidx.compose.runtime.LaunchedEffect(invitation) {
                 if (invitation != null) { showAccount = true; showHouseholds = true }
             }

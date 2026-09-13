@@ -1,0 +1,13 @@
+<resources>
+    <string name="legacy_audio_title">Recordings from before the update</string>
+    <string name="legacy_audio_explanation">These recordings were saved before sign-in was added. Recover a recording to continue working with it. It will not be added to a household automatically.</string>
+    <string name="legacy_audio_recover">Recover recording</string>
+    <string name="legacy_audio_failed">The action did not finish. Try again.</string>
+    <string name="legacy_audio_unreadable">The audio file is missing or unreadable. You can delete this entry.</string>
+    <plurals name="legacy_audio_expired">
+        <item quantity="one">%1$d older recording was removed after its seven-day retention period.</item>
+        <item quantity="other">%1$d older recordings were removed after their seven-day retention period.</item>
+    </plurals>
+    <string name="legacy_audio_acknowledge">Got it</string>
+    <string name="legacy_audio_delete_confirm">Permanently delete this recording? Export it first if you want to keep it.</string>
+</resources>

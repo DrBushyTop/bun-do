@@ -1,0 +1,13 @@
+<resources>
+    <string name="legacy_audio_title">Äänitteet ennen päivitystä</string>
+    <string name="legacy_audio_explanation">Nämä äänitteet tallennettiin ennen kirjautumisen käyttöönottoa. Palauta haluamasi äänite jatkaaksesi sen käsittelyä. Sitä ei lisätä talouteen automaattisesti.</string>
+    <string name="legacy_audio_recover">Palauta äänite</string>
+    <string name="legacy_audio_failed">Toiminto ei onnistunut. Yritä uudelleen.</string>
+    <string name="legacy_audio_unreadable">Äänitiedosto puuttuu tai sitä ei voida lukea. Voit poistaa tämän merkinnän.</string>
+    <plurals name="legacy_audio_expired">
+        <item quantity="one">%1$d aiempi äänite poistettiin seitsemän päivän säilytysajan päätyttyä.</item>
+        <item quantity="other">%1$d aiempaa äänitettä poistettiin seitsemän päivän säilytysajan päätyttyä.</item>
+    </plurals>
+    <string name="legacy_audio_acknowledge">Selvä</string>
+    <string name="legacy_audio_delete_confirm">Poistetaanko tämä äänite pysyvästi? Vie se ensin tiedostoksi, jos haluat säilyttää sen.</string>
+</resources>

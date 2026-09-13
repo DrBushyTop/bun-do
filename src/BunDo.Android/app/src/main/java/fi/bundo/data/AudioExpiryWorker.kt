@@ -13,6 +13,7 @@ class AudioExpiryWorker(context: Context, params: WorkerParameters) : CoroutineW
             ?: return Result.success()
         return try {
             account.recordings.prune()
+            accounts.legacyAudio.preview(account)
             Result.success()
         } catch (_: kotlinx.coroutines.CancellationException) {
             Result.success()

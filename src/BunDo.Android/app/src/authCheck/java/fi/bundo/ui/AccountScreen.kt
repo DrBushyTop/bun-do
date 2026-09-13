@@ -119,6 +119,9 @@ fun AccountScreen(accounts: AccountStore, model: SignInModel, onHouseholds: () -
                 modifier = Modifier.fillMaxWidth().testTag("account-households")) {
                 Text(stringResource(R.string.households_title))
             }
+            if (current != null) key(current.lease.generation) {
+                LegacyRecordingsSection(accounts, current, onClose)
+            }
             Text(stringResource(R.string.account_local_notice))
             if (accounts.unexpectedFiles) Text(stringResource(R.string.account_installation_reset),
                 color = MaterialTheme.colorScheme.error)
