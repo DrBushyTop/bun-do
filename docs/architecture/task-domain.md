@@ -26,6 +26,16 @@ Root and checklist-item orders are separate bounded lists. Keep the established 
 
 Remove the moving task before resolving live anchors in its list. A surviving after-anchor wins, including when the anchors are inverted. Otherwise use a surviving before-anchor, or append if neither survives. Self-anchors are invalid. Active root order contains OPEN roots; completion/cancellation removes a root and reopening appends it. Keep placement separate from each task's intentional-move version.
 
+New captures append by default. The owner retained an exception for explicit
+urgency or a near due date, with placement explained before saving. The visual
+study proposes overdue/today/tomorrow as the date-only threshold. Resolve that
+threshold in the household time zone when implementing the details slice.
+Place exceptional captures after the leading urgent/soon-due tasks and before
+the first ordinary task, without rearranging existing tasks. Use the existing
+anchor semantics for synchronized placement, not a continually sorted queue.
+Human moves remain authoritative. Editing dates, a clock boundary or late AI
+cleanup must not silently change placement.
+
 ## Delete and restore
 
 Delete hides a leaf or a checklist with its currently non-deleted items, using one deletion group. Already-deleted items keep their own groups. Clear claims and recompute checklist completion atomically. Guard a root cascade with its observed subtree version.
@@ -37,3 +47,13 @@ Keep the retention, purge safety and non-resurrection rules implemented by [stal
 ## Details
 
 V1 has title, description, original capture text, due and snooze. Separate shared notes and areas are [deferred](https://github.com/DrBushyTop/bun-do/issues/47). Tags, effort scores and attachments remain outside v1. [Dates and progress](dates-recurrence-progress.md) define simple repeats and completion counting.
+
+V1 also retains an explicit urgent flag and visible creation/change attribution.
+Creation actor and captured creation time are immutable. Anonymous capture must
+not invent an authenticated creator when imported. Last-change attribution
+covers persisted edits, claims, lifecycle and intentional ordering, not reads,
+sync retries or rendering. Canonical accepted changes use the authenticated
+actor and server acceptance time; pending local changes show their provisional
+device time separately. Label system/AI changes rather than inventing a human
+editor. Restore preserves creation attribution and records the restoring actor.
+The details slice owns persistence, replay/snapshot coverage and UI projection.

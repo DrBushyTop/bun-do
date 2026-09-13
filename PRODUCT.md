@@ -38,9 +38,14 @@ Audio sent online goes through the authenticated backend and stays out of logs a
 
 Bun Do means "the way of the bun." Preserve the owner-approved original rabbit salute in `assets/brand/`, including its defined nose and the same drawing at small sizes. Its humor is quiet and dignified. Use Impeccable with native Android guidance for UI work.
 
+The owner selected the September 13 household browser study as the visual
+direction for native v1. Follow the [visual handoff](docs/design/household-visual-reference.md).
+Keep the compact queue, illustrated claimants and quiet action feedback.
+This does not add a production web client or editable profiles to v1.
+
 ## Evidence on hand
 
-GitHub contains slice completion and rendered verification evidence. The owner approved the rabbit artwork, not every future rendered screen. The target phones are vivo X300 Ultra and OnePlus 13; agents verify functional behavior on two Android emulator profiles. The separate phone benchmark was skipped and physical-device performance remains unmeasured.
+GitHub contains slice completion and rendered verification evidence. The owner approved the rabbit artwork and selected the household visual direction, not every future rendered screen. The browser study does not establish native accessibility or production behavior. The target phones are vivo X300 Ultra and OnePlus 13; agents verify functional behavior on two Android emulator profiles. The separate phone benchmark was skipped and physical-device performance remains unmeasured.
 
 ## Product principles
 
@@ -52,4 +57,4 @@ GitHub contains slice completion and rendered verification evidence. The owner a
 
 ## Accessibility and inclusion
 
-Keep typing available without microphone permission or a speech model. Provide complete Finnish/English copy and accessibility labels, large-text layouts, sufficient contrast, accessible reorder controls and reduced motion. Review actual Android screens for each implemented flow.
+Keep typing available without microphone permission or a speech model. Provide complete Finnish/English copy and accessibility labels, large-text layouts, sufficient contrast, accessible reorder controls and reduced motion. The owner chose light-only presentation for illustrated V1; preserve existing dark-theme code for later adaptation. Review actual Android screens for each implemented flow.

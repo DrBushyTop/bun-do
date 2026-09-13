@@ -86,13 +86,13 @@ components:
 ---
 # Bun Do design direction
 
-Status: the anonymous Android capture/edit shell now includes offline voice capture and recording recovery. The direction below applies to the reduced v1 scope in shared-task-manager-architecture-v1.md; owning issues track implemented flows. The owner-approved salute and its vector assets remain unchanged in `assets/brand/`. The frontmatter extracts the shell's Compose tokens; `.impeccable/design.json` records their extensions. Neither artifact claims owner approval of the rendered UI.
+Status: the direction below applies to the reduced v1 scope in shared-task-manager-architecture-v1.md; owning issues track implemented flows. On September 13, 2026, the owner selected the [household visual study](docs/design/household-visual-reference.md) for native v1 adoption. This approves a direction, not a completed Android rendering. The owner-approved salute and its vector assets remain unchanged in `assets/brand/`. The frontmatter extracts the shell's Compose tokens; `.impeccable/design.json` records their extensions.
 
 ## Identity
 
-Bun Do means "the way of the bun." Bun is a bunny. Choose an orderly household notebook expressed through native Material 3 lists, with evergreen controls and a small, solemn martial-arts rabbit. People use this in kitchens, on errands, and in bed. Follow system light/dark appearance, with a settings override.
+Bun Do means "the way of the bun." Bun is a bunny. Choose an orderly household notebook expressed through native Material 3 lists, with evergreen controls and a small, solemn martial-arts rabbit. People use this in kitchens, on errands, and in bed. The owner chose light-only presentation for illustrated V1 on September 13, 2026. Do not expose a theme switch in this direction. Preserve existing dark-theme implementation and the target palette below for later adaptation.
 
-The palette is restrained. Brand appears in the launcher, welcome, empty queue, and optional completion bow. Keep ordinary task actions literal. No belts, scores, or rankings for members.
+The palette is restrained. Brand appears in the launcher, welcome, compact app bar, empty queue and optional action feedback. The selected study adds fixed koala/bunny claimant illustrations and task-icon accents, without redundant category names. Keep ordinary task actions literal. No belts, scores, or rankings for members.
 
 Use the approved refined salute in `assets/brand/bun-do-evergreen.svg`. The small upright rabbit faces right, with one outward-curved ear, a defined nose, a calm eye, joined forepaws, planted feet and a tied belt. The owner preferred this refined drawing over the compact variant and found it recognizable at 24 pixels. Preserve the same drawing, including nose, eye and knot, at every size. The SVG has a nominal 48-pixel size and a 1024-unit view box.
 
@@ -134,9 +134,9 @@ Spacing steps are 4, 8, 12, 16, 24, 32 dp. Screen gutters are 16 dp on compact w
 
 Rows grow with content and font scale. Queue titles allow three lines and then ellipsis; detail exposes the full title. Wrap metadata instead of shrinking it. Semantic labels name task, state, and action. Color never carries status alone. Native focus, pressed, disabled, loading, error, and selected states apply to every control. A disabled action explains its reason nearby.
 
-Use 200 ms state transitions and 150 ms fades. The completion bow is on by default, can be disabled in Settings, and lasts 240 ms once after the local write succeeds. Respect system animation settings with immediate transitions and a static mark. No celebratory screen blocks continued work.
+Use 200 ms state transitions and 150 ms fades. The selected study extends the single completion bow to short bow, hop and checkmark-stamp variants, plus claim and filing feedback. These optional effects finish within 420 ms after the local write succeeds. A claimed-task working pose makes two pencil strokes within 900 ms, then remains static rather than looping. Settings can disable them; system reduced motion always overrides the app preference. Keep a static confirmation and immediate Undo. No celebratory screen blocks continued work.
 
-Release review must use native emulator/device captures, both themes, Finnish and English, font scales 1.0, 1.3, and 2.0, TalkBack, and contrast checks. Use two Android emulator profiles on this Mac for gestures, voice fixtures, interruptions and functional tests. The vivo X300 Ultra and OnePlus 13 remain target phones, but their performance and Finnish recognition quality are unmeasured owner-accepted assumptions; the skipped benchmark is not a hidden release gate. Impeccable's HTML/CSS detector does not validate Compose. Build fully, inspect once, batch corrections, then confirm once before the skill's independent finish review. Validate the approved logo's Android integration and finalize the UI token sidecar from that evidence.
+Release review must use native emulator/device captures of the light-only V1 interface, Finnish and English, font scales 1.0, 1.3, and 2.0, TalkBack, and contrast checks. Use two Android emulator profiles on this Mac for gestures, voice fixtures, interruptions and functional tests. The vivo X300 Ultra and OnePlus 13 remain target phones, but their performance and Finnish recognition quality are unmeasured owner-accepted assumptions; the skipped benchmark is not a hidden release gate. Impeccable's HTML/CSS detector does not validate Compose. Build fully, inspect once, batch corrections, then confirm once before the skill's independent finish review. Validate the approved logo's Android integration and finalize the UI token sidecar from that evidence.
 
 ## Implemented shell
 

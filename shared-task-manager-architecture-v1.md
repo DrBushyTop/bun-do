@@ -8,8 +8,9 @@ Two people can speak or type a household task, turn it into actionable work, sha
 
 ## V1
 
-- Shared queue with any available task selectable, claim/unclaim, complete/reopen/cancel, and accessible reordering.
+- Shared queue with any available task selectable, claim/unclaim, complete/reopen/cancel, and accessible reordering. New tasks normally join the end. Explicitly urgent or soon-due captures can start near the front, with placement explained before saving. Existing tasks never silently reshuffle.
 - Typed capture and editable title/description. Preserve original captured text separately.
+- Task detail shows creator, creation time, last modifier and modification time. Keep creation attribution through edits and distinguish pending local changes from accepted shared changes.
 - MAI transcription online through the authenticated backend, installed Parakeet offline, and typing when either speech path is unavailable. Preserve unsuccessful recordings for retry/export/delete under the existing local storage policy.
 - Cloud cleanup using one configured model. Preserve human corrections, interpret relative dates at capture time and ask before applying ambiguous dates.
 - Manual and AI splitting into a root with direct checklist items. Preview AI output and commit accepted children atomically.
@@ -18,7 +19,7 @@ Two people can speak or type a household task, turn it into actionable work, sha
 - Existing Microsoft sign-in, household joining and ownership controls, account isolation, offline persistence and typed sync.
 - The full [stale-client recovery slice](https://github.com/DrBushyTop/bun-do/issues/21), including snapshot artifacts, pruning coordination, device expiry and explicit old-epoch recovery. The owner retained this in-progress work in v1.
 - Recent shared activity, weekly/monthly first-completion counts, lifetime milestones and a simple weekly streak. Use server acceptance dates, without member rankings, penalties or historical clearance reconstruction.
-- Native Android UI, Finnish/English copy, accessibility and the approved rabbit identity. Remove technical clutter while building each flow.
+- Native Android UI, Finnish/English copy, accessibility and the approved rabbit identity. The illustrated release is light-only; dark-mode adaptation is deferred without deleting existing theme code. Adopt the owner's selected [household visual reference](docs/design/household-visual-reference.md), including compact navigation, illustrated claimants, quiet action animation variants and shared progress charts. Remove technical clutter while building each flow.
 - Safe migrations for data actually in use, existing backups, a documented manual recovery procedure and focused two-device release verification.
 
 ## V2

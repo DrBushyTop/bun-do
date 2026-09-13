@@ -10,11 +10,26 @@ Queue rows show title, claimant and relevant due/snooze state. Checklist roots s
 
 Voice is the primary capture action and Type is adjacent. Reorder by long-press drag or accessible move actions; never require dragging. Reconciliation must not steal focus or move a row while the user is acting on it.
 
+Adopt the [selected household visual reference](household-visual-reference.md)
+in native v1. Reorder mode exposes handles and move actions on the full queue;
+it does not compete with completion swipes. Illustrated category cues need no
+repeated category label. Claimant names accompany static working poses, with
+only brief optional motion.
+
+New tasks normally join the end. Capture explains any urgent/soon-due placement
+exception before saving and confirms where the task went. Editing or a date
+becoming closer does not silently move existing work.
+
 ## Capture and task work
 
 Recording shows elapsed time, recording state, Stop, Cancel and Type. Request microphone permission when needed. Prefer MAI online and installed Parakeet offline; explain a failure without exposing provider mechanics. Keep retry/export/delete for retained unsuccessful recordings. Commit transcript/task before cleaning up audio. Later cleanup never blocks editing or completion.
 
 Typed capture starts with one text field. Description and due editing remain available without requiring a metadata form. Save commits locally and Back preserves a draft. Task detail puts title, claim/completion, description and checklist first, followed by scheduling and collapsed original text/attribution.
+
+Creation and last-change attribution are directly discoverable in detail,
+with actor names and exact localized timestamps. Only original capture text
+needs disclosure. Pending local modification times must not masquerade as
+server-accepted history. Keep this metadata quieter than the task actions.
 
 An actionable task can be completed without a claim. Roots containing items derive completion from those items. Keep Edit, Split, Snooze, Cancel, Delete and applicable Reopen/Restore actions discoverable. No separate Clarify, dependency, area or notes workflow is required in v1.
 
@@ -26,7 +41,7 @@ Due editing distinguishes date-only and timed values, with saved zone where rele
 
 Keep existing sign-in, household creation/join, matching-code invitation approval, owner transfer and member removal flows. Typing works before sign-in; importing anonymous drafts into a household is explicit. Model installation remains optional.
 
-Normal account screens show account/household identity and useful actions. Hide installation IDs, token validation, encryption internals and resolved warnings behind troubleshooting details. Settings includes language, appearance, speech storage, reminders, membership, task recovery and sign-out.
+Normal account screens show account/household identity and useful actions. Hide installation IDs, token validation, encryption internals and resolved warnings behind troubleshooting details. Settings includes language, speech storage, reminders, membership, task recovery and sign-out. The owner chose light-only illustrated V1; theme switching is deferred without deleting existing theme code.
 
 Keep the full recovery experience from [Issue 21](https://github.com/DrBushyTop/bun-do/issues/21): current shared state beside retained intent, explicit reapply/copy/dismiss, same-account export/import and interrupted/low-storage snapshot recovery. Pending text survives refresh. Claims, completion and deletion are never bulk-replayed across an expired identity or epoch. Technical state appears only when it explains a needed action.
 
@@ -42,4 +57,4 @@ Metric details explain that a root counts once, checklist items do not inflate t
 
 Check each flow during implementation, then walk the complete reduced v1 before final release verification. Remove routine technical success notices and stale warnings as screens are built. Finnish must read naturally; task content keeps its own language.
 
-Use actual emulator views in light/dark themes and large text, with TalkBack labels, adequate touch targets, system Back, insets and reduced motion. Cover empty state, permission denial, interrupted recording, account change, simultaneous claims, AI finishing after an edit, delete/undo, snapshot recovery, a weekly boundary and a late synced completion. V2 screens are not release fixtures.
+Use actual emulator views of the light-only V1 interface and large text, with TalkBack labels, adequate touch targets, system Back, insets and reduced motion. Cover empty state, permission denial, interrupted recording, account change, simultaneous claims, AI finishing after an edit, delete/undo, snapshot recovery, a weekly boundary and a late synced completion. V2 screens are not release fixtures.

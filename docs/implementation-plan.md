@@ -12,6 +12,18 @@ Completed slices remain completed. Their issue evidence is historical; revised c
 
 ## V1 slices
 
+The September 13 visual walkthrough is part of v1, not a separate web release.
+[The selected visual reference](design/household-visual-reference.md) specifies
+the native handoff. [Native interface and accessibility](https://github.com/DrBushyTop/bun-do/issues/34)
+owns its adoption. [Task details](https://github.com/DrBushyTop/bun-do/issues/24)
+also owns persisted creator/change attribution, explicit urgency and explained
+initial placement. Do not reopen completed claim/order foundations for this work.
+
+AI cleanup and AI checklist split are explicitly retained, through
+[cleanup](https://github.com/DrBushyTop/bun-do/issues/27) and
+[editable AI split previews](https://github.com/DrBushyTop/bun-do/issues/28).
+The browser's canned suggestions are not evidence that either integration ships.
+
 | Slice | Blocked by |
 | --- | --- |
 | [Accept and retry typed task commands in an executable sync model](https://github.com/DrBushyTop/bun-do/issues/15) | None |
@@ -60,6 +72,13 @@ These are deferred discovery/implementation tickets. Reassess concrete needs and
 | FCM sync hints | [Add FCM sync hints if foreground and periodic sync feel too slow](https://github.com/DrBushyTop/bun-do/issues/48) |
 | Explicit AI placement, optional escalation and worker recovery | [Evaluate optional AI placement, escalation and worker recovery](https://github.com/DrBushyTop/bun-do/issues/49) |
 | Workspace undelete, restore drills and extended compatibility | [Add workspace recovery and extended upgrade operations in V2](https://github.com/DrBushyTop/bun-do/issues/33) |
+
+## Post-core/V3 exploration
+
+[Shared Bun world and optional household quests](https://github.com/DrBushyTop/bun-do/issues/54)
+records the owner's later-stage visual exploration. Follow the
+[design and implementation sketch](design/bun-world-and-quests.md). It does not
+block V1 or commit to XP, autonomous agents or additional AI integrations.
 
 ## AI usage policy after V2
 
