@@ -20,9 +20,15 @@ GitHub decision tickets hold the resolution history. This directory holds the im
 
 ## Chosen deployment and modules
 
+Sign-in uses MSAL Android and Microsoft-hosted authentication for personal
+Microsoft accounts. The existing `huuhka.net` tenant owns the registrations. The owner's
+[identity decision](../adr/0003-use-existing-workforce-tenant-for-sign-in.md)
+replaces the original customer-tenant OTP choice. See
+[development identity setup](../identity-development.md) for registrations.
+
 Use Kotlin, Compose, Room and WorkManager on Android. Start with one app module organized by feature and pure domain packages; separate modules when a real dependency/test seam requires it. Use .NET 10 isolated Functions with one domain project and one Function host, plus tests. Do not create pass-through application/contracts/infrastructure projects solely because the original proposal sketched them.
 
-Use Aspire for local backend composition and diagnostics. Its local profiles must select emulators or explicit substitutes and must not provision Azure during startup. Bicep remains the cloud deployment source. Android emulators connect as clients. See the [Aspire setup record](../research/aspire-local-development.md) and its separate build slice.
+Use Aspire for local backend composition and diagnostics. Its local profiles must select emulators or explicit substitutes and must not provision Azure during startup. Bicep remains the cloud deployment source. Android emulators connect as clients. See [local development](../local-development.md) and its separate build slice.
 
 Bicep modules own an application responsibility, such as the workspace store,
 backend hosting or observability. Group the resources and policy that implement
@@ -37,15 +43,13 @@ route to switch later. [The storage decision](../adr/0001-cosmos-with-replaceabl
 defines the adapter's responsibilities and the behavior any replacement must
 preserve. It does not introduce a second database or generic repository framework.
 
-New infrastructure belongs to Bun Do's own resource group, `rg-bun-do-dev-swc`, through Bicep. Select Sweden Central first, a single write region, Strong Cosmos consistency, .NET 10 Flex, private Blob storage for snapshots/model artifacts, and managed identity for backend resource access. Model deployment names are `bun-do-luna` and optional `bun-do-terra`. Pin actual package, API and model versions during the first live gate. Production uses a separate resource group and non-secret parameter file.
-
-The owner authorizes new resource deployment and supplies Foundry model availability as a planning assumption. Do not mutate unrelated resources or log their credentials. Infrastructure permission is not proof of a successful deployment. The [environment inventory](../research/implementation-environment.md) gives the tools, setup path and required live checks.
+Bicep owns the dedicated development and production resource configuration. Keep deployment values in `infra/`, not this contract. The owner authorizes new resource deployment and supplies Foundry model availability as a planning assumption. Do not mutate unrelated resources or log their credentials. Infrastructure permission is not proof of a successful deployment. Use [Azure development](../azure-development.md) for the safe plan/deploy procedure and live gates.
 
 ## Known assumptions, not open architecture questions
 
 - Local Parakeet is assumed feasible on vivo X300 Ultra and OnePlus 13. The owner skipped the separate phone benchmark. Do not reopen it as a mandatory gate under another name.
 - Agents use two ARM64 Android emulator profiles on this Mac. Install the missing SDK/JDK/emulator tooling during implementation. Emulator functional evidence does not establish those phones' latency, memory use or recognition quality.
-- Azure deployment, Entra OTP/API access, strict schemas on the real model endpoint, Cosmos concurrency and restore drills are untested. They are explicit early implementation/release gates with failure handling, not completed wayfinder experiments.
+- Azure deployment, Entra sign-in/API access, strict schemas on the real model endpoint, Cosmos concurrency and restore drills are early implementation/release gates with failure handling. Check the owning slice for current evidence; the original map did not verify them.
 - DESIGN.md is an architect-selected direction, not a rendering or human approval. Implement the original rabbit mark and inspect native screens through Impeccable.
 - The owner skipped all Azure budget alerts on September 12, 2026, then deferred product AI length/rate quotas until after v1. Technical safety bounds remain required. No production data exists to migrate.
 

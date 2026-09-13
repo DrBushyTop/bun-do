@@ -94,8 +94,8 @@ ignore prerecorded-input extras; the host microphone stays disconnected, and
 the resulting transcript still needs comparison with the supplied clip.
 
 Parakeet requires the pinned model to be installed first. Model downloads are
-not part of this experiment. The actual production `LocalSpeech.transcribe`
-method processes each clip and creates a new recognizer each time.
+not part of this experiment. The runner invokes the installed app exactly as
+production capture would for a completed recording.
 
 Default instrumentation runs skip this opt-in comparison. `OK (1 test)` for the
 experiment means the runner completed, not that every recognizer succeeded.

@@ -36,7 +36,16 @@ results to the slice issue. File concrete deferred bugs with reasons, not vague 
 
 ## Local orchestration addition
 
-The owner requested Aspire after map closure. [Run the backend locally with Aspire and explicit emulator profiles](https://github.com/DrBushyTop/bun-do/issues/36) is an independent build slice and a native prerequisite for cloud sync integration. The CLI and six workflow skills are installed. The Functions health endpoint, Azurite, loopback-only listeners and request telemetry have been verified through Podman. Bicep still owns Azure deployment.
+The owner requested Aspire after map closure. [Run the backend locally with Aspire and explicit emulator profiles](https://github.com/DrBushyTop/bun-do/issues/36) is an independent build slice and a native prerequisite for cloud sync integration. Bicep still owns Azure deployment. Record slice evidence in that issue.
+
+## Identity decision
+
+The owner selected [MSAL sign-in with personal Microsoft accounts](adr/0003-use-existing-workforce-tenant-for-sign-in.md)
+on September 13, 2026. The sign-in slice now uses personal Microsoft accounts
+with Microsoft-hosted sign-in; `huuhka.net` owns the app registrations. It no longer requires a customer tenant or native
+email OTP. [Development identity setup](identity-development.md) records the
+dedicated application registrations. Account isolation and recovery requirements
+remain part of the slice.
 
 ## Speech decision and post-v1 policy
 
@@ -62,4 +71,4 @@ technical bounds, authentication and recovery while deferring product quotas.
 
 The first independent work is the executable command model, Android typed shell, and isolated Bicep deployment. Cloud-specific dependent work waits for actual live gates. None of the stages authorizes feature removal.
 
-See [implementation contracts](architecture/README.md) and [environment evidence](research/implementation-environment.md). No physical-phone benchmark is hidden in this backlog.
+See [implementation contracts](architecture/README.md), [local development](local-development.md), and [Azure development](azure-development.md). No physical-phone benchmark is hidden in this backlog.

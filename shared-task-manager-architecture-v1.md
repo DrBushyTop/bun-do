@@ -424,7 +424,7 @@ Tasks should normally be short commands, not meeting transcripts.
 
 ## 5.1 Default model strategy
 
-Public Azure documentation supports the proposed Luna/Terra model family, Responses, structured outputs, and the reasoning controls below. This is not a verified deployment in Bun Do's subscription. Record the exact deployed model/version, region, API, schema acceptance, quota, and managed-identity access before integration. [Azure platform research](docs/research/azure-platform-constraints.md) records the evidence and a version discrepancy between public tables.
+Public Azure documentation supports the proposed Luna/Terra model family, Responses, structured outputs, and the reasoning controls below. This is not a verified deployment in Bun Do's subscription. Record the exact deployed model/version, region, API, schema acceptance, quota, and managed-identity access before integration. [Azure platform constraints](docs/research/azure-platform-constraints.md) records the primary sources.
 
 Default cloud intelligence model:
 
@@ -1936,7 +1936,7 @@ When applying a mutation:
 
 Every writer must participate in this protocol, including recurrence, AI results, membership changes, and repairs. Define session-token propagation or a stronger consistency policy across Functions instances before implementing cursor reads. A revision number is not a Cosmos session token.
 
-Budget each transaction against the documented 100-operation, 2 MB, and five-second limits. Include domain items, events, receipts, change records, and sync metadata. Hierarchy, deletion, and rank-rebalance limits remain open in [Bound task hierarchy, dependencies, and ordering](https://github.com/DrBushyTop/bun-do/issues/6). See the [platform research](docs/research/azure-platform-constraints.md) for primary sources.
+Budget each transaction against the documented 100-operation, 2 MB, and five-second limits. Include domain items, events, receipts, change records, and sync metadata. Hierarchy, deletion, and rank-rebalance limits remain open in [Bound task hierarchy, dependencies, and ordering](https://github.com/DrBushyTop/bun-do/issues/6). See [Azure platform constraints](docs/research/azure-platform-constraints.md) for primary sources.
 
 Traffic is tiny, so serializing per-workspace mutations at this layer is acceptable.
 
@@ -2122,7 +2122,7 @@ Partial provider-schema sketch. Supply complete `due` and `recurrence` definitio
 
 Exact Foundry structured-output schema syntax should be implemented according to the current SDK/API.
 
-For Azure OpenAI v1 Responses, use `text.format` for the strict schema and `reasoning.effort` for reasoning. Use `store: false` for independent extraction requests. Handle refusal, incomplete generation, and invalid-schema configuration errors separately from retriable outages. A fallback model cannot repair an invalid schema. See [Azure platform research](docs/research/azure-platform-constraints.md).
+For Azure OpenAI v1 Responses, use `text.format` for the strict schema and `reasoning.effort` for reasoning. Use `store: false` for independent extraction requests. Handle refusal, incomplete generation, and invalid-schema configuration errors separately from retriable outages. A fallback model cannot repair an invalid schema. See [Azure platform constraints](docs/research/azure-platform-constraints.md).
 
 Prompt rules should state:
 
@@ -3280,7 +3280,7 @@ https://learn.microsoft.com/en-us/azure/ai-foundry/azure-openai-in-ai-foundry
 Microsoft Learn — Azure OpenAI reasoning models  
 https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/reasoning
 
-The [platform research](docs/research/azure-platform-constraints.md) verified public Luna/Terra, Responses, structured-output and reasoning-control documentation. Bun Do's actual deployment/version, quota and request acceptance still require an integration check.
+The [Azure platform constraints](docs/research/azure-platform-constraints.md) summarizes the public Responses, structured-output, reasoning, and transactional-batch sources. Bun Do's actual deployment/version, quota and request acceptance still require an integration check.
 
 ## Azure Cosmos DB transactional batch
 

@@ -1,23 +1,14 @@
 # Typed-command model
 
-The first executable slice tests create, title/description edit and rejected-dependent disposition. It is a reference model for the later Android and Cosmos adapters, not a running app.
+The first executable slice proves the command and replay shape before Android,
+HTTP, Cosmos, or membership work exists. It is deliberately a small reference
+model, not an application layer to preserve indefinitely.
 
-## Interfaces under test
+The model owns only typed creation, title/description edits, conflict recovery,
+and receipt-aware replay. Its source and behavior tests are the authority for
+its current types and cases. Later adapters must preserve the relevant
+behavioural contract, not copy this in-memory implementation.
 
-`WorkspaceServer.Handle` validates a supplied authenticated member against seeded device ownership, evaluates the command and commits through `IWorkspaceStore.TryCommit`. Repeated compare-and-swap failure returns busy after five attempts. `Pull` exposes immutable revision groups for the scoped model workspace. It is an internal model read, not an unauthenticated HTTP endpoint.
-
-`LocalReplica` captures local typed intent, freezes one submission at a time, records receipts, applies contiguous complete changes, and replays pending title and description edits over the canonical base. It retains rejected text as recovery variants. The model is single-threaded and in memory; Room transactions, process recovery and worker fencing belong to the Android/sync slices.
-
-The store adapter shares immutable state between server instances and commits atomically under a lock. Tests use a fault-injecting adapter at that store interface, not mocks of domain internals.
-
-## Deliberate limits
-
-This slice does not implement HTTP/JSON parsing, JWTs, membership changes, device expiry, disk durability, receipt pruning, snapshots, AI, recurrence, lifecycle, graphs or full workspace admission limits. The frozen operation fingerprint is calculated over the model serializer's fixed envelope; the production transport must hash the exact frozen UTF-8 envelope bytes, excluding transport credentials, and enforce its own versioned schema.
-
-`TaskSnapshot` currently models title and description only. It is not the complete wire DTO. IDs use literal UUIDv5 fixtures independently generated with Python. Protocol and command version 1 participate in the immutable envelope hash; unknown versions reject before consuming a sequence. Unsupported commands fail explicitly rather than masquerading as a completed feature.
-
-## Test evidence
-
-Behavior tests cover response loss, immutable retries, altered envelopes, device/member/epoch mismatch, sequence gaps, terminal rejections, field conflicts and atomic multi-field edits, byte/text validation, paginated empty revisions, compare-and-swap contention, two reconnect orders, an edit made during create response loss, malformed pages and preserved rejected-dependent text.
-
-Run the locked Release commands in the repository README. Fresh adversarial review and its fixes are recorded in the slice's GitHub discussion.
+It intentionally excludes transport, authentication, disk durability, snapshots,
+AI, recurrence, lifecycle, graphs, and full workspace limits. Add those rules in
+the contract that owns them and prove them at the adapter boundary.

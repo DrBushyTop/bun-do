@@ -5,6 +5,10 @@
 - [Architecture contracts](docs/architecture/README.md) define product behavior.
   Keep domain decisions in `BunDo.Domain`, Android persistence in `data/`, and
   Android screens in `ui/`.
+- Keep documentation for decisions, behavioral contracts, external-system setup,
+  and manual procedures. Code, build files, Bicep, and tests own implementation
+  details, pinned values, and test inventories. Record slice-specific evidence
+  and review conclusions in the owning GitHub issue.
 - Group Bicep modules by application responsibility, such as workspace storage,
   backend hosting or observability. Avoid one-resource wrapper modules.
 - Run `python3 tools/check_invariants.py` and

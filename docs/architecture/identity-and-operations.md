@@ -1,10 +1,22 @@
 # Identity, reminders and recovery
 
-These v1 decisions resolve [onboarding and account isolation](https://github.com/DrBushyTop/bun-do/issues/9) and [reminders, upgrades and recovery](https://github.com/DrBushyTop/bun-do/issues/13). They are implementation requirements. No Azure resources, authentication integration or restore drill have been exercised. The [platform research](../research/azure-platform-constraints.md) records documented feasibility.
+These v1 decisions resolve [onboarding and account isolation](https://github.com/DrBushyTop/bun-do/issues/9) and [reminders, upgrades and recovery](https://github.com/DrBushyTop/bun-do/issues/13). They are implementation requirements. Owning implementation issues hold current live verification results.
 
 ## Identity and joining
 
-Use Entra External ID customer-tenant native authentication with email OTP and a delegated Bun Do API scope. The API validates signature, configured issuer, audience, expiry and scope. Internal user identity derives from the exact validated issuer and subject pair. Email and display name are mutable presentation data and never authorization keys. A changed subject is a new account; v1 has no automatic account linking.
+Use MSAL Android with Microsoft-hosted sign-in for personal Microsoft accounts
+through the `consumers` authority. The existing `huuhka.net` workforce tenant
+owns the Android and API registrations, but users need no membership or guest
+invitation there. The owner's
+[replacement decision](../adr/0003-use-existing-workforce-tenant-for-sign-in.md)
+supersedes customer-tenant native OTP and the interim single-tenant setup.
+Microsoft authentication does not grant
+household membership. The API validates signature, configured issuer, audience,
+expiry and scope. Internal user identity derives from the exact validated
+issuer and subject pair. Android obtains that pair from the authenticated API,
+not its client ID token, whose subject can differ. Email and display name are
+mutable presentation data and never authorization keys. A changed subject is a
+new account; v1 has no automatic account linking.
 
 First sign-in and workspace creation/joining require connectivity. Before sign-in, a separate local inbox supports typed capture and installed local speech. After authenticated workspace selection, the user explicitly imports selected inbox drafts as new task commands. Never attach anonymous drafts to an account automatically. Model download is optional during onboarding; typing works immediately. Installing the model requires connectivity, storage preflight, checksum validation and atomic activation.
 
@@ -62,7 +74,7 @@ Retain sync changes and deletion tombstones for at least 120 days and coordinate
 
 Collect only timings, counts, protocol/build versions, result codes, RU and token usage, and random correlation IDs. Exclude request bodies, household text, email, audio, prompts, access tokens and invitation codes from logs, crash breadcrumbs and SDK HTTP tracing. The owner selected full useful OpenTelemetry traces for the low-traffic deployment on September 12, 2026, replacing the earlier exception-only choice. Emit one context-rich completion span per operation, including success, failure and cancellation. Enrich it with actual operation context as execution proceeds. Include code-defined function names, service/build version, duration, outcome, execution stage and HTTP status where available. Unexpected failures include exception type and bounded code-only stack frames, without messages, source paths, inner exception content or incoming trace baggage. Do not deliberately sample normal completions or rate-drop failures at this traffic level. Do not add a collector solely for sampling, routine log export or automatic performance metrics. Retain diagnostics for 30 days and configure the 100 MiB/day workspace ingestion cap. Bounded queues, network failures and ingestion limits can drop diagnostics; these controls are not a strict spending ceiling. Disable exporter disk buffers and keep any future local diagnostic buffers below 10 MiB. See [telemetry implementation and queries](../../infra/observability.md). AI job admission and token budgets follow the AI contract. The owner explicitly skipped all deployment budget alerts on September 12, 2026, including the EUR 25 and EUR 50 thresholds. Do not provision budget alerts. A manual AI kill switch pauses expensive calls while preserving queued jobs.
 
-Release evidence must cover invitation replay and wrong identity, removal racing commits, account switching with an in-flight response, offline logout with pending work, backup transfer creating a fresh device, every Room migration, duplicate/delayed/denied reminders, two-device expired-epoch recovery, and an isolated cloud restore meeting the targets. Pin .NET 10 isolated on Azure Functions Flex and prove real Entra/API access and Cosmos concurrency in the intended tenant. Provisioning and these checks belong to the first implementation tasks. The owner authorizes new resources in a dedicated Bun Do resource group through Bicep and assumes Foundry model availability. See [Azure development](../azure-development.md) for completed deployment checks and remaining gates. Physical phones are unavailable; agents validate two emulator profiles on this Mac and never claim target-phone performance.
+Release evidence must cover invitation replay and wrong identity, removal racing commits, account switching with an in-flight response, offline logout with pending work, backup transfer creating a fresh device, every Room migration, duplicate/delayed/denied reminders, two-device expired-epoch recovery, and an isolated cloud restore meeting the targets. Pin .NET 10 isolated on Azure Functions Flex and prove real Entra/API access and Cosmos concurrency in the intended tenant. Provisioning and these checks belong to the first implementation tasks. The owner authorizes new resources in a dedicated Bun Do resource group through Bicep and assumes Foundry model availability. Record completed checks and remaining gates in their owning GitHub issues. Physical phones are unavailable; agents validate two emulator profiles on this Mac and never claim target-phone performance.
 
 ## Destructive actions and recovery details
 
