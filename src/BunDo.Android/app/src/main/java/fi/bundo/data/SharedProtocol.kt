@@ -33,10 +33,10 @@ internal fun sameJson(left: Any?, right: Any?): Boolean = when {
 }
 
 internal object SharedProtocol {
-    fun taskId(device: String, sequence: String): String {
+    fun taskId(device: String, sequence: String, ordinal: Int = 0): String {
         val namespace = UUID.fromString(device)
         val bytes = ByteBuffer.allocate(16).putLong(namespace.mostSignificantBits).putLong(namespace.leastSignificantBits).array()
-        val digest = MessageDigest.getInstance("SHA-1").digest(bytes + "task/$sequence/0".toByteArray(Charsets.US_ASCII))
+        val digest = MessageDigest.getInstance("SHA-1").digest(bytes + "task/$sequence/$ordinal".toByteArray(Charsets.US_ASCII))
         digest[6] = ((digest[6].toInt() and 0x0f) or 0x50).toByte()
         digest[8] = ((digest[8].toInt() and 0x3f) or 0x80).toByte()
         val buffer = ByteBuffer.wrap(digest)
@@ -62,7 +62,7 @@ internal object SharedProtocol {
         val required = dependencies(intent)
         val dependencies = JSONArray().apply { required.forEach { put("${workspace.registration}:$it") } }
         val rejected = required.firstOrNull { checkNotNull(receipts[it]).getString("code") != "ACCEPTED" }
-        fun previous(sequence: String?): JSONObject? = sequence?.let { checkNotNull(receipts[it]).getJSONObject("task") }
+        fun previous(sequence: String?): JSONObject? = sequence?.let { SharedChecklistActions.receiptTask(checkNotNull(receipts[it]), intent.taskId) }
         val payload = JSONObject()
         val observed = JSONObject()
         val command = when {
@@ -150,6 +150,13 @@ internal object SharedProtocol {
         for (group in SharedTaskActions.groups - "deletion")
             require(SharedTaskActions.version(task, group).toULong() <= revision)
         require(task.optString("lifecycle", "OPEN") in listOf("OPEN", "COMPLETED", "CANCELLED"))
+        task.nullableString("parentId")?.let {
+            require(UUID.fromString(it).toString() == it && it != task.getString("id") && !task.optBoolean("isChecklist"))
+        }
+        val children = SharedChecklistActions.childIds(task)
+        require(children.size <= SharedChecklistActions.MAX_ITEMS && children.distinct().size == children.size)
+        require(children.isEmpty() || task.optBoolean("isChecklist") && task.isNull("parentId"))
+        children.forEach { require(UUID.fromString(it).toString() == it && it != task.getString("id")) }
         task.optJSONObject("firstCompletion")?.let {
             require(it.getString("rootId") == task.getString("id"))
             require(UUID.fromString(it.getString("memberId")).toString() == it.getString("memberId"))
@@ -170,9 +177,12 @@ internal object SharedProtocol {
             val actual = SharedTaskActions.version(current, group).toULong()
             val expected = SharedTaskActions.version(effect, group).toULong()
             val fields = when (group) {
-                "lifecycle" -> listOf("lifecycle", "lifecycleActorId", "lifecycleAt")
+                "lifecycle" -> listOf("lifecycle", "lifecycleActorId", "lifecycleAt", "cancellationGroupId")
                 "claim" -> listOf("claimantId")
                 "deletion" -> listOf("deletion")
+                "hierarchy" -> listOf("parentId", "isChecklist")
+                "subtree" -> listOf("childOrder", "emptyChecklist")
+                "snooze" -> listOf("snoozedUntil")
                 else -> emptyList()
             }
             actual >= expected && (actual > expected || fields.all { sameJson(current.opt(it), effect.opt(it)) })

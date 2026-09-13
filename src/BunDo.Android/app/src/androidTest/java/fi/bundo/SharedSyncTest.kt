@@ -328,6 +328,44 @@ class SharedSyncTest {
         assertEquals(2, server.tasks.size)
     }
 
+    @Test fun snapshotReplaysPendingSplitAndChildEditAsOneFamilyAcrossRestart() = runBlocking {
+        val server = Server()
+        var client = client(server)
+        val id = client.repository.copyText("Kitchen", "")
+        client.synchronize(server)
+        val shared = client.database.shared().workspace(client.state.scope)!!
+        client.database.shared().saveWorkspace(shared.copy(membership = JSONObject().put("me", UUID.randomUUID().toString()).toString()))
+        client.repository.saveChecklistDraft(client.repository.checklistDraft(id).copy(text = "One\nTwo"))
+        client.repository.commitChecklist(id)
+        val child = client.repository.taskStates.first().first { it.nullableString("parentId") == id }
+        val childId = child.getString("id")
+        client.repository.commit(client.repository.draft(childId).copy(title = "Edited step"))
+        client.repository.act("CompleteTask", client.repository.taskStates.first().single { it.getString("id") == childId }.toString())
+        val transport = SnapshotPeer(server).apply { rootOrder = listOf(id) }
+        var recovery = SharedSnapshotRecovery(client.database, client.lease, client.state.scope)
+        var request = client.prepare()
+        recovery.begin(request)
+        client.repository.release(request)
+        var finished = false
+        repeat(24) {
+            if (!finished) {
+                request = client.prepare()
+                finished = !recovery.step(request, transport, Long.MAX_VALUE, 0)
+                client.repository.release(request)
+                client.database.close()
+                client = client(server, client.name, client.state.registration)
+                recovery = SharedSnapshotRecovery(client.database, client.lease, client.state.scope)
+            }
+        }
+        assertTrue(finished)
+        val projected = client.repository.taskStates.first()
+        assertEquals(3, projected.size)
+        assertEquals("Edited step", projected.single { it.getString("id") == childId }.getString("title"))
+        assertEquals("COMPLETED", projected.single { it.getString("id") == childId }.getString("lifecycle"))
+        assertEquals("OPEN", projected.single { it.getString("id") == id }.getString("lifecycle"))
+        assertTrue(client.repository.problems.first().isEmpty())
+    }
+
     @Test fun snapshotKeepsDeletedTaskHiddenAndPreservesPendingText() = runBlocking {
         val server = Server()
         val client = client(server)

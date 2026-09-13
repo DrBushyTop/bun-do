@@ -70,12 +70,21 @@ public static class OperationEnvelope
                 case "CancelTask":
                 case "DeleteTask":
                 case "RestoreTask":
+                case "SetSnooze":
+                case "ClearSnooze":
+                case "SplitTask":
+                case "AddChildren":
                     var kind = root.GetProperty("command").GetString();
-                    Fields(payload, kind == "CompleteTask" ? ["taskId", "confirmedClaimantId"] : ["taskId"]);
-                    Fields(observed, ["lifecycle", "claim", "hierarchy", "deletion"]);
+                    var checklist = kind is "SplitTask" or "AddChildren";
+                    Fields(payload, kind == "CompleteTask" ? ["taskId", "confirmedClaimantId"] :
+                        kind == "SetSnooze" ? ["taskId", "until"] : checklist ? ["taskId", "items"] : ["taskId"]);
+                    Fields(observed, checklist ? ["lifecycle", "claim", "hierarchy", "deletion", "title", "description"] :
+                        ["lifecycle", "claim", "hierarchy", "deletion"], ["subtree", "snooze"]);
                     var taskId = Uuid(payload.GetProperty("taskId")).ToString("D");
                     var expected = new TaskStateVersions(ExactVersion(observed, "lifecycle"), ExactVersion(observed, "claim"),
-                        ExactVersion(observed, "hierarchy"), ExactVersion(observed, "deletion"));
+                        ExactVersion(observed, "hierarchy"), ExactVersion(observed, "deletion"),
+                        observed.TryGetProperty("subtree", out _) ? ExactVersion(observed, "subtree") : 0,
+                        observed.TryGetProperty("snooze", out _) ? ExactVersion(observed, "snooze") : 0);
                     command = kind switch {
                         "ClaimTask" => new ClaimTask(taskId, expected),
                         "UnclaimTask" => new UnclaimTask(taskId, expected),
@@ -84,6 +93,12 @@ public static class OperationEnvelope
                         "ReopenTask" => new ReopenTask(taskId, expected),
                         "DeleteTask" => new DeleteTask(taskId, expected),
                         "RestoreTask" => new RestoreTask(taskId, expected),
+                        "SetSnooze" => new SetSnooze(taskId, expected, UtcInstant(payload.GetProperty("until"))),
+                        "ClearSnooze" => new ClearSnooze(taskId, expected),
+                        "SplitTask" => new SplitTask(taskId, expected, payload.GetProperty("items").EnumerateArray().Select(Text).ToArray(),
+                            Version(observed, "title"), Version(observed, "description")),
+                        "AddChildren" => new AddChildren(taskId, expected, payload.GetProperty("items").EnumerateArray().Select(Text).ToArray(),
+                            Version(observed, "title"), Version(observed, "description")),
                         _ => new CancelTask(taskId, expected),
                     };
                     break;
@@ -136,6 +151,15 @@ public static class OperationEnvelope
             !value.All(char.IsAsciiDigit) || !ulong.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var result))
             throw new EnvelopeException("INVALID_DECIMAL");
         return result;
+    }
+
+    private static DateTimeOffset UtcInstant(JsonElement value)
+    {
+        var text = Text(value);
+        if (!text.EndsWith('Z') || !DateTimeOffset.TryParseExact(text, "yyyy-MM-dd'T'HH:mm:ss.FFFFFFF'Z'",
+                CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var instant))
+            throw new EnvelopeException("INVALID_ENVELOPE");
+        return instant;
     }
 
     private static Guid Uuid(JsonElement value)

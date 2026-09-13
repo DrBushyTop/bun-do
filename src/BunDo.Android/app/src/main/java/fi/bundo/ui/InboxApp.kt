@@ -91,7 +91,7 @@ fun InboxApp(
     canEdit: Boolean = true,
     queueTasks: List<InboxTask>? = null,
     rowSummary: (@Composable (String) -> Unit)? = null,
-    taskControls: (@Composable (String) -> Unit)? = null,
+    taskControls: (@Composable (String, (String) -> Unit) -> Unit)? = null,
     canEditTask: (String) -> Boolean = { true },
     snackbarHost: @Composable () -> Unit = {},
 ) {
@@ -165,7 +165,7 @@ fun InboxApp(
                     settings -> Settings(appearance, onAppearance, Modifier.align(Alignment.TopCenter).widthIn(max = 640.dp).fillMaxWidth(), queueTitle == null)
                     selected != null && !wide -> TaskDetail(
                         selected, { model.openEditor(selected.id) }, state, model::retry, Modifier.fillMaxSize(), queueTitle == null,
-                        taskControls, canEdit && canEditTask(selected.id),
+                        taskControls, canEdit && canEditTask(selected.id), { selectedId = it },
                     )
                     else -> Row(Modifier.fillMaxSize()) {
                         Queue(
@@ -183,7 +183,7 @@ fun InboxApp(
                             modifier = if (wide && selected != null) Modifier.width(360.dp) else Modifier.weight(1f),
                         )
                         if (wide && selected != null) {
-                            TaskDetail(selected, { model.openEditor(selected.id) }, state, model::retry, Modifier.weight(1f), queueTitle == null, taskControls, canEdit && canEditTask(selected.id))
+                            TaskDetail(selected, { model.openEditor(selected.id) }, state, model::retry, Modifier.weight(1f), queueTitle == null, taskControls, canEdit && canEditTask(selected.id), { selectedId = it })
                         }
                     }
                 }
@@ -378,8 +378,9 @@ private fun FieldCount(value: String, limit: Int) {
 @Composable
 private fun TaskDetail(
     task: InboxTask, onEdit: () -> Unit, state: InboxUiState, onRetry: () -> Unit, modifier: Modifier, localOnly: Boolean,
-    controls: (@Composable (String) -> Unit)? = null,
+    controls: (@Composable (String, (String) -> Unit) -> Unit)? = null,
     editable: Boolean = true,
+    onOpenTask: (String) -> Unit = {},
 ) {
     var original by rememberSaveable(task.id) { mutableStateOf(false) }
     Column(
@@ -388,7 +389,7 @@ private fun TaskDetail(
     ) {
         if (state.writeFailed) ErrorNotice(R.string.open_failed, onRetry)
         Text(task.title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
-        controls?.invoke(task.id)
+        controls?.invoke(task.id, onOpenTask)
         if (localOnly) Text(stringResource(R.string.local_only), style = MaterialTheme.typography.labelLarge)
         Text(task.description.ifEmpty { stringResource(R.string.no_description) }, style = MaterialTheme.typography.bodyLarge)
         Button(onClick = onEdit, enabled = editable && !state.working, modifier = Modifier.heightIn(min = 48.dp).testTag("edit")) {

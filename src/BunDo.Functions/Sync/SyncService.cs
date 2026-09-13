@@ -104,6 +104,18 @@ public sealed class SyncService(IHouseholdDocuments documents)
                 var task = (await documents.ReadAsync<TaskSnapshot>(partition, WorkspaceCommit.TaskId(taskId), ct))?.Value
                     ?? metadata.Tasks.GetValueOrDefault(taskId);
                 if (task is not null) tasks = tasks.SetItem(taskId, task);
+                if (task?.ParentId is { } parentId)
+                {
+                    var parent = (await documents.ReadAsync<TaskSnapshot>(partition, WorkspaceCommit.TaskId(parentId), ct))?.Value
+                        ?? metadata.Tasks.GetValueOrDefault(parentId);
+                    if (parent is not null) { tasks = tasks.SetItem(parentId, parent); task = parent; }
+                }
+                foreach (var childId in task?.ChildOrder ?? [])
+                {
+                    var child = (await documents.ReadAsync<TaskSnapshot>(partition, WorkspaceCommit.TaskId(childId), ct))?.Value
+                        ?? metadata.Tasks.GetValueOrDefault(childId);
+                    if (child is not null) tasks = tasks.SetItem(childId, child);
+                }
             }
             var staged = new StagedStore(metadata with { Devices = ImmutableDictionary<Guid, DeviceRegistration>.Empty.Add(device.DeviceId, device),
                 Tasks = tasks, Receipts = receipts, Changes = [] });

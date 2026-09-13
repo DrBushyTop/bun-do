@@ -119,8 +119,8 @@ def main():
         assert send(cursor=manifest["cursor"])["throughRevision"] == str(int(manifest["revision"]) + 1)
         print("PASS Local HTTP: immutable authenticated snapshot, retry, chunk digests, range rejection and delta continuation")
         def versions(value):
-            return {group: {"fieldVersion": value[f"{group}Version"]}
-                for group in ("lifecycle", "claim", "hierarchy", "deletion")}
+            return {group: {"fieldVersion": value.get(f"{group}Version", "0")}
+                for group in ("lifecycle", "claim", "hierarchy", "deletion", "subtree", "snooze")}
 
         task = next(item for item in snapshots if item["id"] == task_id(1))
         delete = envelope(6, "DeleteTask", {"taskId": task["id"]}, versions(task))
@@ -143,6 +143,33 @@ def main():
         assert send(envelope(10, "RestoreTask", {"taskId": task["id"]}, versions(deleted)))["code"] == "DELETION_CONFLICT"
         assert send(envelope(11, "RestoreTask", {"taskId": task["id"]}, versions(again["receipts"][0]["task"])))["code"] == "ACCEPTED"
         print("PASS Local HTTP: delete retry, stale edit rejection, Undo after sync and stale deletion-group restore rejection")
+        root = send(envelope(12, "CreateTask", {"taskId": task_id(12), "title": "Checklist", "description": None}))["receipts"][0]["task"]
+        observed = versions(root) | {field: {"humanVersion": root[f"{field}Version"]["humanVersion"]}
+            for field in ("title", "description")}
+        split = envelope(13, "SplitTask", {"taskId": root["id"], "items": ["One", "Two"]}, observed)
+        result = send(split)
+        assert result["code"] == "ACCEPTED", result["code"]
+        assert send(split)["receipts"] == result["receipts"]
+        family = {item["id"]: item for item in result["receipts"][0]["relatedTasks"]}
+        assert len(family) == 3
+        root = family[root["id"]]
+        assert root["childOrder"] == [str(uuid.uuid5(uuid.UUID(device), f"task/13/{n}")) for n in (1, 2)]
+        for sequence, child_id in enumerate(root["childOrder"], 14):
+            response = send(envelope(sequence, "CompleteTask", {"taskId": child_id, "confirmedClaimantId": None}, versions(family[child_id])), cursor=result["cursor"])
+            assert response["code"] == "ACCEPTED", response["code"]
+            result = response
+            family = {item["id"]: item for item in response["receipts"][0]["relatedTasks"]}
+            assert family[child_id]["firstCompletion"] is None
+        root = family[root["id"]]
+        assert root["lifecycle"] == "COMPLETED" and root["firstCompletion"]["rootId"] == root["id"]
+        deletion = send(envelope(16, "DeleteTask", {"taskId": root["id"]}, versions(root)), cursor=result["cursor"])
+        assert deletion["code"] == "ACCEPTED"
+        assert all(item["deletion"]["groupId"] == f"{device}:16" for item in deletion["receipts"][0]["relatedTasks"])
+        restored = send(envelope(17, "RestoreTask", {"taskId": root["id"]}, versions(deletion["receipts"][0]["task"])), cursor=deletion["cursor"])
+        assert restored["code"] == "ACCEPTED"
+        assert all(item["deletion"] is None for item in restored["receipts"][0]["relatedTasks"])
+        assert restored["receipts"][0]["task"]["firstCompletion"] == root["firstCompletion"]
+        print("PASS Local HTTP: atomic deterministic checklist split/retry, child completion, root-only credit and group delete/restore")
     finally:
         status, response, _ = identity.request("/households", token=token, method="POST", body={
             "action": "get", "registrationId": device, "workspaceId": workspace})

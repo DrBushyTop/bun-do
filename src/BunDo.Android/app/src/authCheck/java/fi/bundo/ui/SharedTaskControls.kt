@@ -16,7 +16,7 @@ import java.time.Instant
 import java.util.Date
 
 internal data class SharedTaskAction(val kind: String, val displayed: String,
-    val confirmedClaimant: String? = null, val after: String? = null, val before: String? = null)
+    val confirmedClaimant: String? = null, val after: String? = null, val before: String? = null, val until: String? = null)
 
 internal fun taskActionLabel(kind: String) = when (kind) {
     "ClaimTask" -> R.string.task_claim
@@ -26,6 +26,8 @@ internal fun taskActionLabel(kind: String) = when (kind) {
     "CancelTask" -> R.string.task_cancel
     "DeleteTask" -> R.string.task_delete
     "RestoreTask" -> R.string.task_restore
+    "SplitTask", "AddChildren" -> R.string.checklist_add
+    "SetSnooze", "ClearSnooze" -> R.string.task_snooze
     else -> R.string.task_move
 }
 
@@ -35,7 +37,7 @@ private fun member(membership: JSONObject?, id: String?): JSONObject? {
 }
 
 @Composable
-private fun memberName(membership: JSONObject?, id: String?): String {
+internal fun memberName(membership: JSONObject?, id: String?): String {
     val person = member(membership, id)
     return if (person == null || !person.optBoolean("active")) stringResource(R.string.task_former_member)
         else person.optString("displayName").ifBlank { stringResource(R.string.task_household_member) }
@@ -72,7 +74,14 @@ internal fun SharedTaskControls(task: JSONObject, ordered: List<JSONObject>, mem
     val me = membership?.optString("me")
     val claimant = task.nullableString("claimantId")?.takeIf { member(membership, it)?.optBoolean("active") == true }
     var confirmation by remember(id) { mutableStateOf<SharedTaskAction?>(null) }
-    val active = ordered.filter { it.optString("lifecycle", "OPEN") == "OPEN" && it.isNull("deletion") }.map { it.getString("id") }
+    val tasks = ordered.associateBy { it.getString("id") }
+    val parentId = task.nullableString("parentId")
+    val isChecklist = task.optBoolean("isChecklist")
+    val snoozed = fi.bundo.data.SharedChecklistActions.snoozed(task, tasks)
+    val siblings = if (parentId != null) tasks[parentId]?.let(fi.bundo.data.SharedChecklistActions::childIds).orEmpty()
+        .mapNotNull(tasks::get) else ordered
+    val active = siblings.filter { it.nullableString("parentId") == parentId && it.isNull("deletion") &&
+        (parentId != null || it.optString("lifecycle", "OPEN") == "OPEN") }.map { it.getString("id") }
     val index = active.indexOf(id)
     val canAct = enabled && me != null
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -80,37 +89,48 @@ internal fun SharedTaskControls(task: JSONObject, ordered: List<JSONObject>, mem
         if (failed) Text(stringResource(R.string.task_changed_retry), color = MaterialTheme.colorScheme.error)
         if (!task.isNull("deletion")) {
             Text(stringResource(R.string.task_restore_explanation))
-            OutlinedButton(enabled = canAct && !task.getJSONObject("deletion").optBoolean("purging"),
+            OutlinedButton(enabled = canAct && !task.getJSONObject("deletion").optBoolean("purging") &&
+                (parentId == null || tasks[parentId]?.isNull("deletion") == true),
                 modifier = Modifier.testTag("task-restore"),
-                onClick = { onAction(SharedTaskAction("RestoreTask", task.toString())) }) {
-                Text(stringResource(R.string.task_restore))
-            }
+                onClick = { onAction(SharedTaskAction("RestoreTask", task.toString())) }) { Text(stringResource(R.string.task_restore)) }
             if (task.getJSONObject("deletion").optBoolean("purging")) Text(stringResource(R.string.task_purging))
         } else {
-        if (open) {
-            Button(enabled = canAct, modifier = Modifier.testTag("task-complete"), onClick = {
-                val action = SharedTaskAction("CompleteTask", task.toString(), claimant?.takeIf { it != me })
-                if (claimant != null && claimant != me) confirmation = action else onAction(action)
-            }) { Text(stringResource(R.string.task_complete)) }
-            if (claimant == null) OutlinedButton(enabled = canAct, modifier = Modifier.testTag("task-claim"),
-                onClick = { onAction(SharedTaskAction("ClaimTask", task.toString())) }) { Text(stringResource(R.string.task_claim)) }
-            else if (claimant == me || membership?.optString("ownerId") == me) OutlinedButton(enabled = canAct,
-                modifier = Modifier.testTag("task-unclaim"),
-                onClick = { onAction(SharedTaskAction("UnclaimTask", task.toString())) }) { Text(stringResource(R.string.task_unclaim)) }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(enabled = canAct && index > 0, modifier = Modifier.testTag("task-earlier"), onClick = {
-                    onAction(SharedTaskAction("MoveTask", task.toString(), after = active.getOrNull(index - 2), before = active[index - 1]))
-                }) { Text(stringResource(R.string.task_earlier)) }
-                TextButton(enabled = canAct && index >= 0 && index < active.lastIndex, modifier = Modifier.testTag("task-later"), onClick = {
-                    onAction(SharedTaskAction("MoveTask", task.toString(), after = active[index + 1], before = active.getOrNull(index + 2)))
-                }) { Text(stringResource(R.string.task_later)) }
+            if (snoozed) Text(stringResource(R.string.task_snoozed))
+            if (isChecklist) Text(stringResource(if (task.optBoolean("emptyChecklist")) R.string.checklist_empty else R.string.checklist_derived))
+            if (open && !isChecklist) {
+                Button(enabled = canAct && !snoozed, modifier = Modifier.testTag("task-complete"), onClick = {
+                    val action = SharedTaskAction("CompleteTask", task.toString(), claimant?.takeIf { it != me })
+                    if (claimant != null && claimant != me) confirmation = action else onAction(action)
+                }) { Text(stringResource(R.string.task_complete)) }
+                if (claimant == null) OutlinedButton(enabled = canAct && !snoozed, modifier = Modifier.testTag("task-claim"),
+                    onClick = { onAction(SharedTaskAction("ClaimTask", task.toString())) }) { Text(stringResource(R.string.task_claim)) }
+                else if (claimant == me || membership?.optString("ownerId") == me) OutlinedButton(enabled = canAct,
+                    modifier = Modifier.testTag("task-unclaim"),
+                    onClick = { onAction(SharedTaskAction("UnclaimTask", task.toString())) }) { Text(stringResource(R.string.task_unclaim)) }
             }
-            TextButton(enabled = canAct, modifier = Modifier.testTag("task-cancel"),
-                onClick = { onAction(SharedTaskAction("CancelTask", task.toString())) }) { Text(stringResource(R.string.task_cancel)) }
-        } else OutlinedButton(enabled = canAct, modifier = Modifier.testTag("task-reopen"),
-            onClick = { onAction(SharedTaskAction("ReopenTask", task.toString())) }) { Text(stringResource(R.string.task_reopen)) }
-        TextButton(enabled = canAct, modifier = Modifier.testTag("task-delete"),
-            onClick = { onAction(SharedTaskAction("DeleteTask", task.toString())) }) { Text(stringResource(R.string.task_delete)) }
+            if (!open && (!isChecklist || !task.isNull("cancellationGroupId"))) OutlinedButton(enabled = canAct,
+                modifier = Modifier.testTag("task-reopen"),
+                onClick = { onAction(SharedTaskAction("ReopenTask", task.toString())) }) { Text(stringResource(R.string.task_reopen)) }
+            if (open) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(enabled = canAct && index > 0, modifier = Modifier.testTag("task-earlier"), onClick = {
+                        onAction(SharedTaskAction("MoveTask", task.toString(), after = active.getOrNull(index - 2), before = active[index - 1]))
+                    }) { Text(stringResource(R.string.task_earlier)) }
+                    TextButton(enabled = canAct && index >= 0 && index < active.lastIndex, modifier = Modifier.testTag("task-later"), onClick = {
+                        onAction(SharedTaskAction("MoveTask", task.toString(), after = active[index + 1], before = active.getOrNull(index + 2)))
+                    }) { Text(stringResource(R.string.task_later)) }
+                }
+                TextButton(enabled = canAct, modifier = Modifier.testTag("task-cancel"),
+                    onClick = { onAction(SharedTaskAction("CancelTask", task.toString())) }) { Text(stringResource(R.string.task_cancel)) }
+                if (task.isNull("snoozedUntil")) TextButton(enabled = canAct, modifier = Modifier.testTag("task-snooze"),
+                    onClick = { onAction(SharedTaskAction("SetSnooze", task.toString(), until = Instant.now().plusSeconds(3600).toString())) }) {
+                    Text(stringResource(R.string.task_snooze_hour))
+                }
+            }
+            if (!task.isNull("snoozedUntil")) TextButton(enabled = canAct, modifier = Modifier.testTag("task-unsnooze"),
+                onClick = { onAction(SharedTaskAction("ClearSnooze", task.toString())) }) { Text(stringResource(R.string.task_unsnooze)) }
+            TextButton(enabled = canAct, modifier = Modifier.testTag("task-delete"),
+                onClick = { onAction(SharedTaskAction("DeleteTask", task.toString())) }) { Text(stringResource(R.string.task_delete)) }
         }
     }
     confirmation?.let { action ->

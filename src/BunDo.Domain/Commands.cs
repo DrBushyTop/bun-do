@@ -10,7 +10,8 @@ public sealed record CreateTask(string TaskId, string Title, string? Description
 public sealed record TextEdit(string? Value, ulong ExpectedHumanVersion);
 public sealed record EditTask(string TaskId, TextEdit? Title = null, TextEdit? Description = null,
     ulong? ExpectedDeletionVersion = null) : TaskCommand;
-public sealed record TaskStateVersions(ulong Lifecycle, ulong Claim, ulong Hierarchy, ulong Deletion);
+public sealed record TaskStateVersions(ulong Lifecycle, ulong Claim, ulong Hierarchy, ulong Deletion,
+    ulong Subtree = 0, ulong Snooze = 0);
 public abstract record TaskTransition(string TaskId, TaskStateVersions Expected) : TaskCommand;
 public sealed record ClaimTask(string TaskId, TaskStateVersions Expected) : TaskTransition(TaskId, Expected);
 public sealed record UnclaimTask(string TaskId, TaskStateVersions Expected) : TaskTransition(TaskId, Expected);
@@ -20,6 +21,16 @@ public sealed record ReopenTask(string TaskId, TaskStateVersions Expected) : Tas
 public sealed record CancelTask(string TaskId, TaskStateVersions Expected) : TaskTransition(TaskId, Expected);
 public sealed record DeleteTask(string TaskId, TaskStateVersions Expected) : TaskTransition(TaskId, Expected);
 public sealed record RestoreTask(string TaskId, TaskStateVersions Expected) : TaskTransition(TaskId, Expected);
+public sealed record SetSnooze(string TaskId, TaskStateVersions Expected, DateTimeOffset Until) : TaskTransition(TaskId, Expected);
+public sealed record ClearSnooze(string TaskId, TaskStateVersions Expected) : TaskTransition(TaskId, Expected);
+public abstract record ChecklistCommand(string TaskId, TaskStateVersions Expected,
+    string[] Items, ulong ExpectedTitleHumanVersion, ulong ExpectedDescriptionHumanVersion) : TaskTransition(TaskId, Expected);
+public sealed record SplitTask(string TaskId, TaskStateVersions Expected, string[] Items,
+    ulong ExpectedTitleHumanVersion, ulong ExpectedDescriptionHumanVersion)
+    : ChecklistCommand(TaskId, Expected, Items, ExpectedTitleHumanVersion, ExpectedDescriptionHumanVersion);
+public sealed record AddChildren(string TaskId, TaskStateVersions Expected, string[] Items,
+    ulong ExpectedTitleHumanVersion, ulong ExpectedDescriptionHumanVersion)
+    : ChecklistCommand(TaskId, Expected, Items, ExpectedTitleHumanVersion, ExpectedDescriptionHumanVersion);
 public sealed record MoveTask(string TaskId, ulong ExpectedOrderVersion, ulong ExpectedDeletionVersion,
     string? ExpectedParentId = null, string? AfterTaskId = null, string? BeforeTaskId = null) : TaskCommand;
 public sealed record DiscardBlockedIntent(ulong RejectedDependencySequence) : TaskCommand;
@@ -68,6 +79,10 @@ public sealed class FrozenOperation
             CancelTask => "CancelTask",
             DeleteTask => "DeleteTask",
             RestoreTask => "RestoreTask",
+            SetSnooze => "SetSnooze",
+            ClearSnooze => "ClearSnooze",
+            SplitTask => "SplitTask",
+            AddChildren => "AddChildren",
             MoveTask => "MoveTask",
             DiscardBlockedIntent => "DiscardBlockedIntent",
             _ => throw new ArgumentException("Unsupported model command.", nameof(command))

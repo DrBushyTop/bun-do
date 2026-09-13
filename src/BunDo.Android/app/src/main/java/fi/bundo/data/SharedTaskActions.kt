@@ -6,34 +6,41 @@ import org.json.JSONObject
 /** Durable action observations and local projection. No command is rebased on a remote conflict. */
 internal object SharedTaskActions {
     const val ORDER_ID = "root-order"
-    val kinds = setOf("ClaimTask", "UnclaimTask", "CompleteTask", "ReopenTask", "CancelTask", "MoveTask", "DeleteTask", "RestoreTask")
-    val groups = listOf("lifecycle", "claim", "hierarchy", "deletion", "orderIntent")
+    val kinds = setOf("ClaimTask", "UnclaimTask", "CompleteTask", "ReopenTask", "CancelTask", "MoveTask", "DeleteTask", "RestoreTask",
+        "SplitTask", "AddChildren", "SetSnooze", "ClearSnooze")
+    val groups = listOf("lifecycle", "claim", "hierarchy", "deletion", "orderIntent", "subtree", "snooze")
     fun version(task: JSONObject, group: String): String =
         if (task.has("${group}Version")) task.decimal("${group}Version").toString() else "0"
     fun observedGroups(kind: String) = if (kind == "MoveTask") listOf("orderIntent", "deletion")
-        else listOf("lifecycle", "claim", "hierarchy", "deletion")
+        else listOf("lifecycle", "claim", "hierarchy", "deletion", "subtree", "snooze") +
+            if (kind in SharedChecklistActions.splitKinds) listOf("title", "description") else emptyList()
     fun writes(kind: String) = when (kind) {
         "CreateTask" -> groups
         "ClaimTask", "UnclaimTask" -> listOf("claim")
-        "CompleteTask", "ReopenTask", "CancelTask" -> listOf("lifecycle", "claim")
+        "CompleteTask", "ReopenTask", "CancelTask" -> listOf("lifecycle", "claim", "subtree", "snooze")
         "MoveTask" -> listOf("orderIntent")
-        "DeleteTask", "RestoreTask" -> listOf("deletion", "claim")
+        "DeleteTask", "RestoreTask" -> listOf("deletion", "claim", "subtree", "lifecycle")
+        "SplitTask", "AddChildren" -> listOf("hierarchy", "subtree", "claim", "lifecycle")
+        "SetSnooze", "ClearSnooze" -> listOf("snooze", "claim", "subtree")
         else -> emptyList()
     }
     fun pending(intent: SharedIntent, revision: String) =
         intent.status in listOf("PENDING", "SUBMITTED", "ACCEPTED") &&
             (intent.receipt == null || JSONObject(intent.receipt).decimal("effectRevision") > revision.toULong())
 
-    fun capture(kind: String, task: JSONObject, pending: List<SharedIntent>, payload: JSONObject, actor: String): String {
+    fun capture(kind: String, task: JSONObject, pending: List<SharedIntent>, payload: JSONObject, actor: String,
+        tasks: Map<String, JSONObject> = mapOf(task.getString("id") to task), registration: String = ""): String {
         val versions = JSONObject()
         val after = JSONObject()
         for (group in observedGroups(kind)) {
-            versions.put(group, version(task, group))
-            pending.lastOrNull { group in writes(it.kind) }?.let { after.put(group, it.sequence) }
+            versions.put(group, observation(task, group))
+            pending.lastOrNull { group in SharedChecklistActions.writes(it, task, tasks) }?.let { after.put(group, it.sequence) }
         }
         return JSONObject().put("payload", payload).put("versions", versions).put("after", after).put("actor", actor)
-            .put("fromLifecycle", task.optString("lifecycle", "OPEN")).toString()
+            .put("fromLifecycle", task.optString("lifecycle", "OPEN"))
+            .put("parentId", task.opt("parentId") ?: JSONObject.NULL).put("registration", registration).toString()
     }
+    private fun observation(task: JSONObject, group: String) = if (group in listOf("title", "description")) task.human(group) else version(task, group)
 
     fun dependencies(intent: SharedIntent): List<String> = intent.taskAction?.let {
         val after = JSONObject(it).getJSONObject("after")
@@ -46,29 +53,34 @@ internal object SharedTaskActions {
         values.keys().forEach { payload.put(it, values.get(it)) }
         val after = action.getJSONObject("after")
         for (group in observedGroups(intent.kind)) {
-            val value = if (after.has(group)) version(checkNotNull(receipts[after.getString(group)]).getJSONObject("task"), group)
-                else action.getJSONObject("versions").getString(group)
-            observed.put(group, JSONObject().put("fieldVersion", value))
+            val value = if (after.has(group)) observation(checkNotNull(SharedChecklistActions.receiptTask(
+                checkNotNull(receipts[after.getString(group)]), intent.taskId)), group)
+                else action.getJSONObject("versions").optString(group, "0")
+            observed.put(group, JSONObject().put(if (group in listOf("title", "description")) "humanVersion" else "fieldVersion", value))
         }
     }
 
-    fun project(task: JSONObject, intent: SharedIntent, intents: List<SharedIntent>, applied: Set<String>): String? {
+    fun project(task: JSONObject, intent: SharedIntent, intents: List<SharedIntent>, applied: Set<String>,
+        tasks: MutableMap<String, JSONObject> = mutableMapOf(task.getString("id") to task)): String? {
+        SharedChecklistActions.guard(task, intent, tasks)?.let { return it }
+        val before = JSONObject(task.toString())
         val action = JSONObject(checkNotNull(intent.taskAction))
         val after = action.getJSONObject("after")
         for (group in observedGroups(intent.kind)) {
             val dependency = if (after.has(group)) intents.find { it.sequence == after.getString(group) } else null
             if (dependency?.status in listOf("REJECTED", "QUARANTINED", "BLOCKED_DEPENDENCY", "DISMISSED"))
                 return "BLOCKED_DEPENDENCY"
-            val expected = dependency?.receipt?.let { JSONObject(it).optJSONObject("task") }
-                ?.let { version(it, group) } ?: if (after.has(group)) {
+            val expected = dependency?.receipt?.let { SharedChecklistActions.receiptTask(JSONObject(it), intent.taskId) }
+                ?.let { observation(it, group) } ?: if (after.has(group)) {
                     // An unresolved output refers to the predecessor we just replayed, not its
                     // old numeric observation. Failed predecessors must not authorize a rebase.
                     if (dependency?.sequence !in applied) return "BLOCKED_DEPENDENCY"
-                    version(task, group)
-                } else action.getJSONObject("versions").getString(group)
-            if (version(task, group) != expected) return when (group) {
+                    observation(task, group)
+                } else action.getJSONObject("versions").optString(group, "0")
+            if (observation(task, group) != expected) return when (group) {
                 "claim" -> "CLAIM_CONFLICT"; "orderIntent" -> "ORDER_CONFLICT"
-                "deletion" -> "DELETION_CONFLICT"; else -> "LIFECYCLE_CONFLICT"
+                "deletion" -> "DELETION_CONFLICT"; "subtree" -> "SUBTREE_CONFLICT"; "snooze" -> "SNOOZE_CONFLICT"
+                "title", "description" -> "FIELD_CONFLICT"; else -> "LIFECYCLE_CONFLICT"
             }
         }
         if (intent.kind == "RestoreTask") {
@@ -93,13 +105,14 @@ internal object SharedTaskActions {
                 .put("claimantId", JSONObject.NULL).put("lifecycleActorId", action.getString("actor"))
                 .put("lifecycleAt", JSONObject.NULL) // Completion credit and acceptance time belong to the server.
         }
+        SharedChecklistActions.apply(before, task, intent, tasks)
         return null
     }
 
     fun ordered(rows: List<SharedProjection>, intents: List<SharedIntent>, state: SharedWorkspace?): List<JSONObject> {
         val entities = rows.associate { it.id to JSONObject(it.snapshot) }
         val tasks = entities.filterKeys { it != ORDER_ID }
-        val active = tasks.filterValues { it.optString("lifecycle", "OPEN") == "OPEN" && it.isNull("deletion") }
+        val active = tasks.filterValues { it.isNull("parentId") && it.optString("lifecycle", "OPEN") == "OPEN" && it.isNull("deletion") }
         // Updating an intent can change its physical row position. Replay the user's sequence.
         val queued = intents.filter { state != null && it.scope == state.scope && pending(it, state.revision) && it.problem == null }
             .sortedBy { it.sequence.toULong() }

@@ -17,6 +17,7 @@ import fi.bundo.data.*
 import fi.bundo.ui.BunDoTheme
 import fi.bundo.ui.SharedWorkspaceScreen
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.*
@@ -60,7 +61,12 @@ class SharedTaskUiTest {
                 data.database.shared().saveProjection(SharedProjection(state.scope, task.getString("id"), task.toString()))
             }
         }
-        val configuration = Configuration(compose.activity.resources.configuration).apply { setLocale(Locale.forLanguageTag(language)) }
+        val configuration = Configuration(compose.activity.resources.configuration).apply {
+            setLocale(Locale.forLanguageTag(language)); this.fontScale = fontScale
+        }
+        // Dialog windows read the activity resources rather than only the composition overrides.
+        @Suppress("DEPRECATION")
+        compose.activity.resources.updateConfiguration(configuration, compose.activity.resources.displayMetrics)
         val translated = compose.activity.createConfigurationContext(configuration)
         compose.runOnUiThread {
             compose.activity.setContent {
@@ -77,6 +83,34 @@ class SharedTaskUiTest {
         }
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Vie paperit kierrätykseen").fetchSemanticsNodes().isNotEmpty() }
         return data to state
+    }
+
+    @Test fun finnishChecklistPreviewProgressAndChildNavigationAtLargeText() {
+        val (data, state) = fixture("fi", "light", fontScale = 2f)
+        compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
+        compose.onNodeWithTag("checklist-add").performScrollTo().performClick()
+        compose.onNodeWithTag("checklist-draft").performTextInput("Kerää paperit\nVie keräykseen")
+        compose.runOnIdle {
+            android.view.inspector.WindowInspector.getGlobalWindowViews().forEach { view ->
+                (view.context.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager)
+                    .hideSoftInputFromWindow(view.windowToken, 0)
+            }
+        }
+        compose.onNodeWithTag("checklist-save").assertIsDisplayed()
+        screenshot("checklist-fi-preview-large.png")
+        compose.onNodeWithTag("checklist-save").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Kerää paperit").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Kerää paperit").performScrollTo().assertIsDisplayed()
+        screenshot("checklist-fi-items-large.png")
+        val children = runBlocking { SharedRepository(data.database, DataLease(), state.scope, state.registration).taskStates.first() }.filter { it.nullableString("parentId") != null }
+        val first = children.single { it.getString("title") == "Kerää paperit" }.getString("id")
+        compose.onNodeWithTag("checklist-check-$first").performScrollTo().performClick()
+        compose.waitUntil(15_000) { compose.onAllNodesWithText("Valmiit vaiheet: 1 / 2").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Valmiit vaiheet: 1 / 2").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Kerää paperit").performScrollTo().performClick()
+        compose.onNodeWithTag("checklist-parent").performScrollTo().performClick()
+        compose.waitUntil(15_000) { compose.onAllNodesWithText("Valmiit vaiheet: 1 / 2").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Valmiit vaiheet: 1 / 2").performScrollTo().assertIsDisplayed()
     }
 
     @Test fun finnishClaimCompleteAndReopenKeepDetailsOpenAndHistoryReachable() {

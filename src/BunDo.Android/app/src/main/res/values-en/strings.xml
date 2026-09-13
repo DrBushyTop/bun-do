@@ -88,4 +88,21 @@
     <string name="task_restore_explanation">Restore keeps the previous task status and snooze, without a claim.</string>
     <string name="task_purging">This task is being permanently removed and can no longer be restored.</string>
     <string name="task_deleted_conflict">The task was deleted. Your text is saved here and can be copied to a new task.</string>
+    <string name="checklist_add">Add steps</string>
+    <string name="checklist_split">Split into steps</string>
+    <string name="checklist_title">Steps</string>
+    <string name="checklist_items">One step per line</string>
+    <string name="checklist_progress">Steps complete: %1$d / %2$d</string>
+    <string name="checklist_empty">No active steps. Add a step or restore a deleted one.</string>
+    <string name="checklist_derived">This task finishes when its steps are complete.</string>
+    <string name="checklist_parent">Open checklist</string>
+    <string name="checklist_editor_help">Write one step per line. Maximum: %1$d. Edit or remove lines before saving.</string>
+    <string name="checklist_invalid">Number of steps: 1 to %1$d. Each step can have up to 160 characters.</string>
+    <string name="checklist_save_failed">Could not save the steps. Your text is still here. Try again.</string>
+    <string name="checklist_toggle">Change completion: %1$s</string>
+    <string name="task_snooze">Snooze</string>
+    <string name="task_snooze_hour">Snooze for an hour</string>
+    <string name="task_snoozed">Snoozed. Clear the snooze before claiming or completing a step.</string>
+    <string name="task_unsnooze">Clear snooze</string>
+    <string name="task_snoozed_view">Snoozed</string>
 </resources>

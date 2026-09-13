@@ -20,6 +20,15 @@ public static class TaskLifecycle
             return "ACCEPTED";
         }
         if (task.Deletion is not null) return "TASK_DELETED";
+        if (command is SetSnooze or ClearSnooze)
+        {
+            if (expected.Snooze != task.SnoozeVersion) return "SNOOZE_CONFLICT";
+            var until = (command as SetSnooze)?.Until;
+            if (until is { } instant && instant <= now) return "INVALID_SNOOZE";
+            if (task.SnoozedUntil != until)
+                result = ClearClaim(task, revision) with { SnoozedUntil = until, SnoozeVersion = revision };
+            return "ACCEPTED";
+        }
         if (command is DeleteTask)
         {
             // Lifecycle, snooze and first credit stay on the retained record, but claims never return.
@@ -32,6 +41,7 @@ public static class TaskLifecycle
         var claimant = task.ClaimantId is { } member && members.CanRead(member) ? task.ClaimantId : null;
         if (command is ClaimTask)
         {
+            if (task.SnoozedUntil > now) return "TASK_SNOOZED";
             if (task.Lifecycle != "OPEN") return "TASK_NOT_OPEN";
             if (claimant is not null && claimant != actor) return "ALREADY_CLAIMED";
             if (task.ClaimantId != actor) result = task with { ClaimantId = actor, ClaimVersion = revision };
@@ -50,13 +60,17 @@ public static class TaskLifecycle
         if (task.Lifecycle == lifecycle) return "ACCEPTED";
         if (command is CompleteTask complete)
         {
+            if (task.SnoozedUntil > now) return "TASK_SNOOZED";
             if (task.Lifecycle != "OPEN") return "TASK_NOT_OPEN";
             if (claimant is not null && claimant != actor && complete.ConfirmedClaimantId != claimant)
                 return "CLAIM_CONFIRMATION_REQUIRED";
         }
         result = ClearClaim(task, revision) with {
             Lifecycle = lifecycle, LifecycleVersion = revision, LifecycleActorId = actor, LifecycleAt = now,
-            FirstCompletion = task.FirstCompletion ?? (lifecycle == "COMPLETED" ? new(task.Id, actor, now) : null),
+            FirstCompletion = task.FirstCompletion ?? (lifecycle == "COMPLETED" && task.ParentId is null ? new(task.Id, actor, now) : null),
+            CancellationGroupId = null,
+            SnoozedUntil = command is CancelTask ? null : task.SnoozedUntil,
+            SnoozeVersion = command is CancelTask && task.SnoozedUntil is not null ? revision : task.SnoozeVersion,
         };
         return "ACCEPTED";
     }

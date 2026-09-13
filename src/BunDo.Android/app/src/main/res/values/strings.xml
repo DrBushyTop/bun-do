@@ -89,4 +89,21 @@
     <string name="task_restore_explanation">Palautus säilyttää aiemman tilan ja lykkäyksen mutta poistaa varauksen.</string>
     <string name="task_purging">Tehtävää poistetaan pysyvästi, eikä sitä voi enää palauttaa.</string>
     <string name="task_deleted_conflict">Tehtävä poistettiin. Tekstisi on tallessa tässä, ja sen voi kopioida uuteen tehtävään.</string>
+    <string name="checklist_add">Lisää vaiheita</string>
+    <string name="checklist_split">Jaa vaiheisiin</string>
+    <string name="checklist_title">Vaiheet</string>
+    <string name="checklist_items">Yksi vaihe riville</string>
+    <string name="checklist_progress">Valmiit vaiheet: %1$d / %2$d</string>
+    <string name="checklist_empty">Ei aktiivisia vaiheita. Lisää vaihe tai palauta poistettu vaihe.</string>
+    <string name="checklist_derived">Tehtävä valmistuu, kun sen vaiheet ovat valmiina.</string>
+    <string name="checklist_parent">Avaa vaiheiden tehtävä</string>
+    <string name="checklist_editor_help">Kirjoita yksi vaihe riville. Enimmäismäärä: %1$d. Muokkaa tai poista rivejä ennen tallennusta.</string>
+    <string name="checklist_invalid">Vaiheiden määrä: 1–%1$d. Kuhunkin vaiheeseen mahtuu 160 merkkiä.</string>
+    <string name="checklist_save_failed">Vaiheita ei voitu tallentaa. Tekstisi on yhä tässä. Yritä uudelleen.</string>
+    <string name="checklist_toggle">Muuta valmistumista: %1$s</string>
+    <string name="task_snooze">Lykkää</string>
+    <string name="task_snooze_hour">Lykkää tunnilla</string>
+    <string name="task_snoozed">Lykätty. Poista lykkäys ennen varaamista tai valmiiksi merkitsemistä.</string>
+    <string name="task_unsnooze">Poista lykkäys</string>
+    <string name="task_snoozed_view">Lykätyt</string>
 </resources>

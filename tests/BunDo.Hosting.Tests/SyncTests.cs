@@ -27,6 +27,38 @@ public sealed class SyncTests : IDisposable
         new(workspace, epoch, device, sequence, new CreateTask(TaskIdentity.ForCreate(device, sequence), title));
 
     [Fact]
+    public async Task Checklist_family_is_atomic_retryable_and_loaded_for_child_commands()
+    {
+        var epoch = await Create(); var sync = new SyncService(documents);
+        var root = (await sync.SubmitAsync(member, Operation(epoch, 1), default)).Receipt!.Task!;
+        var operation = new FrozenOperation(workspace, epoch, device, 2,
+            new SplitTask(root.Id, ChecklistTasks.Versions(root), Enumerable.Repeat("Step", 16).ToArray(), 1, 1));
+        var split = await sync.SubmitAsync(member, operation, default);
+        Assert.Equal("ACCEPTED", split.Code);
+        Assert.Equal(17, split.Receipt!.RelatedTasks!.Value.Length);
+        Assert.Equal(JsonSerializer.Serialize(split), JsonSerializer.Serialize(
+            await new SyncService(new LocalHouseholdDocuments(path)).SubmitAsync(member, operation, default)));
+        var page = await sync.PullAsync(member, workspace, epoch, null, [], "ACCEPTED", default);
+        Assert.Equal(17, JsonDocument.Parse(page.Groups.Last().Parts.Single().Payload).RootElement.GetArrayLength());
+        var child = split.Receipt.RelatedTasks.Value.First(t => t.ParentId == root.Id);
+        var complete = await sync.SubmitAsync(member, new(workspace, epoch, device, 3,
+            new CompleteTask(child.Id, ChecklistTasks.Versions(child))), default);
+        Assert.Equal("ACCEPTED", complete.Code);
+        Assert.Null(complete.Receipt!.Task!.FirstCompletion);
+        root = complete.Receipt.RelatedTasks!.Value.Single(t => t.Id == root.Id);
+        Assert.Equal(3UL, root.SubtreeVersion);
+        var deletion = await sync.SubmitAsync(member, new(workspace, epoch, device, 4,
+            new DeleteTask(root.Id, ChecklistTasks.Versions(root))), default);
+        Assert.Equal("ACCEPTED", deletion.Code);
+        Assert.All(deletion.Receipt!.RelatedTasks!.Value, task => Assert.Equal(deletion.Receipt.Task!.Deletion, task.Deletion));
+        var restore = await sync.SubmitAsync(member, new(workspace, epoch, device, 5,
+            new RestoreTask(root.Id, ChecklistTasks.Versions(deletion.Receipt.Task!))), default);
+        Assert.Equal("ACCEPTED", restore.Code);
+        Assert.All(restore.Receipt!.RelatedTasks!.Value, task => Assert.Null(task.Deletion));
+        Assert.Equal("COMPLETED", restore.Receipt.RelatedTasks.Value.Single(t => t.Id == child.Id).Lifecycle);
+    }
+
+    [Fact]
     public async Task TaskActionsReadCanonicalDocumentsAndCommitCreditOrderAndReceiptsTogether()
     {
         var epoch = await Create();

@@ -235,7 +235,7 @@ internal class SharedSnapshotRecovery(
                 require((code == "ACCEPTED") == (outcome.getString("state") == "ACCEPTED"))
                 if (code == "ACCEPTED") {
                     val task = receipt.getJSONObject("task")
-                    SharedProtocol.validateTask(task, receipt.decimal("effectRevision"))
+                    SharedChecklistActions.validateReceipt(receipt)
                     require(task.getString("id") == intent.taskId)
                     if (intent.titleChanged) require(task.getString("title") == intent.title)
                     if (intent.descriptionChanged) require(task.nullableString("description") == intent.description)
@@ -252,42 +252,22 @@ internal class SharedSnapshotRecovery(
     }
 
     private suspend fun replay(id: String, generation: String, revision: ULong) {
-        var task = dao.baseTask(scope, generation, id)?.snapshot?.let(::JSONObject)
-        val intents = dao.taskIntents(scope, id)
-        val applied = mutableSetOf<String>()
-        for (intent in intents) {
-            if (intent.status in listOf("REJECTED", "BLOCKED_DEPENDENCY", "QUARANTINED", "DISMISSED")) continue
-            if (intent.receipt?.let { JSONObject(it).decimal("effectRevision") <= revision } == true) continue
-            var problem: String? = null
-            if (intent.kind == "CreateTask") {
-                if (task == null) task = SharedProtocol.optimistic(intent)
-            } else if (task == null) problem = "ENTITY_MISSING"
-            else if (intent.taskAction != null) problem = SharedTaskActions.project(task, intent, intents, applied)
-            else {
-                fun version(sequence: String?, field: String, observed: String) = sequence?.let { seq ->
-                    intents.find { it.sequence == seq }?.receipt?.let(::JSONObject)?.optJSONObject("task")?.human(field)
-                } ?: observed
-                val dependency = intent.afterSequence?.let { seq -> intents.find { it.sequence == seq } }
-                problem = when {
-                    dependency?.status in listOf("QUARANTINED", "REJECTED", "BLOCKED_DEPENDENCY") -> "BLOCKED_DEPENDENCY"
-                    !task.isNull("deletion") -> "TASK_DELETED"
-                    task.decimal("deletionVersion").toString() != (intent.deletionAfterSequence?.let { seq ->
-                        intents.find { it.sequence == seq }?.receipt?.let(::JSONObject)?.optJSONObject("task")?.decimal("deletionVersion")?.toString()
-                    } ?: intent.observedDeletion) -> "STALE_LIFECYCLE"
-                    intent.titleChanged && task.human("title").toULong() > version(intent.titleAfterSequence, "title", intent.observedTitle).toULong() ||
-                        intent.descriptionChanged && task.human("description").toULong() > version(intent.descriptionAfterSequence, "description", intent.observedDescription).toULong() -> "FIELD_CONFLICT"
-                    else -> null
-                }
-                if (problem == null) {
-                    if (intent.titleChanged) task.put("title", intent.title)
-                    if (intent.descriptionChanged) task.put("description", intent.description ?: JSONObject.NULL)
-                }
-            }
-            if (problem == null) applied += intent.sequence
-            dao.saveIntent(intent.copy(problem = problem))
-        }
-        dao.deleteProjectionTask(scope, generation, id)
-        if (task != null) dao.saveProjection(SharedProjection(scope, id, task.toString(), generation))
+        val all = dao.intents(scope)
+        val state = checkNotNull(dao.workspace(scope))
+        val initial = dao.baseTask(scope, generation, id)?.snapshot?.let(::JSONObject)
+        val split = all.find { id in SharedChecklistActions.childIds(it, state.registration) }
+        val rootId = initial?.nullableString("parentId") ?: split?.taskId ?:
+            all.find { it.taskId == id && it.taskAction != null }?.taskAction?.let { JSONObject(it).nullableString("parentId") } ?: id
+        val root = dao.baseTask(scope, generation, rootId)?.snapshot?.let(::JSONObject)
+        val ids = (listOf(rootId, id) + root?.let(SharedChecklistActions::childIds).orEmpty() +
+            all.filter { it.taskId == rootId }.flatMap { SharedChecklistActions.childIds(it, state.registration) }).distinct()
+        val base = ids.mapNotNull { dao.baseTask(scope, generation, it)?.snapshot?.let(::JSONObject) }
+        val intents = all.filter { it.taskId in ids }
+        val result = SharedProjectionReplay.replay(base, intents, revision)
+        for (intent in intents) if (result.problems.containsKey(intent.sequence))
+            dao.saveIntent(intent.copy(problem = result.problems[intent.sequence]))
+        for (taskId in ids) dao.deleteProjectionTask(scope, generation, taskId)
+        for ((taskId, task) in result.tasks) dao.saveProjection(SharedProjection(scope, taskId, task.toString(), generation))
     }
 
     companion object {

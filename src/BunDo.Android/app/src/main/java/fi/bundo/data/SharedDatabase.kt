@@ -105,6 +105,8 @@ interface SharedDao {
     suspend fun clearBase(scope: String)
     @Query("SELECT * FROM shared_projection WHERE scope = :scope AND generation = (SELECT projectionGeneration FROM shared_workspaces WHERE scope = :scope) ORDER BY id")
     fun projection(scope: String): Flow<List<SharedProjection>>
+    @Query("SELECT * FROM shared_projection WHERE scope = :scope AND generation = :generation ORDER BY id")
+    suspend fun projectionRows(scope: String, generation: String): List<SharedProjection>
     @Query("SELECT * FROM shared_projection WHERE scope = :scope AND id = :id AND generation = (SELECT projectionGeneration FROM shared_workspaces WHERE scope = :scope)")
     suspend fun task(scope: String, id: String): SharedProjection?
     @Query("DELETE FROM shared_projection WHERE scope = :scope")

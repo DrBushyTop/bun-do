@@ -12,12 +12,15 @@ public sealed record TaskSnapshot(
     string Lifecycle = "OPEN", ulong LifecycleVersion = 0, Guid? ClaimantId = null,
     ulong ClaimVersion = 0, ulong HierarchyVersion = 0, Guid? LifecycleActorId = null,
     DateTimeOffset? LifecycleAt = null, FirstCompletion? FirstCompletion = null, ulong OrderIntentVersion = 0,
-    TaskDeletion? Deletion = null, DateTimeOffset? SnoozedUntil = null);
+    TaskDeletion? Deletion = null, DateTimeOffset? SnoozedUntil = null,
+    string? ParentId = null, bool IsChecklist = false, ImmutableArray<string>? ChildOrder = null,
+    ulong SubtreeVersion = 0, ulong SnoozeVersion = 0, string? CancellationGroupId = null,
+    bool EmptyChecklist = false);
 public sealed record DeviceRegistration(Guid DeviceId, Guid MemberId, ulong LastTerminalSequence = 0,
     ulong AcknowledgedThrough = 0, string? RegistryPartition = null);
 public sealed record OperationReceipt(
     string OperationId, string Fingerprint, string Code, ulong EffectRevision, TaskSnapshot? Task,
-    DateTimeOffset? RecordedAt = null)
+    DateTimeOffset? RecordedAt = null, ImmutableArray<TaskSnapshot>? RelatedTasks = null)
 {
     public bool Accepted => Code == "ACCEPTED";
 }

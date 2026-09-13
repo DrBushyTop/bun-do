@@ -18,6 +18,23 @@ public sealed class OperationEnvelopeTests
     })!.AsObject();
     private static FrozenOperation Parse(JsonNode node) => OperationEnvelope.Parse(Encoding.UTF8.GetBytes(node.ToJsonString()));
 
+    [Theory]
+    [InlineData("2099-01-01", false)]
+    [InlineData("2099-01-01T12:00:00", false)]
+    [InlineData("2099-01-01T12:00:00Z", true)]
+    [InlineData("2099-01-01T12:00:00.123Z", true)]
+    public void Snooze_requires_an_explicit_UTC_instant(string until, bool valid)
+    {
+        var node = Envelope(); node["command"] = "SetSnooze";
+        node["payload"] = new JsonObject { ["taskId"] = TaskIdentity.ForCreate(Device, 1), ["until"] = until };
+        var observed = new JsonObject();
+        foreach (var group in new[] { "lifecycle", "claim", "hierarchy", "deletion", "snooze" })
+            observed[group] = new JsonObject { ["fieldVersion"] = "1" };
+        node["observedVersions"] = observed;
+        if (valid) Assert.IsType<SetSnooze>(Parse(node).Command);
+        else Assert.Throws<EnvelopeException>(() => Parse(node));
+    }
+
     [Fact]
     public void FingerprintIncludesExactBytesRatherThanNormalizedJson()
     {

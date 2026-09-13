@@ -61,11 +61,18 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
     val membership = current?.membership?.let(::JSONObject)
     var history by rememberSaveable(selected.scope) { mutableStateOf(false) }
     var deleted by rememberSaveable(selected.scope) { mutableStateOf(false) }
+    var snoozed by rememberSaveable(selected.scope) { mutableStateOf(false) }
+    var now by remember { mutableStateOf(java.time.Instant.now()) }
+    LaunchedEffect(selected.scope) { while (true) { kotlinx.coroutines.delay(30_000); now = java.time.Instant.now() } }
+    var checklistId by rememberSaveable(selected.scope) { mutableStateOf<String?>(null) }
+    var checklistDraft by remember { mutableStateOf<ChecklistDraft?>(null) }
     val snackbar = remember(selected.scope) { SnackbarHostState() }
     val deletedMessage = stringResource(R.string.task_deleted)
     val undoLabel = stringResource(R.string.task_undo)
-    val queueRows = taskStates.filter { if (deleted) !it.isNull("deletion")
-        else it.isNull("deletion") && (it.optString("lifecycle", "OPEN") != "OPEN") == history }
+    val queueRows = taskStates.filter { if (deleted) !it.isNull("deletion") &&
+        (it.isNull("parentId") || byId[it.getString("parentId")]?.isNull("deletion") == true)
+        else it.isNull("parentId") && it.isNull("deletion") && (it.optString("lifecycle", "OPEN") != "OPEN") == history &&
+            (history || SharedChecklistActions.snoozed(it, byId, now) == snoozed) }
         .let { rows -> if (history) rows.sortedByDescending { it.optString("lifecycleAt") } else rows }
         .map(SharedProtocol::inbox)
     var imports by remember { mutableStateOf<List<RecoveryText>?>(null) }
@@ -85,6 +92,25 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
             finally { busy = false }
         }
     }
+    fun act(action: SharedTaskAction) {
+        run {
+            val sequence = repository.act(action.kind, action.displayed, action.confirmedClaimant, action.after, action.before, action.until)
+            SharedSyncWorker.request(context, data)
+            if (action.kind == "DeleteTask") scope.launch {
+                snackbar.currentSnackbarData?.dismiss()
+                if (snackbar.showSnackbar(deletedMessage, undoLabel, withDismissAction = true,
+                        duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) run {
+                    repository.undoDelete(JSONObject(action.displayed).getString("id"), sequence)
+                    SharedSyncWorker.request(context, data)
+                }
+            }
+        }
+    }
+    LaunchedEffect(checklistId) {
+        try { checklistDraft = checklistId?.let { repository.checklistDraft(it) } }
+        catch (error: CancellationException) { throw error }
+        catch (_: Exception) { failed = true }
+    }
     LaunchedEffect(selected.scope, current?.nextSequence) { SharedSyncWorker.request(context, data) }
     LaunchedEffect(current?.blocked) {
         if (current?.blocked == "FORBIDDEN") model.hide()
@@ -100,31 +126,22 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
         canEdit = current?.blocked == null, queueTasks = queueRows,
         canEditTask = { id -> byId[id]?.isNull("deletion") == true },
         snackbarHost = { SnackbarHost(snackbar) },
-        rowSummary = { id -> byId[id]?.let { SharedTaskSummary(it, membership) } },
-        taskControls = { id -> byId[id]?.let { task ->
-            SharedTaskControls(task, taskStates, membership, !busy && current?.blocked == null && recovery == null, failed) { action ->
-                run {
-                    val sequence = repository.act(action.kind, action.displayed, action.confirmedClaimant, action.after, action.before)
-                    SharedSyncWorker.request(context, data)
-                    if (action.kind == "DeleteTask") scope.launch {
-                        snackbar.currentSnackbarData?.dismiss()
-                        if (snackbar.showSnackbar(deletedMessage, undoLabel, withDismissAction = true,
-                                duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) run {
-                            repository.undoDelete(JSONObject(action.displayed).getString("id"), sequence)
-                            SharedSyncWorker.request(context, data)
-                        }
-                    }
-                }
-            }
+        rowSummary = { id -> byId[id]?.let { SharedTaskSummary(it, membership); ChecklistProgress(it, byId) } },
+        taskControls = { id, onOpen -> byId[id]?.let { task ->
+            SharedChecklist(task, byId, membership, !busy && current?.blocked == null && recovery == null,
+                onOpen, { checklistId = id }, ::act)
+            SharedTaskControls(task, taskStates, membership, !busy && current?.blocked == null && recovery == null, failed, ::act)
         } },
         queueHeader = {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-            FilterChip(selected = !history && !deleted, onClick = { history = false; deleted = false }, modifier = Modifier.testTag("task-active-view"),
+            FilterChip(selected = !history && !deleted && !snoozed, onClick = { history = false; deleted = false; snoozed = false }, modifier = Modifier.testTag("task-active-view"),
                 label = { Text(stringResource(R.string.task_active_view)) })
-            FilterChip(selected = history && !deleted, onClick = { history = true; deleted = false }, modifier = Modifier.testTag("task-history-view"),
+            FilterChip(selected = history && !deleted, onClick = { history = true; deleted = false; snoozed = false }, modifier = Modifier.testTag("task-history-view"),
                 label = { Text(stringResource(R.string.task_history_view)) })
             FilterChip(selected = deleted, onClick = { deleted = true }, modifier = Modifier.testTag("task-deleted-view"),
                 label = { Text(stringResource(R.string.task_deleted_view)) })
+            FilterChip(selected = snoozed && !deleted && !history, onClick = { snoozed = true; deleted = false; history = false },
+                modifier = Modifier.testTag("task-snoozed-view"), label = { Text(stringResource(R.string.task_snoozed_view)) })
             if (deleted) Text(stringResource(if (queueRows.isEmpty()) R.string.task_deleted_empty else R.string.task_deleted_retention))
             recovery?.let { recovering ->
                 Text(stringResource(if (recovering.problem == "STORAGE_REQUIRED") R.string.shared_storage_required
@@ -158,6 +175,15 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
             if (failed) Text(stringResource(R.string.shared_action_failed), color = MaterialTheme.colorScheme.error)
         }
     })
+    checklistDraft?.let { draft -> ChecklistEditor(draft, busy || current?.blocked != null, failed,
+        repository::saveChecklistDraft,
+        onSave = { latest -> run {
+            repository.saveChecklistDraft(latest)
+            repository.commitChecklist(latest.taskId)
+            checklistId = null; checklistDraft = null
+            SharedSyncWorker.request(context, data)
+        } },
+        onClose = { latest -> run { repository.saveChecklistDraft(latest); checklistId = null; checklistDraft = null } }) }
     imports?.let { texts ->
         AlertDialog(onDismissRequest = { if (!busy) imports = null },
             title = { Text(stringResource(R.string.shared_import)) },
@@ -191,10 +217,10 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
                 if (intent.taskAction != null) Text(stringResource(taskActionLabel(intent.kind)))
                 Text(stringResource(when (intent.problem) {
                     "CLAIM_CONFLICT", "ALREADY_CLAIMED", "CLAIM_CONFIRMATION_REQUIRED", "CLAIM_NOT_YOURS" -> R.string.task_claim_conflict
-                    "LIFECYCLE_CONFLICT", "HIERARCHY_CONFLICT", "ORDER_CONFLICT", "TASK_NOT_OPEN", "TASK_NOT_DELETED" -> R.string.task_state_conflict
+                    "LIFECYCLE_CONFLICT", "HIERARCHY_CONFLICT", "ORDER_CONFLICT", "SUBTREE_CONFLICT", "SNOOZE_CONFLICT", "TASK_SNOOZED", "PARENT_UNAVAILABLE", "CHECKLIST_ROOT", "CHECKLIST_DERIVED", "TASK_NOT_OPEN", "TASK_NOT_DELETED" -> R.string.task_state_conflict
                     "TASK_DELETED", "TASK_PURGING" -> R.string.task_deleted_conflict
                     "FIELD_CONFLICT", "DELETION_CONFLICT" -> R.string.shared_conflict_reason
-                    "TASK_LIMIT" -> R.string.shared_limit_reason
+                    "TASK_LIMIT", "CHECKLIST_LIMIT" -> R.string.shared_limit_reason
                     "BLOCKED_DEPENDENCY" -> R.string.shared_dependency_reason
                     else -> R.string.shared_preserved_reason
                 }))
@@ -212,7 +238,7 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
                     onClick = { reapply = intent.sequence to shared }) {
                     Text(stringResource(R.string.shared_reapply))
                 }
-                if (intent.taskAction == null || shared == null || !JSONObject(shared).isNull("deletion"))
+                if (intent.taskAction == null || intent.kind in SharedChecklistActions.splitKinds || shared == null || !JSONObject(shared).isNull("deletion"))
                     TextButton(enabled = !busy && current?.blocked == null && terminal, onClick = { run {
                     repository.copyText(intent.title, intent.description.orEmpty())
                     showProblems = false

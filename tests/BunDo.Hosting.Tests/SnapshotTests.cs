@@ -280,6 +280,42 @@ public sealed class SnapshotTests : IDisposable
         Assert.Equal(completed.FirstCompletion, credit);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Checklist_purge_keeps_families_intact_and_detaches_independent_items(bool deleteRoot)
+    {
+        var epoch = await Create(); var sync = new SyncService(storage);
+        var root = (await sync.SubmitAsync(member, Capture(epoch), default, "registry")).Receipt!.Task!;
+        var split = (await sync.SubmitAsync(member, new(workspace, epoch, device, 2,
+            new SplitTask(root.Id, ChecklistTasks.Versions(root), ["One", "Two"], 1, 1)), default, "registry")).Receipt!;
+        root = split.Task!;
+        var child = split.RelatedTasks!.Value.First(t => t.ParentId == root.Id);
+        var deleted = (await sync.SubmitAsync(member, new(workspace, epoch, device, 3,
+            new DeleteTask(child.Id, ChecklistTasks.Versions(child))), default, "registry")).Receipt!;
+        root = deleted.RelatedTasks!.Value.Single(t => t.Id == root.Id);
+        if (deleteRoot)
+            await sync.SubmitAsync(member, new(workspace, epoch, device, 4,
+                new DeleteTask(root.Id, ChecklistTasks.Versions(root))), default, "registry");
+        await sync.AcknowledgeAsync(member, workspace, epoch, device, deleteRoot ? 4UL : 3UL, default);
+        clock.Now = clock.Now.AddDays(121);
+        var registrations = new RegistrationReader { Registration = new(Guid.NewGuid(), device, clock.Now.AddDays(-1)) };
+        var module = Module(registrations: registrations);
+        await module.PruneAsync(member, workspace, epoch, default);
+        Assert.NotNull(await storage.ReadAsync<TaskSnapshot>(workspace.ToString(), WorkspaceCommit.TaskId(child.Id), default));
+        await module.PruneAsync(member, workspace, epoch, default);
+        Assert.Null(await storage.ReadAsync<TaskSnapshot>(workspace.ToString(), WorkspaceCommit.TaskId(child.Id), default));
+        var retained = await storage.ReadAsync<TaskSnapshot>(workspace.ToString(), WorkspaceCommit.TaskId(root.Id), default);
+        if (deleteRoot) Assert.Null(retained);
+        else {
+            Assert.NotNull(retained);
+            Assert.Single(retained.Value.ChildOrder!.Value);
+            Assert.DoesNotContain(child.Id, retained.Value.ChildOrder.Value);
+        }
+        var state = (await storage.ReadAsync<WorkspaceState>(workspace.ToString(), "state", default))!.Value;
+        Assert.Equal(deleteRoot ? 0 : 2, state.TaskCount);
+    }
+
     private static TaskStateVersions Versions(TaskSnapshot task) =>
         new(task.LifecycleVersion, task.ClaimVersion, task.HierarchyVersion, task.DeletionVersion);
 

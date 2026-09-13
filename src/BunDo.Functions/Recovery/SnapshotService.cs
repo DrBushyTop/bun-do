@@ -201,7 +201,8 @@ public sealed class SnapshotService(IHouseholdDocuments documents, ISnapshotArti
                 }
                 deletes.Add(receiptId);
             }
-            else if (!group.Tasks.IsEmpty && !group.Tasks.All(t => t.Deletion?.Purging == true)) break;
+            else if (!group.Tasks.IsEmpty && !group.Tasks.All(t => t.Deletion?.Purging == true) &&
+                group.PurgedTaskIds.GetValueOrDefault().IsDefaultOrEmpty) break;
             deletes.Add(groupId); through++;
         }
         if (through == stored.Value.PrunedThrough)
@@ -211,8 +212,8 @@ public sealed class SnapshotService(IHouseholdDocuments documents, ISnapshotArti
         return deletes.Count + await PurgeDeletedTasksAsync(member, workspace, epoch, ct);
     }
 
-    // Leaf captures are embedded in their task document. PURGING is the durable cleanup cursor:
-    // the next maintenance pass removes the document and its capture together, at most 32 per commit.
+    // Captures are embedded in task documents. PURGING is the durable cleanup cursor.
+    // Remove at most 32 tasks per commit, keeping each deleted checklist family together.
     private async Task<int> PurgeDeletedTasksAsync(Guid member, Guid workspace, Guid epoch, CancellationToken ct)
     {
         if (registrations is null) return 0;
@@ -235,25 +236,45 @@ public sealed class SnapshotService(IHouseholdDocuments documents, ISnapshotArti
                 ? await registrations.ReadAsync(registry, device.DeviceId, ct) : null;
             if (registration is null || !registration.Revoked && registration.ExpiresAt > clock.GetUtcNow()) return 0;
         }
-        var candidates = new List<TaskSnapshot>();
+        var tasks = new Dictionary<string, TaskSnapshot>();
         do
         {
             var page = await documents.ReadPageAsync<TaskSnapshot>(partition, "task:", continuation, 64, ct);
-            candidates.AddRange(page.Items.Select(x => x.Value).Where(task =>
-                !stored.Value.Tasks.ContainsKey(task.Id) &&
-                task.Deletion is { } deletion && deletion.DeletedAt <= clock.GetUtcNow().AddDays(-120) &&
-                (deletion.Purging || task.DeletionVersion <= stored.Value.PrunedThrough)).Take(32 - candidates.Count));
+            foreach (var item in page.Items) tasks[item.Value.Id] = item.Value;
             continuation = page.Continuation;
-        } while (continuation is not null && candidates.Count < 32);
+        } while (continuation is not null);
+        bool Eligible(TaskSnapshot task) => !stored.Value.Tasks.ContainsKey(task.Id) &&
+            task.Deletion is { } deletion && deletion.DeletedAt <= clock.GetUtcNow().AddDays(-120) &&
+            (deletion.Purging || task.DeletionVersion <= stored.Value.PrunedThrough);
+        var candidates = new List<TaskSnapshot>();
+        foreach (var task in tasks.Values.OrderBy(value => value.Id))
+        {
+            if (!Eligible(task) || candidates.Any(value => value.Id == task.Id)) continue;
+            if (task.ParentId is { } parentId && (!tasks.TryGetValue(parentId, out var parent) || parent.Deletion is not null)) continue;
+            var group = new List<TaskSnapshot> { task };
+            foreach (var childId in task.ChildOrder ?? [])
+            {
+                if (!tasks.TryGetValue(childId, out var child) || !Eligible(child)) { group.Clear(); break; }
+                group.Add(child);
+            }
+            // A deleted root waits for every independent child group. Never orphan a retained item.
+            if (group.Count == 0 || candidates.Count + group.Count > 32) continue;
+            candidates.AddRange(group.All(value => value.Deletion!.Purging) ? group :
+                group.Select(value => value with { Deletion = value.Deletion! with { Purging = false } }));
+        }
         if (candidates.Count == 0) return 0;
         var next = Advance(stored.Value);
         var purge = candidates.Where(t => t.Deletion!.Purging).Select(t => t.Id).ToImmutableArray();
         var marked = candidates.Where(t => !t.Deletion!.Purging)
             .Select(t => t with { Deletion = t.Deletion! with { Purging = true }, DeletionVersion = next.Revision }).ToImmutableArray();
+        var parents = candidates.Where(task => purge.Contains(task.Id) && task.ParentId is not null && !purge.Contains(task.ParentId))
+            .Select(task => task.ParentId!).Distinct().Select(id => tasks[id] with {
+                ChildOrder = tasks[id].ChildOrder?.RemoveRange(purge), HierarchyVersion = next.Revision, SubtreeVersion = next.Revision,
+            }).ToImmutableArray();
         next = next with {
             TaskCount = next.TaskCount - purge.Length,
             RootOrder = next.RootOrder?.RemoveRange(purge),
-            Changes = [new(next.Revision, marked, clock.GetUtcNow(), PurgedTaskIds: purge,
+            Changes = [new(next.Revision, marked.AddRange(parents), clock.GetUtcNow(), PurgedTaskIds: purge,
                 RetainedCompletions: candidates.Where(t => purge.Contains(t.Id) && t.FirstCompletion is not null)
                     .Select(t => t.FirstCompletion!).ToImmutableArray())],
         };
