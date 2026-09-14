@@ -240,6 +240,10 @@ private fun Queue(
                     }
                 }
             }
+            if (state.savedPlacement != null) item {
+                Text(stringResource(if (state.savedPlacement == "EXPEDITED") R.string.detail_saved_priority else R.string.detail_saved_append),
+                    Modifier.padding(horizontal = gutter, vertical = 8.dp).semantics { liveRegion = LiveRegionMode.Polite })
+            }
             if (state.readFailed || state.writeFailed) {
                 item { ErrorNotice(if (state.readFailed) R.string.read_failed else R.string.open_failed, onRetry) }
             } else if (!state.loaded) {
@@ -351,6 +355,7 @@ private fun Editor(state: InboxUiState, model: InboxViewModel, modifier: Modifie
             supportingText = { FieldCount(draft.description, InboxLimits.DESCRIPTION) },
             modifier = Modifier.fillMaxWidth().testTag("description"),
         )
+        draft.details?.let { TaskDateFields(it, draft.key == fi.bundo.data.InboxRepository.NEW_DRAFT, !state.working, model::changeDetails) }
         if (draft.title.isBlank()) Text(stringResource(R.string.title_required), style = MaterialTheme.typography.bodyMedium)
         Text(
             stringResource(if (state.draftSaved) R.string.draft_saved else R.string.saving),

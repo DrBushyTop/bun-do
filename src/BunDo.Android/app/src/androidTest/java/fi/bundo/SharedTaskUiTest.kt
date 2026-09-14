@@ -85,6 +85,46 @@ class SharedTaskUiTest {
         return data to state
     }
 
+    @Test fun tomorrowCaptureExplainsPlacementAndPersistsUrgencyInEnglish() {
+        val (data, state) = fixture("en", "light")
+        compose.onNodeWithTag("capture").performClick()
+        compose.onNodeWithTag("title").performTextInput("Collect parcel")
+        compose.onNodeWithTag("due-tomorrow").performScrollTo().performClick()
+        compose.onNodeWithTag("task-urgent").performScrollTo().performClick()
+        compose.onNodeWithTag("placement-hint").performScrollTo().assertTextEquals("Added after the urgent and soon-due tasks at the front of the queue.")
+        screenshot("details-en-placement")
+        compose.onNodeWithTag("save").performClick()
+        compose.waitUntil(5_000) {
+            runBlocking { data.database.shared().intents(state.scope).any { it.kind == "CreateTask" } }
+        }
+        compose.onNodeWithText("Saved among urgent and soon-due tasks.").assertExists()
+        val intent = runBlocking { data.database.shared().intents(state.scope).first { it.kind == "CreateTask" } }
+        assertTrue(JSONObject(intent.details!!).getBoolean("urgent"))
+        assertEquals("DATE_ONLY", JSONObject(intent.details).getJSONObject("due").getString("kind"))
+    }
+
+    @Test fun finnishLargeTextShowsAttributionAndSnoozesOffline() {
+        val (data, state) = fixture("fi", "light", fontScale = 2f)
+        runBlocking {
+            val dao = data.database.shared()
+            val base = dao.base(state.scope).first { JSONObject(it.snapshot).optString("title") == "Vie paperit kierrätykseen" }
+            val task = JSONObject(base.snapshot).put("creation", JSONObject().put("actorId", alice)
+                .put("capturedAt", "2026-09-14T07:00:00Z").put("acceptedAt", "2026-09-14T08:00:00Z"))
+                .put("lastChange", JSONObject().put("actorId", JSONObject.NULL).put("source", "AI").put("at", "2026-09-14T08:10:00Z"))
+            dao.saveBase(base.copy(snapshot = task.toString()))
+            dao.saveProjection(SharedProjection(state.scope, task.getString("id"), task.toString()))
+        }
+        compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
+        compose.onNodeWithTag("task-creation").performScrollTo().assertTextContains("Alice", substring = true)
+        compose.onNodeWithTag("task-last-change").performScrollTo().assertExists()
+        screenshot("details-fi-attribution")
+        compose.onNodeWithTag("snooze-tomorrow").performScrollTo().performClick()
+        compose.waitUntil(5_000) { runBlocking { data.database.shared().intents(state.scope).any { it.kind == "SetSnooze" } } }
+        compose.onNodeWithTag("task-claim").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("task-last-change").performScrollTo().assertExists()
+        screenshot("details-fi-snoozed")
+    }
+
     @Test fun cleanupPendingAndCancelStayUsableAtLargeFinnishText() {
         fixture("fi", "light", fontScale = 2f)
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()

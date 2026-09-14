@@ -26,6 +26,7 @@ data class InboxUiState(
     val working: Boolean = false,
     val writeFailed: Boolean = false,
     val readFailed: Boolean = false,
+    val savedPlacement: String? = null,
 )
 
 class InboxViewModel(private val repository: TaskEditorRepository, private val savedState: SavedStateHandle) :
@@ -84,7 +85,7 @@ class InboxViewModel(private val repository: TaskEditorRepository, private val s
 
     fun openEditor(key: String = InboxRepository.NEW_DRAFT) {
         if (state.value.working) return
-        mutableState.update { it.copy(working = true, writeFailed = false) }
+        mutableState.update { it.copy(working = true, writeFailed = false, savedPlacement = null) }
         writes.trySend(Write(perform = {
             val draft = repository.draft(key)
             savedState["editorKey"] = key
@@ -98,6 +99,13 @@ class InboxViewModel(private val repository: TaskEditorRepository, private val s
     fun change(title: String, description: String) {
         if (state.value.working) return
         val draft = state.value.editor?.copy(title = title, description = description) ?: return
+        mutableState.update { it.copy(editor = draft, draftSaved = false, writeFailed = false) }
+        persist(draft)
+    }
+
+    fun changeDetails(details: String) {
+        if (state.value.working) return
+        val draft = state.value.editor?.copy(details = details) ?: return
         mutableState.update { it.copy(editor = draft, draftSaved = false, writeFailed = false) }
         persist(draft)
     }
@@ -124,14 +132,15 @@ class InboxViewModel(private val repository: TaskEditorRepository, private val s
 
     fun closeEditor(commit: Boolean) {
         val draft = state.value.editor ?: return
-        if (state.value.working || (commit && !InboxLimits.valid(draft.title, draft.description))) return
+        if (state.value.working || (commit && (!InboxLimits.valid(draft.title, draft.description) || !fi.bundo.data.SharedTaskDetails.valid(draft.details)))) return
         mutableState.update { it.copy(working = true, writeFailed = false) }
         writes.trySend(Write(perform = {
             // Explicit Back is a durability boundary, just like Save.
-            if (commit) repository.commit(draft) else repository.saveDraft(draft)
+            val placement = if (commit) repository.commit(draft).let { if (draft.key == InboxRepository.NEW_DRAFT) repository.placement(it) else null }
+                else { repository.saveDraft(draft); null }
             savedState.remove<String>("editorKey")
             mutableState.update {
-                it.copy(editor = null, working = false, draftSaved = true, writeFailed = false)
+                it.copy(editor = null, working = false, draftSaved = true, writeFailed = false, savedPlacement = placement)
             }
         }, failed = {
             retryWrite = { closeEditor(commit) }

@@ -1,11 +1,68 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["title", "description", "language", "needsReview"],
+  "required": [
+    "title",
+    "description",
+    "language",
+    "needsReview",
+    "due"
+  ],
   "properties": {
-    "title": { "type": "string" },
-    "description": { "type": ["string", "null"] },
-    "language": { "type": "string", "enum": ["fi", "en", "mixed", "und"] },
-    "needsReview": { "type": "boolean" }
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "language": {
+      "type": "string",
+      "enum": [
+        "fi",
+        "en",
+        "mixed",
+        "und"
+      ]
+    },
+    "needsReview": {
+      "type": "boolean"
+    },
+    "due": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "localDate",
+        "localTime",
+        "zoneId"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "DATE_ONLY",
+            "DATE_TIME"
+          ]
+        },
+        "localDate": {
+          "type": "string"
+        },
+        "localTime": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "zoneId": {
+          "type": "string"
+        }
+      }
+    }
   }
 }

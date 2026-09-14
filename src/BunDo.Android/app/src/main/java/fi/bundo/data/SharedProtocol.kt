@@ -16,8 +16,8 @@ internal fun JSONObject.decimal(key: String): ULong {
     return text.toULong()
 }
 
-internal fun JSONObject.human(group: String) = getJSONObject("${group}Version").decimal("humanVersion").toString()
-internal fun JSONObject.field(group: String) = getJSONObject("${group}Version").decimal("fieldVersion")
+internal fun JSONObject.human(group: String) = optJSONObject("${group}Version")?.decimal("humanVersion")?.toString() ?: "0"
+internal fun JSONObject.field(group: String) = optJSONObject("${group}Version")?.decimal("fieldVersion") ?: 0uL
 internal fun JSONObject.nullableString(key: String) = if (isNull(key)) null else getString(key)
 internal fun sha256(text: String): String =
     MessageDigest.getInstance("SHA-256").digest(text.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
@@ -43,8 +43,7 @@ internal object SharedProtocol {
         return UUID(buffer.long, buffer.long).toString()
     }
 
-    fun context(): String {
-        val now = Instant.now()
+    fun context(now: Instant = Instant.now()): String {
         val zone = ZoneId.systemDefault()
         val local = now.atZone(zone)
         return JSONObject().put("capturedInstant", now.toString())
@@ -56,7 +55,7 @@ internal object SharedProtocol {
 
     fun dependencies(intent: SharedIntent): List<String> = listOfNotNull(intent.afterSequence,
         intent.titleAfterSequence, intent.descriptionAfterSequence, intent.deletionAfterSequence)
-        .plus(SharedTaskActions.dependencies(intent)).distinct()
+        .plus(SharedTaskActions.dependencies(intent)).plus(SharedTaskDetails.dependencies(intent)).distinct()
 
     fun freeze(workspace: SharedWorkspace, intent: SharedIntent, receipts: Map<String, JSONObject>): String {
         val required = dependencies(intent)
@@ -96,6 +95,7 @@ internal object SharedProtocol {
                 "EditTask"
             }
         }
+        if (rejected == null && intent.details != null) SharedTaskDetails.freeze(intent, receipts, payload, observed)
         return JSONObject().put("protocolVersion", 1).put("commandVersion", 1)
             .put("workspaceId", workspace.workspaceId).put("stateEpoch", workspace.epoch)
             .put("deviceId", workspace.registration).put("sequence", intent.sequence)
@@ -111,6 +111,7 @@ internal object SharedProtocol {
         .put("deletionVersion", "0").put("capture", JSONObject().put("title", intent.title)
             .put("description", intent.description ?: JSONObject.NULL).put("context", JSONObject(intent.captureContext)))
         .put("lifecycle", "OPEN").put("claimantId", JSONObject.NULL)
+        .also { SharedTaskDetails.projectCreate(it, intent) }
 
     fun inbox(task: JSONObject): InboxTask {
         val capture = task.optJSONObject("capture")
@@ -140,6 +141,18 @@ internal object SharedProtocol {
             val field = task.field(group)
             val human = task.human(group).toULong()
             require(human > 0u && human <= field && field <= revision)
+        }
+        task.optJSONObject("dueVersion")?.let {
+            require(task.human("due").toULong() <= task.field("due") && task.field("due") <= revision)
+        }
+        task.optJSONObject("due")?.let { SharedTaskDetails.normalize(it) }
+        task.optJSONObject("creation")?.let {
+            it.nullableString("capturedAt")?.let(Instant::parse); Instant.parse(it.getString("acceptedAt"))
+            it.nullableString("actorId")?.let(UUID::fromString)
+        }
+        task.optJSONObject("lastChange")?.let {
+            Instant.parse(it.getString("at")); require(it.getString("source") in listOf("HUMAN", "AI", "SYSTEM"))
+            it.nullableString("actorId")?.let(UUID::fromString)
         }
         require(task.decimal("deletionVersion") in 1uL..revision)
         task.optJSONObject("deletion")?.let {
@@ -173,10 +186,13 @@ internal object SharedProtocol {
         listOf("title", "description").all { group ->
             current.field(group) >= effect.field(group) &&
                 (current.field(group) != effect.field(group) || current.nullableString(group) == effect.nullableString(group))
-        } && SharedTaskActions.groups.all { group ->
+        } && current.field("due") >= effect.field("due") &&
+            (current.field("due") != effect.field("due") || sameJson(current.optJSONObject("due"), effect.optJSONObject("due"))) &&
+            SharedTaskActions.groups.all { group ->
             val actual = SharedTaskActions.version(current, group).toULong()
             val expected = SharedTaskActions.version(effect, group).toULong()
             val fields = when (group) {
+                "urgent" -> listOf("urgent")
                 "lifecycle" -> listOf("lifecycle", "lifecycleActorId", "lifecycleAt", "cancellationGroupId")
                 "claim" -> listOf("claimantId")
                 "deletion" -> listOf("deletion")

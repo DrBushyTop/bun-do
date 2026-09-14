@@ -65,11 +65,12 @@ data class SharedIntent(
     val titleAfterSequence: String? = null, val descriptionAfterSequence: String? = null,
     val deletionAfterSequence: String? = null,
     val taskAction: String? = null,
+    val details: String? = null,
 )
 
 @Entity(tableName = "shared_drafts", primaryKeys = ["scope", "key"])
 data class SharedDraft(val scope: String, val key: String, val title: String, val description: String, val savedAt: Long,
-    val basis: String? = null)
+    val basis: String? = null, val details: String? = null)
 
 @Dao
 interface SharedDao {

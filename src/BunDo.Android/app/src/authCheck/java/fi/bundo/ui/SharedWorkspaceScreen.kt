@@ -200,7 +200,7 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
             } },
             confirmButton = { TextButton(enabled = !busy && chosen.isNotEmpty(), onClick = { run {
                 for (text in texts.filter { it.source in chosen }) {
-                    repository.copyText(text.title, text.description)
+                    repository.copyText(text.title, text.description, text.capturedAt, text.captureContext)
                     chosen = chosen - text.source
                 }
                 imports = null
@@ -225,6 +225,11 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
                     else -> R.string.shared_preserved_reason
                 }))
                 if (!intent.description.isNullOrEmpty()) Text(intent.description)
+                intent.details?.let(::JSONObject)?.let { detail ->
+                    detail.optJSONObject("due")?.let { Text(dueLabel(it)) }
+                    if (detail.has("due") && detail.isNull("due")) Text(stringResource(R.string.detail_no_due))
+                    if (detail.has("urgent")) Text(stringResource(if (detail.getBoolean("urgent")) R.string.detail_urgent else R.string.detail_not_urgent))
+                }
                 val shared = canonical[intent.taskId]
                 if (shared != null) {
                     val task = JSONObject(shared)

@@ -4,7 +4,7 @@ The owner retained simple statistics and explicitly requested a weekly streak in
 
 ## Capture and due dates
 
-Preserve the existing capture context, including original local date/time and zone. Relative language such as "tomorrow" uses capture time, not later processing time. A task deadline and a time mentioned in its text are different facts. An ambiguous date remains a suggestion for human confirmation. V1 does not require a new authenticated-clock confidence system; existing metadata can remain without making it an automatic-date admission gate.
+Preserve the existing capture context, including original local date/time and zone. Relative language such as "tomorrow" uses capture time, not later processing time. Recovery imports preserve valid original capture context. An unknown timestamp or missing original zone stays unknown; an import-time device zone must not become the original capture zone. Date proposals without original capture context require review. A task deadline and a time mentioned in its text are different facts. An ambiguous date remains a suggestion for human confirmation. V1 does not require a new authenticated-clock confidence system; existing metadata can remain without making it an automatic-date admission gate.
 
 Date-only values stay dates. Timed values keep their local time and IANA zone. Pin the reminder zone when saving a date-only deadline. Later changes to device or workspace defaults do not rewrite saved dates. In a DST overlap choose the earlier instant; in a gap shift by the gap duration. Preserve the nominal value and explain any adjustment where relevant. Snooze is a separate until-instant.
 

@@ -1,0 +1,33 @@
+<resources>
+    <string name="detail_due">Due date</string>
+    <string name="detail_choose_date">Choose date</string>
+    <string name="detail_today">Today</string>
+    <string name="detail_tomorrow">Tomorrow</string>
+    <string name="detail_next_week">In a week</string>
+    <string name="detail_add_time">Add time</string>
+    <string name="detail_date_only">Date only</string>
+    <string name="detail_remove_due">Remove due date</string>
+    <string name="detail_urgent">Urgent</string>
+    <string name="detail_gap">This time falls in a daylight-saving gap. It moves forward by the length of the gap.</string>
+    <string name="detail_overlap">This time occurs twice. The earlier instant is used.</string>
+    <string name="detail_keep_position">The task keeps its queue position.</string>
+    <string name="detail_priority_position">Added after the urgent and soon-due tasks at the front of the queue.</string>
+    <string name="detail_append_position">Added at the end of the queue.</string>
+    <string name="detail_saved_priority">Saved among urgent and soon-due tasks.</string>
+    <string name="detail_saved_append">Saved at the end of the queue.</string>
+    <string name="detail_created">Created by %1$s · %2$s</string>
+    <string name="detail_anonymous_created">Original capture · %1$s</string>
+    <string name="detail_changed">Changed by %1$s · %2$s</string>
+    <string name="detail_ai_changed">AI change · %1$s</string>
+    <string name="detail_pending_changed">Local change, %1$s · %2$s</string>
+    <string name="detail_pending_created">Saved locally · %1$s</string>
+    <string name="detail_snooze_until">Snoozed until %1$s</string>
+    <string name="detail_snooze_choose">Choose when snooze ends</string>
+    <string name="detail_snooze_tomorrow">Until tomorrow morning</string>
+    <string name="detail_snooze_week">For a week</string>
+    <string name="detail_not_urgent">Not urgent</string>
+    <string name="detail_no_due">No due date</string>
+    <string name="detail_system_changed">System changed · %1$s</string>
+    <string name="detail_snooze_future">Choose a future time.</string>
+    <string name="detail_unknown_capture">Capture time unknown</string>
+</resources>

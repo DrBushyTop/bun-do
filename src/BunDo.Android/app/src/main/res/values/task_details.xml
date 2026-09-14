@@ -1,0 +1,33 @@
+<resources>
+    <string name="detail_due">Eräpäivä</string>
+    <string name="detail_choose_date">Valitse päivä</string>
+    <string name="detail_today">Tänään</string>
+    <string name="detail_tomorrow">Huomenna</string>
+    <string name="detail_next_week">Viikon päästä</string>
+    <string name="detail_add_time">Lisää kellonaika</string>
+    <string name="detail_date_only">Vain päivä</string>
+    <string name="detail_remove_due">Poista eräpäivä</string>
+    <string name="detail_urgent">Kiireellinen</string>
+    <string name="detail_gap">Kellonaika osuu kesäaikasiirtymän aukkoon. Aikaa siirretään aukon verran eteenpäin.</string>
+    <string name="detail_overlap">Kellonaika esiintyy kahdesti. Käytetään aikaisempaa hetkeä.</string>
+    <string name="detail_keep_position">Tehtävän paikka jonossa säilyy.</string>
+    <string name="detail_priority_position">Lisätään jonon alun kiireellisten ja pian erääntyvien tehtävien jälkeen.</string>
+    <string name="detail_append_position">Lisätään jonon loppuun.</string>
+    <string name="detail_saved_priority">Tallennettu kiireellisten ja pian erääntyvien tehtävien joukkoon.</string>
+    <string name="detail_saved_append">Tallennettu jonon loppuun.</string>
+    <string name="detail_created">Luonut %1$s · %2$s</string>
+    <string name="detail_anonymous_created">Alkuperäinen tallennus · %1$s</string>
+    <string name="detail_changed">Muuttanut %1$s · %2$s</string>
+    <string name="detail_ai_changed">Tekoälyn muutos · %1$s</string>
+    <string name="detail_pending_changed">Paikallinen muutos, %1$s · %2$s</string>
+    <string name="detail_pending_created">Tallennettu paikallisesti · %1$s</string>
+    <string name="detail_snooze_until">Lykätty: %1$s</string>
+    <string name="detail_snooze_choose">Valitse lykkäyksen päättyminen</string>
+    <string name="detail_snooze_tomorrow">Huomisaamuun</string>
+    <string name="detail_snooze_week">Viikon päähän</string>
+    <string name="detail_not_urgent">Ei kiireellinen</string>
+    <string name="detail_no_due">Ei määräpäivää</string>
+    <string name="detail_system_changed">Järjestelmä muutti · %1$s</string>
+    <string name="detail_snooze_future">Valitse tuleva ajankohta.</string>
+    <string name="detail_unknown_capture">Tallennusaika ei tiedossa</string>
+</resources>

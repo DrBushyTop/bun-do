@@ -38,7 +38,10 @@ internal object SharedProjectionReplay {
                 else if (task.decimal("deletionVersion").toString() != deletionVersion) problem = "DELETION_CONFLICT"
                 else if (intent.titleChanged && task.human("title").toULong() > titleVersion.toULong() ||
                     intent.descriptionChanged && task.human("description").toULong() > descriptionVersion.toULong()) problem = "FIELD_CONFLICT"
+                else if (SharedTaskDetails.problem(task, intent, intents, applied) != null)
+                    problem = SharedTaskDetails.problem(task, intent, intents, applied)
                 else {
+                    SharedTaskDetails.projectEdit(task, intent)
                     if (intent.titleChanged) task.put("title", intent.title)
                     if (intent.descriptionChanged) task.put("description", intent.description ?: JSONObject.NULL)
                 }

@@ -21,6 +21,155 @@ class SharedTaskActionsTest {
     private val other = UUID.randomUUID().toString()
     @get:Rule val migrations = MigrationTestHelper(InstrumentationRegistry.getInstrumentation(), InboxDatabase::class.java)
 
+    private fun due(date: String, time: String? = null) = JSONObject().put("kind", if (time == null) "DATE_ONLY" else "DATE_TIME")
+        .put("localDate", date).put("localTime", time ?: JSONObject.NULL).put("zoneId", "Europe/Helsinki")
+
+    @Test fun savedDeadlineUsesPinnedZoneAndHelsinkiDstPolicy() {
+        for ((date, instant, adjustment) in listOf(Triple("2026-03-29", "2026-03-29T01:30:00Z", "GAP_FORWARD"),
+            Triple("2026-10-25", "2026-10-25T00:30:00Z", "OVERLAP_EARLIER"))) {
+            val result = SharedTaskDetails.normalize(due(date, "03:30"))
+            assertEquals(instant, result.getString("instant")); assertEquals("03:30", result.getString("localTime"))
+            assertEquals(adjustment, result.getString("adjustment"))
+            val original = java.util.TimeZone.getDefault()
+            try {
+                java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("America/New_York"))
+                assertTrue(sameJson(result, SharedTaskDetails.normalize(due(date, "03:30"))))
+            } finally { java.util.TimeZone.setDefault(original) }
+        }
+        assertTrue(SharedTaskDetails.normalize(due("2026-09-15")).isNull("instant"))
+    }
+
+    @Test fun offlinePlacementIncludesPendingCapturesAndKeepsOrdinaryEditsInPlace() = runBlocking {
+        fixture { _, _, repository ->
+            val ordinary = task("Ordinary")
+            val poll = repository.prepare(1000, 1)!!
+            repository.apply(poll, reply(poll, listOf(ordinary, order(ordinary.getString("id")))))
+            val first = repository.commit(repository.draft(InboxRepository.NEW_DRAFT).copy(title = "Urgent one",
+                details = JSONObject().put("urgent", true).put("due", JSONObject.NULL).toString()))
+            repository.commit(repository.draft(InboxRepository.NEW_DRAFT).copy(title = "Urgent two",
+                details = JSONObject().put("urgent", true).put("due", JSONObject.NULL).toString()))
+            assertEquals(listOf("Urgent one", "Urgent two", "Ordinary"), repository.tasks.first().map { it.title })
+            val edit = repository.draft(first)
+            repository.commit(edit.copy(details = JSONObject(edit.details!!).put("urgent", false).toString()))
+            assertEquals(listOf("Urgent one", "Urgent two", "Ordinary"), repository.tasks.first().map { it.title })
+        }
+    }
+
+    @Test fun deadlineDraftAndFrozenEditSurviveRestartAndRejectCompetingHumanWithoutLosingVariant() = runBlocking {
+        fixture { db, state, repository ->
+            val task = task("Milk").put("dueVersion", JSONObject().put("fieldVersion", "1").put("humanVersion", "1"))
+                .put("urgencyVersion", "1").put("due", JSONObject.NULL).put("urgent", false)
+            val id = task.getString("id")
+            val poll = repository.prepare(1000, 1)!!
+            repository.apply(poll, reply(poll, listOf(task, order(id))))
+            val draft = repository.draft(id).copy(description = "Oat milk", details = JSONObject()
+                .put("due", due("2026-10-25", "03:30")).put("urgent", true).toString())
+            repository.saveDraft(draft)
+            val restart = SharedRepository(db, DataLease(), state.scope, state.registration)
+            assertEquals(draft.details, restart.draft(id).details)
+            restart.commit(restart.draft(id))
+            assertEquals("LOCAL", restart.taskStates.first().single().getJSONObject("lastChange").getString("source"))
+            val edit = restart.prepare(1001, 1)!!
+            val wire = JSONObject(edit.envelope!!)
+            assertEquals("03:30", wire.getJSONObject("payload").getJSONObject("due").getString("localTime"))
+            val resumed = repository.prepare(200_000, 2)!!
+            assertEquals(edit.envelope, resumed.envelope)
+            val remote = JSONObject(task.toString()).put("due", SharedTaskDetails.normalize(due("2026-10-26")))
+                .put("dueVersion", JSONObject().put("fieldVersion", "2").put("humanVersion", "2"))
+            repository.apply(resumed, reply(resumed, listOf(remote), receipt(resumed, remote, "FIELD_CONFLICT")))
+            assertEquals("2026-10-26", repository.taskStates.first().single().getJSONObject("due").getString("localDate"))
+            val retained = repository.problems.first().single()
+            assertEquals("2026-10-25", JSONObject(retained.details!!).getJSONObject("due").getString("localDate"))
+            repository.reapply(retained.sequence, remote.toString())
+            val reapplied = JSONObject(repository.prepare(200_001, 2)!!.envelope!!)
+            assertEquals("2", reapplied.getJSONObject("observedVersions").getJSONObject("due").getString("humanVersion"))
+            assertEquals("2026-10-25", reapplied.getJSONObject("payload").getJSONObject("due").getString("localDate"))
+            assertTrue(reapplied.getJSONObject("payload").getBoolean("urgent"))
+        }
+    }
+
+    @Test fun acceptedDeadlineThenOfflineClearUsesItsReceiptAndPreservesOriginalCreation() = runBlocking {
+        fixture { _, _, repository ->
+            val creation = JSONObject().put("actorId", me).put("capturedAt", "2026-09-14T08:00:00Z").put("acceptedAt", "2026-09-14T08:00:00Z")
+            val task = task("Milk").put("creation", creation).put("dueVersion", JSONObject().put("fieldVersion", "1").put("humanVersion", "1"))
+                .put("urgencyVersion", "1").put("due", JSONObject.NULL).put("urgent", false)
+            val poll = repository.prepare(1000, 1)!!
+            repository.apply(poll, reply(poll, listOf(task, order(task.getString("id")))))
+            val draft = repository.draft(task.getString("id"))
+            repository.commit(draft.copy(details = JSONObject(draft.details!!).put("due", due("2026-09-15")).toString()))
+            val clear = repository.draft(task.getString("id"))
+            repository.commit(clear.copy(details = JSONObject(clear.details!!).put("due", JSONObject.NULL).toString()))
+            val first = repository.prepare(1001, 1)!!
+            val changed = JSONObject(task.toString()).put("due", SharedTaskDetails.normalize(due("2026-09-15")))
+                .put("dueVersion", JSONObject().put("fieldVersion", "2").put("humanVersion", "2"))
+            repository.apply(first, reply(first, listOf(changed), receipt(first, changed)))
+            val projected = repository.taskStates.first().single()
+            assertTrue(projected.isNull("due")); assertTrue(sameJson(creation, projected.getJSONObject("creation")))
+            val wire = JSONObject(repository.prepare(1002, 1)!!.envelope!!)
+            assertTrue(wire.getJSONObject("payload").isNull("due"))
+            assertEquals("2", wire.getJSONObject("observedVersions").getJSONObject("due").getString("humanVersion"))
+        }
+    }
+
+    @Test fun anonymousImportRetainsCaptureTimeWithoutInventingCreator() = runBlocking {
+        fixture { _, _, repository ->
+            val captured = java.time.Instant.parse("2025-01-02T08:00:00Z").toEpochMilli()
+            repository.copyText("Imported", "Description", captured)
+            val creation = repository.taskStates.first().single().getJSONObject("creation")
+            assertTrue(creation.isNull("actorId"))
+            assertEquals("2025-01-02T08:00:00Z", creation.getString("capturedAt"))
+            val wire = JSONObject(repository.prepare(1000, 1)!!.envelope!!)
+            assertTrue(wire.getJSONObject("payload").getBoolean("anonymousCapture"))
+        }
+    }
+
+    @Test fun recoveryImportsKeepOriginalZoneAndUnknownTimeWithoutFabrication() = runBlocking {
+        fixture { _, _, repository ->
+            val original = JSONObject().put("capturedInstant", "2026-03-27T22:30:00Z").put("capturedLocal", "2026-03-28T00:30:00.000")
+                .put("captureZoneId", "Europe/Helsinki").put("captureOffsetSeconds", 7200).put("zoneSource", "DEVICE")
+                .put("locale", "fi").put("clockConfidence", "UNKNOWN")
+            val deviceZone = java.util.TimeZone.getDefault()
+            try {
+                java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("America/New_York"))
+                val file = JSONObject().put("formatVersion", 1).put("records", JSONArray().put(JSONObject()
+                    .put("title", "Finish tomorrow").put("description", "").put("capturedAt", JSONObject.NULL)
+                    .put("captureContext", JSONObject.NULL))).toString()
+                val unknown = RecoveryExport.read(file.byteInputStream()).single()
+                repository.copyText(unknown.title, unknown.description, unknown.capturedAt, unknown.captureContext)
+                val known = repository.copyText("Original zone", "", 0, original.toString())
+                val tasks = repository.taskStates.first()
+                val unknownTask = tasks.single { it.getString("title") == "Finish tomorrow" }
+                assertTrue(unknownTask.getJSONObject("creation").isNull("capturedAt"))
+                assertTrue(unknownTask.getJSONObject("capture").isNull("context"))
+                assertTrue(sameJson(original, tasks.single { it.getString("id") == known }.getJSONObject("capture").getJSONObject("context")))
+                val wire = JSONObject(repository.prepare(1000, 1)!!.envelope!!)
+                assertTrue(wire.getJSONObject("payload").getJSONObject("originalCapture").isNull("capturedAt"))
+                assertTrue(wire.getJSONObject("payload").getJSONObject("originalCapture").isNull("context"))
+            } finally { java.util.TimeZone.setDefault(deviceZone) }
+        }
+    }
+
+    @Test fun migrationKeepsExistingDraftAndFrozenBytesWithoutInventingDates() {
+        val name = "details-migration-${UUID.randomUUID()}.db"
+        try {
+            migrations.createDatabase(name, 7).use {
+                it.execSQL("INSERT INTO editor_drafts (`key`,title,description,savedAt) VALUES ('new','Keep','Details',42)")
+                it.execSQL("""INSERT INTO shared_intents
+                    (scope,sequence,taskId,kind,title,titleChanged,descriptionChanged,observedTitle,observedDescription,
+                    observedDeletion,captureContext,frozen,status)
+                    VALUES ('scope','7','task','EditTask','Keep this',1,0,'4','1','1','{}','unchanged wire bytes','SUBMITTED')""")
+            }
+            migrations.runMigrationsAndValidate(name, 8, true, InboxDatabase.MIGRATION_7_8).use { db ->
+                db.query("SELECT title, details FROM editor_drafts").use {
+                    assertTrue(it.moveToFirst()); assertEquals("Keep", it.getString(0)); assertTrue(it.isNull(1))
+                }
+                db.query("SELECT frozen, details FROM shared_intents").use {
+                    assertTrue(it.moveToFirst()); assertEquals("unchanged wire bytes", it.getString(0)); assertTrue(it.isNull(1))
+                }
+            }
+        } finally { context.deleteDatabase(name) }
+    }
+
     @Test fun cleanupIntentSurvivesRestartAndHumanEditWinsOverAutomaticText() = runBlocking {
         fixture { db, state, repository ->
             val task = task("osta maitoa")
@@ -362,7 +511,9 @@ class SharedTaskActionsTest {
             assertEquals(2, children.size)
             val child = children.single { it.getString("title") == "Wash dishes" }
             assertEquals(SharedProtocol.taskId(state.registration, "1", 1), child.getString("id"))
-            restarted.commit(restarted.draft(child.getString("id")).copy(title = "Wash carefully"))
+            assertEquals(me, child.getJSONObject("creation").getString("actorId"))
+            val draft = restarted.draft(child.getString("id"))
+            restarted.commit(draft.copy(title = "Wash carefully", details = JSONObject(draft.details!!).put("due", due("2026-09-15")).toString()))
             val edited = restarted.taskStates.first().single { it.getString("id") == child.getString("id") }
             assertEquals("Wash carefully", edited.getString("title"))
             restarted.act("CompleteTask", edited.toString())
@@ -372,7 +523,7 @@ class SharedTaskActionsTest {
                 .put("hierarchyVersion", "2").put("childOrder", JSONArray(children.map { it.getString("id") }))
             val canonicalChildren = children.map { item -> task(item.getString("title")).put("id", item.getString("id"))
                 .put("parentId", id).apply {
-                    for (group in listOf("title", "description")) put("${group}Version", JSONObject().put("fieldVersion", "2").put("humanVersion", "2"))
+                    for (group in listOf("title", "description", "due")) put("${group}Version", JSONObject().put("fieldVersion", "2").put("humanVersion", "2"))
                     for (group in listOf("lifecycle", "claim", "hierarchy", "deletion", "orderIntent")) put("${group}Version", "2")
                 } }
             val accepted = receipt(request, canonicalRoot).put("relatedTasks", JSONArray(listOf(canonicalRoot) + canonicalChildren))
@@ -381,6 +532,7 @@ class SharedTaskActionsTest {
             val wire = JSONObject(edit.envelope!!)
             assertEquals("EditTask", wire.getString("command"))
             assertEquals("2", wire.getJSONObject("observedVersions").getJSONObject("title").getString("humanVersion"))
+            assertEquals("2", wire.getJSONObject("observedVersions").getJSONObject("due").getString("humanVersion"))
             assertEquals("Wash carefully", restarted.taskStates.first().single { it.getString("id") == child.getString("id") }.getString("title"))
             assertEquals("COMPLETED", restarted.taskStates.first().single { it.getString("id") == child.getString("id") }.getString("lifecycle"))
             assertTrue(restarted.problems.first().isEmpty())

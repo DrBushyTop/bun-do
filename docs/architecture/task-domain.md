@@ -27,9 +27,8 @@ Root and checklist-item orders are separate bounded lists. Keep the established 
 Remove the moving task before resolving live anchors in its list. A surviving after-anchor wins, including when the anchors are inverted. Otherwise use a surviving before-anchor, or append if neither survives. Self-anchors are invalid. Active root order contains OPEN roots; completion/cancellation removes a root and reopening appends it. Keep placement separate from each task's intentional-move version.
 
 New captures append by default. The owner retained an exception for explicit
-urgency or a near due date, with placement explained before saving. The visual
-study proposes overdue/today/tomorrow as the date-only threshold. Resolve that
-threshold in the household time zone when implementing the details slice.
+urgency or a near due date, with placement explained before saving. The owner confirmed overdue/today/tomorrow as the threshold on September 14,
+2026. Resolve it in the saved household time zone.
 Place exceptional captures after the leading urgent/soon-due tasks and before
 the first ordinary task, without rearranging existing tasks. Use the existing
 anchor semantics for synchronized placement, not a continually sorted queue.

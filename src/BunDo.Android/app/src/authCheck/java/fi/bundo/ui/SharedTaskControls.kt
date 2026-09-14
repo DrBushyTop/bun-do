@@ -52,6 +52,7 @@ internal fun SharedTaskSummary(task: JSONObject, membership: JSONObject?) {
         Text(stringResource(R.string.task_deleted), style = MaterialTheme.typography.bodyMedium)
         return
     }
+    SharedDueSummary(task)
     val lifecycle = task.optString("lifecycle", "OPEN")
     val claimant = task.nullableString("claimantId")?.takeIf { member(membership, it)?.optBoolean("active") == true }
     if (lifecycle != "OPEN") {
@@ -88,6 +89,7 @@ internal fun SharedTaskControls(task: JSONObject, ordered: List<JSONObject>, mem
     val index = active.indexOf(id)
     val canAct = enabled && me != null
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SharedTaskAttribution(task, membership)
         SharedTaskSummary(task, membership)
         if (failed) Text(stringResource(R.string.task_changed_retry), color = MaterialTheme.colorScheme.error)
         if (!task.isNull("deletion")) {
@@ -116,6 +118,7 @@ internal fun SharedTaskControls(task: JSONObject, ordered: List<JSONObject>, mem
                 modifier = Modifier.testTag("task-reopen"),
                 onClick = { onAction(SharedTaskAction("ReopenTask", task.toString())) }) { Text(stringResource(R.string.task_reopen)) }
             if (open) {
+                SharedSnoozePresets(task, membership, canAct, onAction)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(enabled = canAct && index > 0, modifier = Modifier.testTag("task-earlier"), onClick = {
                         onAction(SharedTaskAction("MoveTask", task.toString(), after = active.getOrNull(index - 2), before = active[index - 1]))

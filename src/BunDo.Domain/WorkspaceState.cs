@@ -15,7 +15,9 @@ public sealed record TaskSnapshot(
     TaskDeletion? Deletion = null, DateTimeOffset? SnoozedUntil = null,
     string? ParentId = null, bool IsChecklist = false, ImmutableArray<string>? ChildOrder = null,
     ulong SubtreeVersion = 0, ulong SnoozeVersion = 0, string? CancellationGroupId = null,
-    bool EmptyChecklist = false, CleanupRequest? Cleanup = null, string? ContentLanguage = null);
+    bool EmptyChecklist = false, CleanupRequest? Cleanup = null, string? ContentLanguage = null, TaskDue? Due = null, FieldVersion? DueVersion = null,
+    bool Urgent = false, ulong UrgencyVersion = 0, TaskCreation? Creation = null, TaskChange? LastChange = null,
+    string? InitialPlacement = null);
 public sealed record DeviceRegistration(Guid DeviceId, Guid MemberId, ulong LastTerminalSequence = 0,
     ulong AcknowledgedThrough = 0, string? RegistryPartition = null);
 public sealed record OperationReceipt(
@@ -46,7 +48,7 @@ public sealed record WorkspaceState(
     string? CursorSecret = null,
     int TaskCount = 0,
     ulong PrunedThrough = 0,
-    ImmutableDictionary<Guid, SnapshotPin>? SnapshotPins = null, ImmutableArray<string>? RootOrder = null);
+    ImmutableDictionary<Guid, SnapshotPin>? SnapshotPins = null, ImmutableArray<string>? RootOrder = null, string TimeZoneId = "Europe/Helsinki");
 
 /// <summary>The transaction seam; a failed compare-and-swap must have no effects.</summary>
 public interface IWorkspaceStore

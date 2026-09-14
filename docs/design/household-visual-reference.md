@@ -27,7 +27,7 @@ owns the handoff and records the exact reference commit and verification.
 - Show new-task placement before Save and confirm it afterward. Normal captures
   append. Explicit urgency and soon-due capture are exceptions, not a reason to
   re-sort existing work. The study treats overdue, today and tomorrow as soon
-  due. This threshold is a proposed default for the next walkthrough.
+  due. The owner confirmed this threshold in the household time zone on September 14, 2026.
 - Detail shows creator and creation time, then last modifier and modification
   time as compact inline label/name/date rows. Omit the duplicate modification
   row until a change exists. Format exact dates in the selected language and

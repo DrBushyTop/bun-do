@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Azure.Identity;
 using BunDo.Domain;
 using BunDo.Functions.AI;
@@ -53,19 +54,24 @@ public sealed class CleanupProofFunction(CosmosClient client, IConfiguration con
         }
         var inputs = new[] {
             ("öö osta maitoa huomenna", "kaksi litraa laktoositonta maitoa", "fi"),
-            ("um buy some milk tomorrow", "two litres of lactose-free milk", "en"),
-            ("osta oat milk huomenna", "2 litraa, please", "mixed"),
+            ("Buy milk by 29 March 2026 at 03:30", "two litres of lactose-free milk", "en"),
+            ("osta oat milk 25.10.2026 klo 03:30 mennessä", "2 litraa, please", "mixed"),
             ("Älä osta maitoa", "Osta 2 purkkia kaurajuomaa. Ei sokeria.", "fi"),
             ("Call Alex next Friday maybe", "Check which Alex first", "en"),
         };
         var device = new Guid(SHA256.HashData(Encoding.UTF8.GetBytes($"cleanup/{run}/{slot}")).AsSpan(0, 16));
         var sync = new SyncService(documents);
-        var created = await sync.SubmitAsync(member, new(workspace, workspace, device, 1,
-            new CreateTask(TaskIdentity.ForCreate(device, 1), inputs[slot].Item1, inputs[slot].Item2)), ct);
+        var capture = new { capturedInstant = "2026-03-27T22:30:00Z", capturedLocal = "2026-03-28T00:30:00.000",
+            captureZoneId = "Europe/Helsinki", captureOffsetSeconds = 7200, zoneSource = "DEVICE", locale = "fi", clockConfidence = "UNKNOWN" };
+        var wire = JsonSerializer.SerializeToUtf8Bytes(new { protocolVersion = 1, commandVersion = 1,
+            stateEpoch = workspace, workspaceId = workspace, deviceId = device, sequence = "1", command = "CreateTask",
+            payload = new { taskId = TaskIdentity.ForCreate(device, 1), title = inputs[slot].Item1, description = inputs[slot].Item2 },
+            observedVersions = new { }, dependencies = Array.Empty<string>(), occurredAtContext = capture });
+        var created = await sync.SubmitAsync(member, OperationEnvelope.Parse(wire), ct);
         var task = created.Receipt!.Task!;
         var accepted = await sync.SubmitAsync(member, new(workspace, workspace, device, 2,
             new RequestCleanup(task.Id, task.TitleVersion.Server, task.DescriptionVersion.Server, task.LifecycleVersion,
-                task.HierarchyVersion, task.DeletionVersion, null)), ct);
+                task.HierarchyVersion, task.DeletionVersion, null) { ExpectedDueVersion = task.DueVersion!.Server }), ct);
         if (!accepted.Receipt!.Accepted) return new ConflictResult();
         using var http = new HttpClient();
         var provider = new FoundryCleanupProvider(http,
@@ -79,6 +85,8 @@ public sealed class CleanupProofFunction(CosmosClient client, IConfiguration con
             title = proposal?.Title ?? result.Title, description = proposal?.Description ?? result.Description,
             language = proposal?.Language ?? result.ContentLanguage, expectedLanguage = inputs[slot].Item3,
             preservedHumanVersion = result.TitleVersion.Human == task.TitleVersion.Human,
+            due = proposal?.Due ?? result.Due, needsReview = proposal?.NeedsReview ?? false,
+            creation = result.Creation, lastChange = result.LastChange,
             releasedInput = result.Cleanup.InputTitle is null });
     }
 }

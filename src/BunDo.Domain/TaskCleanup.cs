@@ -2,11 +2,11 @@ using System.Text.Json;
 
 namespace BunDo.Domain;
 
-public sealed record CleanupProposal(string Title, string? Description, string Language, bool NeedsReview);
+public sealed record CleanupProposal(string Title, string? Description, string Language, bool NeedsReview, TaskDue? Due = null);
 public sealed record CleanupRequest(string Id, Guid Requester, Guid Epoch, string Status,
     string? InputTitle, string? InputDescription, ulong TitleVersion, ulong DescriptionVersion,
     ulong LifecycleVersion, ulong HierarchyVersion, ulong DeletionVersion,
-    Guid? Lease = null, DateTimeOffset? LeaseUntil = null, CleanupProposal? Proposal = null, string? Error = null);
+    Guid? Lease = null, DateTimeOffset? LeaseUntil = null, CleanupProposal? Proposal = null, string? Error = null, ulong? ExpectedDueVersion = null);
 
 public static class TaskCleanup
 {
@@ -21,7 +21,8 @@ public static class TaskCleanup
         if (command is CancelCleanup)
             return ("ACCEPTED", task with { Cleanup = task.Cleanup is { } old
                 ? old with { Status = "SUPERSEDED", Lease = null, LeaseUntil = null, InputTitle = null, InputDescription = null } : null });
-        if (task.TitleVersion.Server != command.TitleVersion || task.DescriptionVersion.Server != command.DescriptionVersion)
+        if (task.TitleVersion.Server != command.TitleVersion || task.DescriptionVersion.Server != command.DescriptionVersion ||
+            command.ExpectedDueVersion is { } expectedDue && (task.DueVersion?.Server ?? 0) != expectedDue)
             return ("FIELD_CONFLICT", null);
         if (task.LifecycleVersion != command.LifecycleVersion || task.HierarchyVersion != command.HierarchyVersion ||
             task.DeletionVersion != command.DeletionVersion) return ("LIFECYCLE_CONFLICT", null);
@@ -29,7 +30,8 @@ public static class TaskCleanup
         if (command is ApplyCleanup)
         {
             if (task.Cleanup is not { Status: "READY", Proposal: { } proposal } || !Valid(proposal) ||
-                WorkspaceServer.ValidateText(Patch(task, proposal, revision, human: true)) != "ACCEPTED")
+                WorkspaceServer.ValidateText(Patch(task, proposal, revision, human: true)) != "ACCEPTED" ||
+                proposal.Due is not null && command.ExpectedDueVersion is null)
                 return ("CLEANUP_UNAVAILABLE", null);
             return ("ACCEPTED", Patch(task, proposal, revision, human: true) with {
                 Cleanup = task.Cleanup with { Status = "APPLIED", Proposal = null },
@@ -37,7 +39,7 @@ public static class TaskCleanup
         }
         return ("ACCEPTED", task with { Cleanup = new(id, member, state.StateEpoch, "PENDING", task.Title,
             task.Description, task.TitleVersion.Server, task.DescriptionVersion.Server, task.LifecycleVersion,
-            task.HierarchyVersion, task.DeletionVersion) });
+            task.HierarchyVersion, task.DeletionVersion, ExpectedDueVersion: command.ExpectedDueVersion) });
     }
 
     public static bool Current(WorkspaceState state, TaskSnapshot task, CleanupRequest request) =>
@@ -56,9 +58,14 @@ public static class TaskCleanup
         if (proposal is not null && (!Valid(proposal) ||
             WorkspaceServer.ValidateText(Patch(task, proposal, revision, human: false)) != "ACCEPTED"))
         { proposal = null; error = "INVALID_OUTPUT"; }
+        if (proposal?.Due is not null && task.Capture?.Context.ValueKind != JsonValueKind.Object)
+            proposal = proposal with { NeedsReview = true };
+        if (proposal?.Due is { } due && TaskDates.TryNormalize(due, out var normalized)) proposal = proposal with { Due = normalized };
         var automatic = permitted && proposal is { NeedsReview: false } &&
+            (proposal.Due is null || request.ExpectedDueVersion is { } expectedDue && (task.DueVersion?.Server ?? 0) == expectedDue) &&
             task.TitleVersion.Server == request.TitleVersion && task.DescriptionVersion.Server == request.DescriptionVersion;
         var result = automatic ? Patch(task, proposal!, revision, human: false) : task;
+        if (result != task) result = result with { LastChange = new(null, now, "AI") };
         return result with { Cleanup = request with {
             Status = automatic ? "APPLIED" : proposal is not null ? "READY" : "FAILED",
             InputTitle = null, InputDescription = null, Lease = null, LeaseUntil = null,
@@ -70,11 +77,17 @@ public static class TaskCleanup
         !string.IsNullOrWhiteSpace(value.Title) && value.Title == value.Title.Trim() &&
         value.Title.EnumerateRunes().Count() <= 160 && value.Description?.EnumerateRunes().Count() is not > 4000 &&
         !value.Title.Any(char.IsControl) && !(value.Description?.Any(c => char.IsControl(c) && c is not ('\n' or '\t')) ?? false) &&
-        value.Language is "fi" or "en" or "mixed" or "und";
+        (value.Language is "fi" or "en" or "mixed" or "und") && TaskDates.TryNormalize(value.Due, out _);
 
-    private static TaskSnapshot Patch(TaskSnapshot task, CleanupProposal proposal, ulong revision, bool human) => task with {
+    private static TaskSnapshot Patch(TaskSnapshot task, CleanupProposal proposal, ulong revision, bool human)
+    {
+        TaskDates.TryNormalize(proposal.Due, out var normalized);
+        return task with {
         Title = proposal.Title, Description = proposal.Description, ContentLanguage = proposal.Language,
+        Due = normalized ?? task.Due,
+        DueVersion = proposal.Due is null || normalized == task.Due ? task.DueVersion : new(revision, human ? revision : task.DueVersion?.Human ?? 0),
         TitleVersion = proposal.Title == task.Title ? task.TitleVersion : new(revision, human ? revision : task.TitleVersion.Human),
         DescriptionVersion = proposal.Description == task.Description ? task.DescriptionVersion : new(revision, human ? revision : task.DescriptionVersion.Human),
-    };
+        };
+    }
 }

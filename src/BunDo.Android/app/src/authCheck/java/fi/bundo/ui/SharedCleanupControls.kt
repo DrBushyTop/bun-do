@@ -40,9 +40,11 @@ internal fun SharedCleanupControls(task: JSONObject, enabled: Boolean, onAction:
             Text(stringResource(R.string.cleanup_current), style = MaterialTheme.typography.titleSmall)
             Text(task.getString("title"))
             task.nullableString("description")?.let { Text(it) }
+            task.optJSONObject("due")?.let { Text(dueLabel(it)) }
             Text(stringResource(R.string.cleanup_suggestion), style = MaterialTheme.typography.titleSmall)
             Text(proposal.getString("title"))
             proposal.nullableString("description")?.let { Text(it) }
+            proposal.optJSONObject("due")?.let { Text(stringResource(R.string.detail_due) + ": " + dueLabel(it)) }
             OutlinedButton(enabled = enabled && open, modifier = Modifier.testTag("cleanup-apply"),
                 onClick = { onAction(SharedTaskAction("ApplyCleanup", task.toString())) }) { Text(stringResource(R.string.cleanup_apply)) }
         }

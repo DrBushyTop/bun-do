@@ -43,6 +43,7 @@ data class EditorDraft(
     val title: String = "",
     val description: String = "",
     @ColumnInfo(defaultValue = "0") val savedAt: Long = 0,
+    val details: String? = null,
 )
 
 @Dao
@@ -88,7 +89,7 @@ interface InboxDao {
     entities = [InboxTask::class, InboxIntent::class, EditorDraft::class, VoiceRecording::class,
         SharedWorkspace::class, SharedBase::class, SharedProjection::class, SharedIntent::class, SharedDraft::class,
         SharedRecovery::class],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 abstract class InboxDatabase : RoomDatabase() {
@@ -153,9 +154,17 @@ abstract class InboxDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE editor_drafts ADD COLUMN details TEXT")
+                db.execSQL("ALTER TABLE shared_drafts ADD COLUMN details TEXT")
+                db.execSQL("ALTER TABLE shared_intents ADD COLUMN details TEXT")
+            }
+        }
+
         fun open(context: Context, name: String = FILE_NAME, passphrase: ByteArray? = null): InboxDatabase {
             val builder = Room.databaseBuilder(context, InboxDatabase::class.java, name)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                 // AccountStore owns the connection used by both UI and workers.
                 // Workers cannot independently open a signed-out account.
             if (passphrase != null) {

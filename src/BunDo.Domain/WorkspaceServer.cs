@@ -74,15 +74,28 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
                 task = new(create.TaskId, create.Title, create.Description, new(revision, revision), new(revision, revision),
                     revision, operation.CaptureContext is { } capture
                         ? new(create.Title, create.Description, capture, acceptedAt) : null,
-                    LifecycleVersion: revision, ClaimVersion: revision, HierarchyVersion: revision, OrderIntentVersion: revision);
-                if (state.TaskCount >= 1024) code = "TASK_LIMIT";
+                    LifecycleVersion: revision, ClaimVersion: revision, HierarchyVersion: revision, OrderIntentVersion: revision,
+                    DueVersion: new(revision, revision), Urgent: create.Urgent, UrgencyVersion: revision);
+                if (create.AnonymousCapture) task = task with { Capture = new(create.Title, create.Description,
+                    create.OriginalCapture?.Context ?? JsonSerializer.SerializeToElement<object?>(null), acceptedAt) };
+                if (TaskDates.TryNormalize(create.Due, out var due)) task = task with { Due = due };
+                if (!TaskDates.TryNormalize(create.Due, out _)) code = "INVALID_DUE";
+                else if (state.TaskCount >= 1024) code = "TASK_LIMIT";
                 else if (state.Tasks.ContainsKey(create.TaskId))
                     code = "ENTITY_EXISTS";
                 else if (create.TaskId != TaskIdentity.ForCreate(operation.DeviceId, operation.Sequence))
                     code = "INVALID_TASK_ID";
                 else
                     code = ValidateText(task);
-                if (code == "ACCEPTED") changed = task;
+                if (code == "ACCEPTED")
+                {
+                    var expedited = create.Placement is not null && TaskDates.Expedited(create.Urgent, task.Due,
+                        TaskDates.CapturedAt(task, acceptedAt), state.TimeZoneId);
+                    task = task with { Creation = new(create.AnonymousCapture ? null : authenticatedMemberId,
+                        create.AnonymousCapture ? create.OriginalCapture?.CapturedAt : TaskDates.CapturedAt(task, acceptedAt), acceptedAt), InitialPlacement = expedited ? "EXPEDITED" : "APPENDED" };
+                    if (expedited) order = RootOrdering.Place(order, task.Id, create.Placement!.AfterTaskId, create.Placement.BeforeTaskId);
+                    changed = task;
+                }
                 else task = null;
             }
             else if (operation.Command is DiscardBlockedIntent blocked)
@@ -146,9 +159,11 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
                 else if (task.Deletion is not null) code = "TASK_DELETED";
                 else if (task.ParentId is { } parentId && (!state.Tasks.TryGetValue(parentId, out var parent) || parent.Deletion is not null))
                     code = "PARENT_UNAVAILABLE";
-                else if (edit.Title is null && edit.Description is null) code = "EMPTY_EDIT";
+                else if (edit.Title is null && edit.Description is null && edit.Due is null && edit.Urgent is null) code = "EMPTY_EDIT";
                 else if (edit.Title is { } t && t.ExpectedHumanVersion != task.TitleVersion.Human ||
-                    edit.Description is { } d && d.ExpectedHumanVersion != task.DescriptionVersion.Human)
+                    edit.Description is { } d && d.ExpectedHumanVersion != task.DescriptionVersion.Human ||
+                    edit.Due is { } dueEdit && dueEdit.ExpectedHumanVersion != (task.DueVersion?.Human ?? 0) ||
+                    edit.Urgent is { } urgency && urgency.ExpectedVersion != task.UrgencyVersion)
                     code = "FIELD_CONFLICT";
                 else
                 {
@@ -157,7 +172,11 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
                         proposed = proposed with { Title = title.Value!, TitleVersion = new(revision, revision) };
                     if (edit.Description is { } description && description.Value != task.Description)
                         proposed = proposed with { Description = description.Value, DescriptionVersion = new(revision, revision) };
-                    code = ValidateText(proposed);
+                    if (edit.Urgent is { } urgent && urgent.Value != task.Urgent)
+                        proposed = proposed with { Urgent = urgent.Value, UrgencyVersion = revision };
+                    if (edit.Due is { } newDue && TaskDates.TryNormalize(newDue.Value, out var normalized) && normalized != task.Due)
+                        proposed = proposed with { Due = normalized, DueVersion = new(revision, revision) };
+                    code = edit.Due is { } invalid && !TaskDates.TryNormalize(invalid.Value, out _) ? "INVALID_DUE" : ValidateText(proposed);
                     if (code == "ACCEPTED")
                     {
                         if (proposed != task) changed = proposed;
@@ -167,6 +186,18 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
             }
             if (changed is not null) effects = effects.SetItem(changed.Id, changed);
             effects = ChecklistTasks.Reconcile(state, effects, authenticatedMemberId, revision, acceptedAt);
+            foreach (var effect in effects.Values.ToArray())
+            {
+                if (!state.Tasks.TryGetValue(effect.Id, out var before))
+                {
+                    if (effect.Creation is null) effects = effects.SetItem(effect.Id, effect with {
+                        Creation = new(authenticatedMemberId, TaskDates.CapturedAt(effect, acceptedAt), acceptedAt),
+                        DueVersion = new(revision, revision), UrgencyVersion = revision,
+                    });
+                }
+                else if (operation.Command is not (RequestCleanup or CancelCleanup) && effect with { Cleanup = before.Cleanup } != before)
+                    effects = effects.SetItem(effect.Id, effect with { LastChange = new(authenticatedMemberId, acceptedAt, "HUMAN") });
+            }
             if (task is not null && effects.TryGetValue(task.Id, out var finalTask)) task = finalTask;
             foreach (var effect in effects.Values.Where(value => value.ParentId is null))
             {

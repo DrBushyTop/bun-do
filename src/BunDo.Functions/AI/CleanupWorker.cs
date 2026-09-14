@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Text.Json;
 using BunDo.Domain;
 using BunDo.Functions.Households;
 using BunDo.Functions.Sync;
@@ -8,7 +9,7 @@ namespace BunDo.Functions.AI;
 
 public interface ICleanupProvider
 {
-    Task<CleanupProposal> GenerateAsync(string title, string? description, CancellationToken ct);
+    Task<CleanupProposal> GenerateAsync(string title, string? description, CancellationToken ct, JsonElement? captureContext = null);
 }
 
 /// <summary>Foreground and periodic sync resume durable intent, one inference per sync.
@@ -52,7 +53,7 @@ public sealed class CleanupWorker(IHouseholdDocuments documents, ICleanupProvide
         if (claimed?.Cleanup is not { Status: "RUNNING" } owned || owned.Lease != lease) return;
         CleanupProposal? proposal = null;
         string? error = null;
-        try { proposal = await provider.GenerateAsync(owned.InputTitle!, owned.InputDescription, ct); }
+        try { proposal = await provider.GenerateAsync(owned.InputTitle!, owned.InputDescription, ct, claimed.Capture?.Context); }
         catch (CleanupProviderException failure) { error = failure.Code; }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested) { error = "PROVIDER_TIMEOUT"; }
         catch (HttpRequestException) { error = "PROVIDER_UNAVAILABLE"; }
@@ -94,7 +95,7 @@ public sealed class CleanupWorker(IHouseholdDocuments documents, ICleanupProvide
 
 public sealed class UnavailableCleanupProvider : ICleanupProvider
 {
-    public Task<CleanupProposal> GenerateAsync(string title, string? description, CancellationToken ct) =>
+    public Task<CleanupProposal> GenerateAsync(string title, string? description, CancellationToken ct, JsonElement? captureContext = null) =>
         throw new CleanupProviderException("PROVIDER_UNAVAILABLE");
 }
 

@@ -9,17 +9,17 @@ internal object SharedTaskActions {
     val cleanupKinds = setOf("RequestCleanup", "CancelCleanup", "ApplyCleanup")
     val kinds = cleanupKinds + setOf("ClaimTask", "UnclaimTask", "CompleteTask", "ReopenTask", "CancelTask", "MoveTask", "DeleteTask", "RestoreTask",
         "SplitTask", "AddChildren", "SetSnooze", "ClearSnooze")
-    val groups = listOf("lifecycle", "claim", "hierarchy", "deletion", "orderIntent", "subtree", "snooze")
+    val groups = listOf("lifecycle", "claim", "hierarchy", "deletion", "orderIntent", "subtree", "snooze", "urgent")
     fun version(task: JSONObject, group: String): String =
-        if (task.has("${group}Version")) task.decimal("${group}Version").toString() else "0"
-    fun observedGroups(kind: String) = if (kind in cleanupKinds) listOf("title", "description", "lifecycle", "hierarchy", "deletion")
+        if (group == "urgent") task.optString("urgencyVersion", "0") else if (task.has("${group}Version")) task.decimal("${group}Version").toString() else "0"
+    fun observedGroups(kind: String) = if (kind in cleanupKinds) listOf("title", "description", "due", "lifecycle", "hierarchy", "deletion")
         else if (kind == "MoveTask") listOf("orderIntent", "deletion")
         else listOf("lifecycle", "claim", "hierarchy", "deletion", "subtree", "snooze") +
             if (kind in SharedChecklistActions.splitKinds) listOf("title", "description") else emptyList()
     fun writes(kind: String) = when (kind) {
-        "CreateTask" -> groups + listOf("title", "description")
+        "CreateTask" -> groups + listOf("title", "description", "due")
         "RequestCleanup", "CancelCleanup" -> listOf("cleanup")
-        "ApplyCleanup" -> listOf("cleanup", "title", "description")
+        "ApplyCleanup" -> listOf("cleanup", "title", "description", "due")
         "ClaimTask", "UnclaimTask" -> listOf("claim")
         "CompleteTask", "ReopenTask", "CancelTask" -> listOf("lifecycle", "claim", "subtree", "snooze")
         "MoveTask" -> listOf("orderIntent")
@@ -46,7 +46,7 @@ internal object SharedTaskActions {
             .put("fromLifecycle", task.optString("lifecycle", "OPEN"))
             .put("parentId", task.opt("parentId") ?: JSONObject.NULL).put("registration", registration).toString()
     }
-    private fun observation(task: JSONObject, group: String, kind: String) = if (group in listOf("title", "description"))
+    private fun observation(task: JSONObject, group: String, kind: String) = if (group in listOf("title", "description", "due"))
         if (kind in cleanupKinds) task.field(group).toString() else task.human(group) else version(task, group)
 
     fun dependencies(intent: SharedIntent): List<String> = intent.taskAction?.let {
@@ -66,7 +66,7 @@ internal object SharedTaskActions {
             val value = if (after.has(group)) observation(checkNotNull(SharedChecklistActions.receiptTask(
                 checkNotNull(receipts[after.getString(group)]), intent.taskId)), group, intent.kind)
                 else action.getJSONObject("versions").optString(group, "0")
-            observed.put(group, JSONObject().put(if (group in listOf("title", "description") && intent.kind !in cleanupKinds) "humanVersion" else "fieldVersion", value))
+            observed.put(group, JSONObject().put(if (group in listOf("title", "description", "due") && intent.kind !in cleanupKinds) "humanVersion" else "fieldVersion", value))
         }
     }
 
@@ -100,7 +100,7 @@ internal object SharedTaskActions {
             if (observation(task, group, kind) != expected) return when (group) {
                 "claim" -> "CLAIM_CONFLICT"; "orderIntent" -> "ORDER_CONFLICT"
                 "deletion" -> "DELETION_CONFLICT"; "subtree" -> "SUBTREE_CONFLICT"; "snooze" -> "SNOOZE_CONFLICT"
-                "title", "description" -> "FIELD_CONFLICT"; else -> "LIFECYCLE_CONFLICT"
+                "title", "description", "due" -> "FIELD_CONFLICT"; else -> "LIFECYCLE_CONFLICT"
             }
         }
         if (intent.kind == "RestoreTask") {
@@ -110,7 +110,7 @@ internal object SharedTaskActions {
         val receipt = intent.receipt?.let(::JSONObject)?.optJSONObject("task")
         if (receipt != null) {
             // A receipt can reveal concurrent state changes as well as this action's own effect.
-            for (group in groups) task.put("${group}Version", version(receipt, group))
+            for (group in groups) task.put(if (group == "urgent") "urgencyVersion" else "${group}Version", version(receipt, group))
             for (key in listOf("lifecycle", "claimantId", "lifecycleActorId", "lifecycleAt", "firstCompletion", "deletion", "snoozedUntil"))
                 if (receipt.has(key)) task.put(key, receipt.get(key))
         } else when (intent.kind) {
@@ -119,6 +119,7 @@ internal object SharedTaskActions {
             "CancelCleanup" -> task.optJSONObject("cleanup")?.put("status", "SUPERSEDED")
             "ApplyCleanup" -> task.optJSONObject("cleanup")?.optJSONObject("proposal")?.let {
                 task.put("title", it.getString("title")).put("description", it.opt("description") ?: JSONObject.NULL)
+                it.optJSONObject("due")?.let { due -> task.put("due", due) }
                 task.optJSONObject("cleanup")?.put("status", "APPLIED")
             }
             "ClaimTask" -> task.put("claimantId", action.getString("actor"))
@@ -133,6 +134,8 @@ internal object SharedTaskActions {
                 .put("lifecycleAt", JSONObject.NULL) // Completion credit and acceptance time belong to the server.
         }
         SharedChecklistActions.apply(before, task, intent, tasks)
+        if (intent.receipt == null && intent.kind !in listOf("RequestCleanup", "CancelCleanup"))
+            SharedTaskDetails.markPending(task, intent)
         return null
     }
 
@@ -154,7 +157,12 @@ internal object SharedTaskActions {
             if (intent.kind in listOf("CreateTask", "RestoreTask") || intent.kind == "ReopenTask" &&
                 JSONObject(checkNotNull(intent.taskAction)).optString("fromLifecycle") != "OPEN") {
                 order.remove(intent.taskId)
-                if (intent.taskId in tasks) order += intent.taskId
+                if (intent.taskId in tasks) {
+                    val placement = intent.details?.let(::JSONObject)?.optJSONObject("placement")
+                    val after = order.indexOf(placement?.nullableString("afterTaskId"))
+                    val before = order.indexOf(placement?.nullableString("beforeTaskId"))
+                    order.add(if (after >= 0) after + 1 else if (before >= 0) before else order.size, intent.taskId)
+                }
                 continue
             }
             if (intent.kind != "MoveTask" || intent.taskId !in order) continue

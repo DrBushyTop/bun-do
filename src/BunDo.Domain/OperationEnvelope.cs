@@ -41,26 +41,33 @@ public static class OperationEnvelope
             switch (root.GetProperty("command").GetString())
             {
                 case "CreateTask":
-                    Fields(payload, ["taskId", "title", "description"]);
+                    Fields(payload, ["taskId", "title", "description"], ["due", "urgent", "placement", "anonymousCapture", "originalCapture"]);
                     Fields(observed, []);
                     command = new CreateTask(Uuid(payload.GetProperty("taskId")).ToString("D"),
-                        Text(payload.GetProperty("title")), NullableText(payload.GetProperty("description")));
+                        Text(payload.GetProperty("title")), NullableText(payload.GetProperty("description")),
+                        payload.TryGetProperty("due", out var dueValue) ? Due(dueValue) : null,
+                        payload.TryGetProperty("urgent", out var urgentValue) && urgentValue.GetBoolean(),
+                        payload.TryGetProperty("placement", out var placement) && placement.ValueKind != JsonValueKind.Null ? Placement(placement) : null,
+                        payload.TryGetProperty("anonymousCapture", out var anonymous) && anonymous.GetBoolean(),
+                        payload.TryGetProperty("originalCapture", out var original) ? ImportCapture(original) : null);
                     break;
                 case "EditTask":
-                    Fields(payload, ["taskId"], ["title", "description"]);
-                    var groups = new[] { "title", "description" }.Where(x => payload.TryGetProperty(x, out _)).ToArray();
+                    Fields(payload, ["taskId"], ["title", "description", "due", "urgent"]);
+                    var groups = new[] { "title", "description", "due", "urgent" }.Where(x => payload.TryGetProperty(x, out _)).ToArray();
                     Fields(observed, groups.Append("deletion").ToArray());
                     Fields(observed.GetProperty("deletion"), ["fieldVersion"]);
                     command = new EditTask(Uuid(payload.GetProperty("taskId")).ToString("D"),
                         groups.Contains("title") ? new(Text(payload.GetProperty("title")), Version(observed, "title")) : null,
                         groups.Contains("description") ? new(NullableText(payload.GetProperty("description")), Version(observed, "description")) : null,
-                        Decimal(observed.GetProperty("deletion").GetProperty("fieldVersion")));
+                        Decimal(observed.GetProperty("deletion").GetProperty("fieldVersion")),
+                        groups.Contains("due") ? new(Due(payload.GetProperty("due")), Version(observed, "due")) : null,
+                        groups.Contains("urgent") ? new(payload.GetProperty("urgent").GetBoolean(), ExactVersion(observed, "urgent")) : null);
                     break;
                 case "RequestCleanup":
                 case "CancelCleanup":
                 case "ApplyCleanup":
                     Fields(payload, ["taskId", "requestId"]);
-                    Fields(observed, ["title", "description", "lifecycle", "hierarchy", "deletion"]);
+                    Fields(observed, ["title", "description", "lifecycle", "hierarchy", "deletion"], ["due"]);
                     var cleanupId = Uuid(payload.GetProperty("taskId")).ToString("D");
                     var requestId = NullableText(payload.GetProperty("requestId"));
                     if (requestId?.Length > 100) throw new EnvelopeException("INVALID_ENVELOPE");
@@ -71,6 +78,9 @@ public static class OperationEnvelope
                         "RequestCleanup" => new RequestCleanup(cleanupId, tv, dv, lv, hv, del, requestId),
                         "CancelCleanup" => new CancelCleanup(cleanupId, tv, dv, lv, hv, del, requestId),
                         _ => new ApplyCleanup(cleanupId, tv, dv, lv, hv, del, requestId),
+                    };
+                    command = (CleanupCommand)command with {
+                        ExpectedDueVersion = observed.TryGetProperty("due", out _) ? ExactVersion(observed, "due") : null,
                     };
                     break;
                 case "DiscardBlockedIntent":
@@ -136,6 +146,33 @@ public static class OperationEnvelope
         {
             throw new EnvelopeException("INVALID_ENVELOPE");
         }
+    }
+
+    private static ImportedCapture ImportCapture(JsonElement value)
+    {
+        Fields(value, ["capturedAt", "context"]);
+        var capturedAt = value.GetProperty("capturedAt");
+        DateTimeOffset? at = capturedAt.ValueKind == JsonValueKind.Null ? null : capturedAt.GetDateTimeOffset();
+        var context = value.GetProperty("context");
+        if (context.ValueKind != JsonValueKind.Null)
+        {
+            ValidateContext(context);
+            at = context.GetProperty("capturedInstant").GetDateTimeOffset();
+        }
+        return new(at, context.ValueKind == JsonValueKind.Null ? null : context.Clone());
+    }
+
+    private static TaskDue? Due(JsonElement value)
+    {
+        if (value.ValueKind == JsonValueKind.Null) return null;
+        Fields(value, ["kind", "localDate", "localTime", "zoneId"]);
+        return new(Text(value.GetProperty("kind")), Text(value.GetProperty("localDate")),
+            NullableText(value.GetProperty("localTime")), Text(value.GetProperty("zoneId")));
+    }
+    private static InitialPlacement Placement(JsonElement value)
+    {
+        Fields(value, ["afterTaskId", "beforeTaskId"]);
+        return new(NullableUuid(value.GetProperty("afterTaskId")), NullableUuid(value.GetProperty("beforeTaskId")));
     }
 
     private static ulong Version(JsonElement observed, string group)

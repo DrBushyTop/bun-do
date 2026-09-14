@@ -237,6 +237,7 @@ internal class SharedSnapshotRecovery(
                     val task = receipt.getJSONObject("task")
                     SharedChecklistActions.validateReceipt(receipt)
                     require(task.getString("id") == intent.taskId)
+                    SharedTaskDetails.validateReceipt(intent, task)
                     if (intent.titleChanged) require(task.getString("title") == intent.title)
                     if (intent.descriptionChanged) require(task.nullableString("description") == intent.description)
                 }

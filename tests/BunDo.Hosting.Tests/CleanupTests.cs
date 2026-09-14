@@ -41,7 +41,7 @@ public sealed class CleanupTests : IDisposable
     private sealed class Provider(Func<CancellationToken, Task<CleanupProposal>> generate) : ICleanupProvider
     {
         public int Calls;
-        public Task<CleanupProposal> GenerateAsync(string title, string? description, CancellationToken ct) { Calls++; return generate(ct); }
+        public Task<CleanupProposal> GenerateAsync(string title, string? description, CancellationToken ct, JsonElement? captureContext = null) { Calls++; return generate(ct); }
     }
     private static CleanupProposal Good => new("Osta maitoa", "kaksi litraa", "fi", false);
 

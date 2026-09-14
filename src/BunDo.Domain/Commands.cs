@@ -6,10 +6,11 @@ using System.Text.Json;
 namespace BunDo.Domain;
 
 public abstract record TaskCommand;
-public sealed record CreateTask(string TaskId, string Title, string? Description = null) : TaskCommand;
+public sealed record CreateTask(string TaskId, string Title, string? Description = null, TaskDue? Due = null,
+    bool Urgent = false, InitialPlacement? Placement = null, bool AnonymousCapture = false, ImportedCapture? OriginalCapture = null) : TaskCommand;
 public sealed record TextEdit(string? Value, ulong ExpectedHumanVersion);
 public sealed record EditTask(string TaskId, TextEdit? Title = null, TextEdit? Description = null,
-    ulong? ExpectedDeletionVersion = null) : TaskCommand;
+    ulong? ExpectedDeletionVersion = null, DueEdit? Due = null, UrgencyEdit? Urgent = null) : TaskCommand;
 public sealed record TaskStateVersions(ulong Lifecycle, ulong Claim, ulong Hierarchy, ulong Deletion,
     ulong Subtree = 0, ulong Snooze = 0);
 public abstract record TaskTransition(string TaskId, TaskStateVersions Expected) : TaskCommand;
@@ -34,7 +35,10 @@ public sealed record AddChildren(string TaskId, TaskStateVersions Expected, stri
 public sealed record MoveTask(string TaskId, ulong ExpectedOrderVersion, ulong ExpectedDeletionVersion,
     string? ExpectedParentId = null, string? AfterTaskId = null, string? BeforeTaskId = null) : TaskCommand;
 public abstract record CleanupCommand(string TaskId, ulong TitleVersion, ulong DescriptionVersion,
-    ulong LifecycleVersion, ulong HierarchyVersion, ulong DeletionVersion, string? RequestId) : TaskCommand;
+    ulong LifecycleVersion, ulong HierarchyVersion, ulong DeletionVersion, string? RequestId) : TaskCommand
+{
+    public ulong? ExpectedDueVersion { get; init; }
+}
 public sealed record RequestCleanup(string TaskId, ulong TitleVersion, ulong DescriptionVersion,
     ulong LifecycleVersion, ulong HierarchyVersion, ulong DeletionVersion, string? RequestId)
     : CleanupCommand(TaskId, TitleVersion, DescriptionVersion, LifecycleVersion, HierarchyVersion, DeletionVersion, RequestId);

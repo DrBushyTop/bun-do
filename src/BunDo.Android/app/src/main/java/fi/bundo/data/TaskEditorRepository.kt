@@ -8,5 +8,6 @@ interface TaskEditorRepository {
     val drafts: Flow<List<EditorDraft>>
     suspend fun draft(key: String): EditorDraft
     suspend fun saveDraft(draft: EditorDraft)
+    suspend fun placement(id: String): String? = null
     suspend fun commit(draft: EditorDraft): String
 }

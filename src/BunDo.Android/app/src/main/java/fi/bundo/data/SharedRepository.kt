@@ -22,7 +22,7 @@ class SharedRepository(
         SharedTaskActions.ordered(rows, intents, state)
     }
     override val tasks = taskStates.map { rows -> rows.map(SharedProtocol::inbox) }
-    override val drafts = dao.drafts(scope).map { rows -> rows.filterNot { it.key.startsWith("checklist:") }.map { EditorDraft(it.key, it.title, it.description, it.savedAt) } }
+    override val drafts = dao.drafts(scope).map { rows -> rows.filterNot { it.key.startsWith("checklist:") }.map { EditorDraft(it.key, it.title, it.description, it.savedAt, it.details) } }
     val workspace = dao.observeWorkspace(scope)
     val problems = dao.problems(scope)
     val recovery = dao.observeRecovery(scope)
@@ -160,7 +160,8 @@ class SharedRepository(
                 if (retained.titleChanged) retained.title else task.getString("title"),
                 if (retained.descriptionChanged) retained.description else task.nullableString("description"),
                 retained.titleChanged, retained.descriptionChanged, task.human("title"), task.human("description"),
-                task.decimal("deletionVersion").toString(), null, SharedProtocol.context())
+                task.decimal("deletionVersion").toString(), null, SharedProtocol.context(),
+                details = SharedTaskDetails.reapply(retained, task, state))
             dao.saveIntent(intent)
             dao.saveIntent(retained.copy(status = "DISMISSED"))
             dao.saveWorkspace(state.copy(nextSequence = (next + 1u).toString(), journalVersion = state.journalVersion + 1))
@@ -178,13 +179,13 @@ class SharedRepository(
         database.withTransaction {
             check(current().blocked == null)
             val saved = dao.draft(scope, key)
-            if (saved != null) EditorDraft(key, saved.title, saved.description, saved.savedAt)
-            else if (key == InboxRepository.NEW_DRAFT) EditorDraft(key)
+            if (saved != null) EditorDraft(key, saved.title, saved.description, saved.savedAt, saved.details)
+            else if (key == InboxRepository.NEW_DRAFT) EditorDraft(key, details = SharedTaskDetails.values(null, current()).toString())
             else {
                 val basis = editBasis(key, current())
                 val task = SharedProtocol.inbox(basis.getJSONObject("task"))
-                dao.saveDraft(SharedDraft(scope, key, task.title, task.description, System.currentTimeMillis(), basis.toString()))
-                EditorDraft(key, task.title, task.description)
+                dao.saveDraft(SharedDraft(scope, key, task.title, task.description, System.currentTimeMillis(), basis.toString(), SharedTaskDetails.values(basis.getJSONObject("task"), current()).toString()))
+                EditorDraft(key, task.title, task.description, details = SharedTaskDetails.values(basis.getJSONObject("task"), current()).toString())
             }
         }
     }
@@ -195,7 +196,7 @@ class SharedRepository(
             val saved = dao.draft(scope, draft.key)
             val basis = if (saved != null) saved.basis else
                 if (draft.key == InboxRepository.NEW_DRAFT) null else editBasis(draft.key, current()).toString()
-            dao.saveDraft(SharedDraft(scope, draft.key, draft.title, draft.description, System.currentTimeMillis(), basis))
+            dao.saveDraft(SharedDraft(scope, draft.key, draft.title, draft.description, System.currentTimeMillis(), basis, draft.details))
         }
     }
 
@@ -210,12 +211,13 @@ class SharedRepository(
         return JSONObject().put("task", task)
             .put("titleAfterSequence", after("title")).put("descriptionAfterSequence", after("description"))
             .put("deletionAfterSequence", after("deletion"))
+            .put("dueAfterSequence", after("due")).put("urgentAfterSequence", after("urgent"))
     }
 
     override suspend fun commit(draft: EditorDraft): String = commit(draft, removeDraft = true)
 
     private suspend fun commit(draft: EditorDraft, removeDraft: Boolean): String = lease.access {
-        require(InboxLimits.valid(draft.title, draft.description))
+        require(InboxLimits.valid(draft.title, draft.description) && SharedTaskDetails.valid(draft.details))
         database.withTransaction {
             val state = current()
             check(state.blocked == null)
@@ -230,7 +232,8 @@ class SharedRepository(
             val old = basis?.getJSONObject("task")
             val titleChanged = creating || old!!.getString("title") != draft.title
             val descriptionChanged = creating || old!!.nullableString("description").orEmpty() != draft.description
-            if (!titleChanged && !descriptionChanged) { dao.deleteDraft(scope, draft.key); return@withTransaction id }
+            val detailEdit = SharedTaskDetails.intent(draft, old, basis, SharedTaskActions.ordered(dao.projectionRows(scope, state.projectionGeneration), dao.intents(scope), state), state)
+            if (!titleChanged && !descriptionChanged && detailEdit == null) { dao.deleteDraft(scope, draft.key); return@withTransaction id }
             val prior = dao.intents(scope).lastOrNull { it.taskId == id && it.status in listOf("PENDING", "SUBMITTED", "ACCEPTED") &&
                 (it.receipt == null || JSONObject(it.receipt).decimal("effectRevision") > state.revision.toULong()) }
             val intent = SharedIntent(scope, sequence.toString(), id, if (creating) "CreateTask" else "EditTask",
@@ -239,7 +242,7 @@ class SharedRepository(
                 prior?.sequence, SharedProtocol.context(),
                 titleAfterSequence = basis?.nullableString("titleAfterSequence"),
                 descriptionAfterSequence = basis?.nullableString("descriptionAfterSequence"),
-                deletionAfterSequence = basis?.nullableString("deletionAfterSequence"))
+                deletionAfterSequence = basis?.nullableString("deletionAfterSequence"), details = detailEdit)
             dao.saveIntent(intent)
             dao.saveWorkspace(state.copy(nextSequence = (sequence + 1u).toString(), journalVersion = state.journalVersion + 1))
             if (removeDraft) dao.deleteDraft(scope, draft.key)
@@ -248,6 +251,7 @@ class SharedRepository(
                 val visible = if (creating) SharedProtocol.optimistic(intent)
                     else JSONObject(checkNotNull(dao.task(scope, id)).snapshot)
                         .put("title", draft.title).put("description", draft.description)
+                if (!creating) SharedTaskDetails.projectEdit(visible, intent)
                 dao.saveProjection(SharedProjection(scope, id, visible.toString(), state.projectionGeneration))
             }
             lease.check()
@@ -256,8 +260,14 @@ class SharedRepository(
     }
 
     /** Imports copy selected text into new commands; never copy old envelopes, IDs or sequences. */
-    suspend fun copyText(title: String, description: String): String =
-        commit(EditorDraft(InboxRepository.NEW_DRAFT, title, description), removeDraft = false)
+    suspend fun copyText(title: String, description: String, capturedAt: Long? = null, captureContext: String? = null): String =
+        commit(EditorDraft(InboxRepository.NEW_DRAFT, title, description, details = JSONObject()
+            .put("due", JSONObject.NULL).put("urgent", false).put("anonymousCapture", true)
+            .put("originalCapture", SharedTaskDetails.importedCapture(capturedAt, captureContext)).toString()), removeDraft = false)
+
+    override suspend fun placement(id: String): String? = lease.access {
+        dao.task(scope, id)?.snapshot?.let(::JSONObject)?.nullableString("initialPlacement")
+    }
 
     suspend fun prepare(now: Long, boot: Int): SharedRequest? = lease.access {
         database.withTransaction {
@@ -316,7 +326,7 @@ class SharedRepository(
                 for (draft in dao.allDrafts().filter { it.scope == scope }) {
                     val checklist = draft.key.startsWith("checklist:")
                     val original = draft.basis?.let(::JSONObject)?.optJSONObject("task")
-                    dao.saveDraft(draft.copy(basis = null,
+                    dao.saveDraft(draft.copy(basis = null, details = SharedTaskDetails.authoredDraft(draft.details, original),
                         title = if (checklist || original?.getString("title") == draft.title) "" else draft.title,
                         description = if (!checklist && original?.nullableString("description").orEmpty() == draft.description) "" else draft.description))
                 }
@@ -381,6 +391,7 @@ class SharedRepository(
                     val task = receipt.getJSONObject("task")
                     SharedChecklistActions.validateReceipt(receipt)
                     require(task.getString("id") == intent.taskId)
+                    SharedTaskDetails.validateReceipt(intent, task)
                     if (intent.titleChanged) require(task.getString("title") == intent.title)
                     if (intent.descriptionChanged) require(task.nullableString("description") == intent.description)
                 }

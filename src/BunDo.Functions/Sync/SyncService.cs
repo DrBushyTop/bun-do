@@ -152,7 +152,7 @@ public sealed class SyncService(IHouseholdDocuments documents)
         var through = position.After;
         SyncReply Reply() => new(code, workspace, epoch, position.After, through, state.Revision, target,
             SyncCursor.Write(state, new(through, through == target ? 0 : target)), through < target, receipts, groups.ToArray(),
-            new(member, state.Membership.OwnerId, state.Membership.Members.Values.OrderBy(x => x.Id).ToArray()));
+            new(member, state.Membership.OwnerId, state.Membership.Members.Values.OrderBy(x => x.Id).ToArray(), state.TimeZoneId));
         var responseBytes = JsonSerializer.SerializeToUtf8Bytes(Reply(), SyncJson.Options).Length;
         while (through < target && groups.Count < 100)
         {
@@ -197,7 +197,7 @@ public sealed class SyncService(IHouseholdDocuments documents)
 public sealed record SyncReply(string Code, Guid WorkspaceId, Guid StateEpoch, ulong AfterRevision,
     ulong ThroughRevision, ulong HeadRevision, ulong TargetRevision, string Cursor, bool HasMore,
     IReadOnlyList<OperationReceipt> Receipts, IReadOnlyList<SyncGroup> Groups, SyncMembership? Membership = null);
-public sealed record SyncMembership(Guid Me, Guid OwnerId, IReadOnlyList<HouseholdMember> Members);
+public sealed record SyncMembership(Guid Me, Guid OwnerId, IReadOnlyList<HouseholdMember> Members, string TimeZoneId = "Europe/Helsinki");
 public sealed record SyncPart(int PartIndex, string[] EntityIds, string Payload);
 public sealed record SyncGroup(ulong Revision, int PartCount, SyncPart[] Parts, string Digest)
 {

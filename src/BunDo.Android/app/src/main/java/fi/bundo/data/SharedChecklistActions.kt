@@ -21,13 +21,13 @@ internal object SharedChecklistActions {
     }
     fun writes(intent: SharedIntent, target: JSONObject, tasks: Map<String, JSONObject>): List<String> {
         val id = target.getString("id")
-        if (intent.taskId == id) return SharedTaskActions.writes(intent.kind) +
+        if (intent.taskId == id) return SharedTaskActions.writes(intent.kind) + SharedTaskDetails.writes(intent) +
             listOfNotNull("title".takeIf { intent.titleChanged }, "description".takeIf { intent.descriptionChanged },
                 "subtree".takeIf { target.optBoolean("isChecklist") && intent.kind in listOf("EditTask", "MoveTask") })
         if (tasks[intent.taskId]?.nullableString("parentId") == id) return listOf("subtree", "lifecycle")
         if (target.nullableString("parentId") != intent.taskId) return emptyList()
         return when (intent.kind) {
-            "SplitTask", "AddChildren" -> SharedTaskActions.groups + listOf("title", "description")
+            "SplitTask", "AddChildren" -> SharedTaskActions.groups + listOf("title", "description", "due")
             "DeleteTask", "RestoreTask" -> listOf("deletion", "claim")
             "CancelTask", "ReopenTask" -> listOf("lifecycle", "claim", "snooze")
             "SetSnooze" -> listOf("claim")

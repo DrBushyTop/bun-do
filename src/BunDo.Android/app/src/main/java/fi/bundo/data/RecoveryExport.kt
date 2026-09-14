@@ -30,7 +30,8 @@ object RecoveryExport {
             require(InboxLimits.length(title) <= InboxLimits.TITLE && InboxLimits.length(description) <= InboxLimits.DESCRIPTION)
             RecoveryText("file:$index", title, description,
                 record.nullableString("capturedAt")?.let { Instant.parse(it).toEpochMilli() } ?: 0,
-                record.optString("workspaceLabel").takeIf { it.isNotBlank() })
+                record.optString("workspaceLabel").takeIf { it.isNotBlank() },
+                captureContext = record.optJSONObject("captureContext")?.toString())
         }
     }
 
