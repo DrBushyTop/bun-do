@@ -49,6 +49,7 @@ class SharedRepository(
             val prior = dao.intents(scope).filter { SharedTaskActions.pending(it, state.revision) &&
                 SharedChecklistActions.writes(it, task, tasks).isNotEmpty() }
             val payload = JSONObject().put("taskId", id)
+            if (kind in SharedTaskActions.cleanupKinds) payload.put("requestId", task.optJSONObject("cleanup")?.opt("id") ?: JSONObject.NULL)
             if (kind == "CompleteTask") payload.put("confirmedClaimantId", confirmedClaimant ?: JSONObject.NULL)
             if (kind == "MoveTask") payload.put("expectedParentId", task.opt("parentId") ?: JSONObject.NULL)
                 .put("afterTaskId", after ?: JSONObject.NULL).put("beforeTaskId", before ?: JSONObject.NULL)
@@ -274,7 +275,7 @@ class SharedRepository(
                 } else next = null
             }
             val worker = UUID.randomUUID().toString()
-            dao.saveWorkspace(state.copy(worker = worker, workerUntil = now + 90_000, workerBoot = boot))
+            dao.saveWorkspace(state.copy(worker = worker, workerUntil = now + 150_000, workerBoot = boot))
             lease.check()
             SharedRequest(worker, state, next?.frozen)
         }

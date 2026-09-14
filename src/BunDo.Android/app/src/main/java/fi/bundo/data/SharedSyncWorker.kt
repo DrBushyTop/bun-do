@@ -46,7 +46,7 @@ internal class SharedEndpoint {
         try {
             connection.instanceFollowRedirects = false
             connection.connectTimeout = 15_000
-            connection.readTimeout = 30_000
+            connection.readTimeout = 110_000
             connection.requestMethod = method
             connection.setRequestProperty("Authorization", "Bearer $token")
             val status = connection.responseCode

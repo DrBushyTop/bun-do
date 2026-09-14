@@ -115,6 +115,23 @@ class CloudSyncDeviceTest {
             }
             val receipt = JSONObject(databases[0].second.shared().intents(repositories[0].scope).first().receipt!!)
             assertEquals(original.getJSONArray("receipts").getJSONObject(0).getString("effectRevision"), receipt.getString("effectRevision"))
+            if (InstrumentationRegistry.getArguments().getString("cleanupCloudSmoke") == "true") {
+                val id = repositories[0].commit(EditorDraft("new", "öö osta maitoa huomenna", "2 litraa"))
+                sync(repositories[0])
+                val captured = repositories[0].taskStates.first().single { it.getString("id") == id }
+                repositories[0].act("RequestCleanup", captured.toString())
+                sync(repositories[0])
+                sync(repositories[1])
+                for (repository in repositories) {
+                    val cleaned = repository.taskStates.first().single { it.getString("id") == id }
+                    assertEquals("APPLIED", cleaned.getJSONObject("cleanup").getString("status"))
+                    assertEquals("fi", cleaned.getString("contentLanguage"))
+                    assertTrue(cleaned.getString("title").contains("maitoa"))
+                    assertTrue(cleaned.getString("title").contains("huomenna"))
+                    assertEquals(captured.human("title"), cleaned.human("title"))
+                    assertEquals("öö osta maitoa huomenna", cleaned.getJSONObject("capture").getString("title"))
+                }
+            }
             repositories[0].commit(EditorDraft("new", "Synthetic unsent recovery", ""))
             val current = home("get").getJSONObject("household")
             home("delete", JSONObject().put("stateEpoch", epoch).put("expectedVersion", current.getString("membershipVersion")))

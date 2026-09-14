@@ -83,7 +83,7 @@ public sealed class SyncService(IHouseholdDocuments documents)
                 if (receipt is not null) receipts = receipts.Add(id, receipt);
             }
             var taskId = operation.Command switch {
-                CreateTask c => c.TaskId, EditTask e => e.TaskId, TaskTransition t => t.TaskId, MoveTask m => m.TaskId, _ => null,
+                CleanupCommand c => c.TaskId, CreateTask c => c.TaskId, EditTask e => e.TaskId, TaskTransition t => t.TaskId, MoveTask m => m.TaskId, _ => null,
             };
             var tasks = ImmutableDictionary<string, TaskSnapshot>.Empty;
             if (metadata.RootOrder is null && (metadata.TaskCount > 0 || metadata.Tasks.Count > 0))

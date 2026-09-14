@@ -14,7 +14,13 @@ Use the chosen provider's structured-output contract and server-side semantic va
 
 Persist accepted AI intent with the task's visible pending state and normal operation receipt. Keep request identity, requester, input snapshot, expected task versions and enough status to resume or offer Retry after interruption. A worker must not lose accepted work or apply a result twice. Choose the smallest worker implementation that proves those behaviors; a generic job framework is unnecessary.
 
-A request may be pending, running, ready, failed or superseded. Use conditional ownership and task-version checks when applying results. A late worker, cancelled request, deleted task, removed member or changed account/epoch cannot mutate the current task. A restarted worker can leave uncertain work retryable. Bounded retries may incur a duplicate provider charge; v1 promises one visible result application, not exactly-once billing.
+Cleanup runs during authenticated foreground or periodic sync, one request per
+sync from that requester. Pending intent remains durable between syncs. An
+interrupted running request becomes a visible retry after its lease expires;
+resumption does not automatically repeat a paid call. Other household members
+can compare a retained proposal or explicitly request fresh cleanup.
+
+A request may be pending, running, ready, applied, failed or superseded. Use conditional ownership and task-version checks when applying results. A late worker, cancelled request, deleted task, removed member or changed account/epoch cannot mutate the current task. A restarted worker can leave uncertain work retryable. Bounded retries may incur a duplicate provider charge; v1 promises one visible result application, not exactly-once billing.
 
 Keep input/output text out of telemetry and discard private AI input when no longer needed for active work or user recovery. Record operational timings, status and usage counts without prompt text. No token reservations, daily budgets, fairness quotas, durable SENT ledger or named UNKNOWN_OUTCOME state is required for v1. V2 may revisit worker handling using observed failures.
 

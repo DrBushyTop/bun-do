@@ -208,7 +208,7 @@ resource app 'Microsoft.Web/sites@2024-04-01' = {
         { name: 'OTEL_DOTNET_AZURE_MONITOR_ENABLE_RESOURCE_METRICS', value: 'false' }
         { name: 'APPLICATIONINSIGHTS_STATSBEAT_DISABLED', value: 'true' }
         { name: 'APPLICATIONINSIGHTS_SDKSTATS_DISABLED', value: 'true' }
-        { name: 'AI__Enabled', value: 'false' }
+        { name: 'AI__Enabled', value: 'true' }
         { name: 'AI__Endpoint', value: aiEndpoint }
         { name: 'AI__LunaDeployment', value: lunaDeployment }
         { name: 'AI__TerraDeployment', value: terraDeployment }

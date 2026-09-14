@@ -56,6 +56,23 @@ public static class OperationEnvelope
                         groups.Contains("description") ? new(NullableText(payload.GetProperty("description")), Version(observed, "description")) : null,
                         Decimal(observed.GetProperty("deletion").GetProperty("fieldVersion")));
                     break;
+                case "RequestCleanup":
+                case "CancelCleanup":
+                case "ApplyCleanup":
+                    Fields(payload, ["taskId", "requestId"]);
+                    Fields(observed, ["title", "description", "lifecycle", "hierarchy", "deletion"]);
+                    var cleanupId = Uuid(payload.GetProperty("taskId")).ToString("D");
+                    var requestId = NullableText(payload.GetProperty("requestId"));
+                    if (requestId?.Length > 100) throw new EnvelopeException("INVALID_ENVELOPE");
+                    var tv = ExactVersion(observed, "title"); var dv = ExactVersion(observed, "description");
+                    var lv = ExactVersion(observed, "lifecycle"); var hv = ExactVersion(observed, "hierarchy");
+                    var del = ExactVersion(observed, "deletion");
+                    command = root.GetProperty("command").GetString() switch {
+                        "RequestCleanup" => new RequestCleanup(cleanupId, tv, dv, lv, hv, del, requestId),
+                        "CancelCleanup" => new CancelCleanup(cleanupId, tv, dv, lv, hv, del, requestId),
+                        _ => new ApplyCleanup(cleanupId, tv, dv, lv, hv, del, requestId),
+                    };
+                    break;
                 case "DiscardBlockedIntent":
                     Fields(payload, ["rejectedDependency"]);
                     Fields(observed, []);

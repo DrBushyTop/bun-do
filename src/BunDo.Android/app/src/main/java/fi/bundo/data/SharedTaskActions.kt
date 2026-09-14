@@ -6,16 +6,20 @@ import org.json.JSONObject
 /** Durable action observations and local projection. No command is rebased on a remote conflict. */
 internal object SharedTaskActions {
     const val ORDER_ID = "root-order"
-    val kinds = setOf("ClaimTask", "UnclaimTask", "CompleteTask", "ReopenTask", "CancelTask", "MoveTask", "DeleteTask", "RestoreTask",
+    val cleanupKinds = setOf("RequestCleanup", "CancelCleanup", "ApplyCleanup")
+    val kinds = cleanupKinds + setOf("ClaimTask", "UnclaimTask", "CompleteTask", "ReopenTask", "CancelTask", "MoveTask", "DeleteTask", "RestoreTask",
         "SplitTask", "AddChildren", "SetSnooze", "ClearSnooze")
     val groups = listOf("lifecycle", "claim", "hierarchy", "deletion", "orderIntent", "subtree", "snooze")
     fun version(task: JSONObject, group: String): String =
         if (task.has("${group}Version")) task.decimal("${group}Version").toString() else "0"
-    fun observedGroups(kind: String) = if (kind == "MoveTask") listOf("orderIntent", "deletion")
+    fun observedGroups(kind: String) = if (kind in cleanupKinds) listOf("title", "description", "lifecycle", "hierarchy", "deletion")
+        else if (kind == "MoveTask") listOf("orderIntent", "deletion")
         else listOf("lifecycle", "claim", "hierarchy", "deletion", "subtree", "snooze") +
             if (kind in SharedChecklistActions.splitKinds) listOf("title", "description") else emptyList()
     fun writes(kind: String) = when (kind) {
-        "CreateTask" -> groups
+        "CreateTask" -> groups + listOf("title", "description")
+        "RequestCleanup", "CancelCleanup" -> listOf("cleanup")
+        "ApplyCleanup" -> listOf("cleanup", "title", "description")
         "ClaimTask", "UnclaimTask" -> listOf("claim")
         "CompleteTask", "ReopenTask", "CancelTask" -> listOf("lifecycle", "claim", "subtree", "snooze")
         "MoveTask" -> listOf("orderIntent")
@@ -33,14 +37,17 @@ internal object SharedTaskActions {
         val versions = JSONObject()
         val after = JSONObject()
         for (group in observedGroups(kind)) {
-            versions.put(group, observation(task, group))
+            versions.put(group, observation(task, group, kind))
             pending.lastOrNull { group in SharedChecklistActions.writes(it, task, tasks) }?.let { after.put(group, it.sequence) }
         }
+        if (kind in cleanupKinds) pending.lastOrNull { it.taskId == task.getString("id") && it.kind in cleanupKinds }
+            ?.let { after.put("__cleanup", it.sequence) }
         return JSONObject().put("payload", payload).put("versions", versions).put("after", after).put("actor", actor)
             .put("fromLifecycle", task.optString("lifecycle", "OPEN"))
             .put("parentId", task.opt("parentId") ?: JSONObject.NULL).put("registration", registration).toString()
     }
-    private fun observation(task: JSONObject, group: String) = if (group in listOf("title", "description")) task.human(group) else version(task, group)
+    private fun observation(task: JSONObject, group: String, kind: String) = if (group in listOf("title", "description"))
+        if (kind in cleanupKinds) task.field(group).toString() else task.human(group) else version(task, group)
 
     fun dependencies(intent: SharedIntent): List<String> = intent.taskAction?.let {
         val after = JSONObject(it).getJSONObject("after")
@@ -52,32 +59,45 @@ internal object SharedTaskActions {
         val values = action.getJSONObject("payload")
         values.keys().forEach { payload.put(it, values.get(it)) }
         val after = action.getJSONObject("after")
+        if (intent.kind in cleanupKinds && after.has("__cleanup")) payload.put("requestId",
+            SharedChecklistActions.receiptTask(checkNotNull(receipts[after.getString("__cleanup")]), intent.taskId)
+                ?.optJSONObject("cleanup")?.opt("id") ?: JSONObject.NULL)
         for (group in observedGroups(intent.kind)) {
             val value = if (after.has(group)) observation(checkNotNull(SharedChecklistActions.receiptTask(
-                checkNotNull(receipts[after.getString(group)]), intent.taskId)), group)
+                checkNotNull(receipts[after.getString(group)]), intent.taskId)), group, intent.kind)
                 else action.getJSONObject("versions").optString(group, "0")
-            observed.put(group, JSONObject().put(if (group in listOf("title", "description")) "humanVersion" else "fieldVersion", value))
+            observed.put(group, JSONObject().put(if (group in listOf("title", "description") && intent.kind !in cleanupKinds) "humanVersion" else "fieldVersion", value))
         }
     }
 
     fun project(task: JSONObject, intent: SharedIntent, intents: List<SharedIntent>, applied: Set<String>,
         tasks: MutableMap<String, JSONObject> = mutableMapOf(task.getString("id") to task)): String? {
         SharedChecklistActions.guard(task, intent, tasks)?.let { return it }
+        val kind = intent.kind
         val before = JSONObject(task.toString())
         val action = JSONObject(checkNotNull(intent.taskAction))
         val after = action.getJSONObject("after")
+        if (kind in cleanupKinds) {
+            val expectedRequest = if (after.has("__cleanup")) {
+                val predecessor = intents.find { it.sequence == after.getString("__cleanup") }
+                predecessor?.receipt?.let { SharedChecklistActions.receiptTask(JSONObject(it), intent.taskId) }
+                    ?.optJSONObject("cleanup")?.nullableString("id")
+                    ?: if (predecessor?.sequence in applied) task.optJSONObject("cleanup")?.nullableString("id") else return "BLOCKED_DEPENDENCY"
+            } else action.getJSONObject("payload").nullableString("requestId")
+            if (task.optJSONObject("cleanup")?.nullableString("id") != expectedRequest) return "CLEANUP_CONFLICT"
+        }
         for (group in observedGroups(intent.kind)) {
             val dependency = if (after.has(group)) intents.find { it.sequence == after.getString(group) } else null
             if (dependency?.status in listOf("REJECTED", "QUARANTINED", "BLOCKED_DEPENDENCY", "DISMISSED"))
                 return "BLOCKED_DEPENDENCY"
             val expected = dependency?.receipt?.let { SharedChecklistActions.receiptTask(JSONObject(it), intent.taskId) }
-                ?.let { observation(it, group) } ?: if (after.has(group)) {
+                ?.let { observation(it, group, intent.kind) } ?: if (after.has(group)) {
                     // An unresolved output refers to the predecessor we just replayed, not its
                     // old numeric observation. Failed predecessors must not authorize a rebase.
                     if (dependency?.sequence !in applied) return "BLOCKED_DEPENDENCY"
-                    observation(task, group)
+                    observation(task, group, kind)
                 } else action.getJSONObject("versions").optString(group, "0")
-            if (observation(task, group) != expected) return when (group) {
+            if (observation(task, group, kind) != expected) return when (group) {
                 "claim" -> "CLAIM_CONFLICT"; "orderIntent" -> "ORDER_CONFLICT"
                 "deletion" -> "DELETION_CONFLICT"; "subtree" -> "SUBTREE_CONFLICT"; "snooze" -> "SNOOZE_CONFLICT"
                 "title", "description" -> "FIELD_CONFLICT"; else -> "LIFECYCLE_CONFLICT"
@@ -94,6 +114,13 @@ internal object SharedTaskActions {
             for (key in listOf("lifecycle", "claimantId", "lifecycleActorId", "lifecycleAt", "firstCompletion", "deletion", "snoozedUntil"))
                 if (receipt.has(key)) task.put(key, receipt.get(key))
         } else when (intent.kind) {
+            "RequestCleanup" -> task.put("cleanup", JSONObject().put("status", "PENDING")
+                .put("id", "pending:${intent.sequence}"))
+            "CancelCleanup" -> task.optJSONObject("cleanup")?.put("status", "SUPERSEDED")
+            "ApplyCleanup" -> task.optJSONObject("cleanup")?.optJSONObject("proposal")?.let {
+                task.put("title", it.getString("title")).put("description", it.opt("description") ?: JSONObject.NULL)
+                task.optJSONObject("cleanup")?.put("status", "APPLIED")
+            }
             "ClaimTask" -> task.put("claimantId", action.getString("actor"))
             "UnclaimTask" -> task.put("claimantId", JSONObject.NULL)
             "DeleteTask" -> task.put("claimantId", JSONObject.NULL).put("deletion", JSONObject()

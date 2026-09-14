@@ -87,7 +87,7 @@ class SharedSyncTest {
         server.reply(request)
         client.database.close()
         val restarted = client(server, client.name, client.state.registration)
-        val retry = restarted.prepare(100_000)
+        val retry = restarted.prepare(200_000)
         assertEquals(request.envelope, retry.envelope)
         restarted.repository.apply(retry, server.reply(retry))
         assertEquals(1, server.revision)
@@ -129,7 +129,7 @@ class SharedSyncTest {
         client.repository.commit(EditorDraft("new", "Private", ""))
         val old = client.prepare()
         assertNull(client.repository.prepare(2000, 1))
-        val replacement = client.prepare(100_000)
+        val replacement = client.prepare(200_000)
         assertFails { client.repository.apply(old, server.reply(old)) }
         assertEquals("0", client.database.shared().workspace(client.state.scope)!!.revision)
         client.lease.revoke()
@@ -466,7 +466,7 @@ class SharedSyncTest {
         recovery.begin(old)
         val transport = SnapshotPeer(server)
         recovery.step(old, transport, Long.MAX_VALUE, 0)
-        transport.onChunk = { client.prepare(100_000) }
+        transport.onChunk = { client.prepare(200_000) }
         assertFails { recovery.step(old, transport, Long.MAX_VALUE, 0) }
         assertEquals(0, client.database.shared().recoveryState(client.state.scope)!!.nextChunk)
         assertEquals("Original", client.repository.tasks.first().single().title)
@@ -535,7 +535,7 @@ class SharedSyncTest {
             }
         }
         client.repository.release(request)
-        assertNull(client.repository.prepare(100_000, 1))
+        assertNull(client.repository.prepare(200_000, 1))
         assertEquals("REGISTRATION_REPLACEMENT_REQUIRED", client.repository.workspace.first()!!.blocked)
         assertTrue(client.database.shared().recovery().any { it.title == "Unsent edit" })
     }

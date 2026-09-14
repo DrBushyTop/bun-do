@@ -21,6 +21,47 @@ class SharedTaskActionsTest {
     private val other = UUID.randomUUID().toString()
     @get:Rule val migrations = MigrationTestHelper(InstrumentationRegistry.getInstrumentation(), InboxDatabase::class.java)
 
+    @Test fun cleanupIntentSurvivesRestartAndHumanEditWinsOverAutomaticText() = runBlocking {
+        fixture { db, state, repository ->
+            val task = task("osta maitoa")
+            val first = repository.prepare(1000, 1)!!
+            repository.apply(first, reply(first, listOf(task, order(task.getString("id")))))
+            repository.act("RequestCleanup", repository.taskStates.first().single().toString())
+            assertEquals("PENDING", repository.taskStates.first().single().getJSONObject("cleanup").getString("status"))
+            val request = repository.prepare(1001, 1)!!
+            val wire = JSONObject(request.envelope!!)
+            assertEquals("RequestCleanup", wire.getString("command"))
+            assertEquals("1", wire.getJSONObject("observedVersions").getJSONObject("title").getString("fieldVersion"))
+            val restart = SharedRepository(db, DataLease(), state.scope, state.registration)
+            val resumed = restart.prepare(100_000, 2)!!
+            assertEquals(request.envelope, resumed.envelope)
+            val draft = repository.draft(task.getString("id")).copy(title = "Osta kauramaitoa")
+            repository.commit(draft)
+            val cleaned = JSONObject(task.toString()).put("title", "Osta maitoa")
+                .put("titleVersion", JSONObject().put("fieldVersion", "2").put("humanVersion", "1"))
+                .put("cleanup", JSONObject().put("id", "${state.registration}:1").put("status", "APPLIED"))
+            restart.apply(resumed, reply(resumed, listOf(cleaned), receipt(resumed, cleaned)))
+            assertEquals("Osta kauramaitoa", repository.taskStates.first().single().getString("title"))
+        }
+    }
+
+    @Test fun offlineCleanupThenCancelResolvesTheAcceptedRequestIdentity() = runBlocking {
+        fixture { _, state, repository ->
+            val task = task("Text")
+            val first = repository.prepare(1000, 1)!!
+            repository.apply(first, reply(first, listOf(task, order(task.getString("id")))))
+            repository.act("RequestCleanup", repository.taskStates.first().single().toString())
+            repository.act("CancelCleanup", repository.taskStates.first().single().toString())
+            val request = repository.prepare(1001, 1)!!
+            val pending = JSONObject(task.toString()).put("cleanup", JSONObject()
+                .put("id", "${state.registration}:1").put("status", "PENDING"))
+            repository.apply(request, reply(request, listOf(pending), receipt(request, pending)))
+            val cancel = JSONObject(repository.prepare(1002, 1)!!.envelope!!)
+            assertEquals("CancelCleanup", cancel.getString("command"))
+            assertEquals("${state.registration}:1", cancel.getJSONObject("payload").getString("requestId"))
+        }
+    }
+
     @Test fun migrationPreservesFrozenWorkAndAddsNoImplicitTaskAction() {
         val name = "task-action-migration-${UUID.randomUUID()}.db"
         try {

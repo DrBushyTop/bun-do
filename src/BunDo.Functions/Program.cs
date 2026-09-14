@@ -57,6 +57,13 @@ else
         builder.Configuration["BunDoIdentity:Audience"]));
 }
 
+if (builder.Configuration["AI:Enabled"] == "true")
+{
+    builder.Services.AddSingleton<BunDo.Functions.AI.ICleanupProvider>(_ =>
+        new BunDo.Functions.AI.FoundryCleanupProvider(new HttpClient(),
+            new ManagedIdentityCredential(ManagedIdentityId.FromUserAssignedClientId(builder.Configuration["AZURE_CLIENT_ID"]!)),
+            new Uri(builder.Configuration["AI:Endpoint"]!), builder.Configuration["AI:LunaDeployment"]!));
+}
 builder.Services.AddSingleton<BackendTelemetry>();
 // Wrap the HTTP proxy too, including IActionResult execution/serialization.
 builder.UseMiddleware<FunctionTelemetryMiddleware>();

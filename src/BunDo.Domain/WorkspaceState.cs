@@ -15,7 +15,7 @@ public sealed record TaskSnapshot(
     TaskDeletion? Deletion = null, DateTimeOffset? SnoozedUntil = null,
     string? ParentId = null, bool IsChecklist = false, ImmutableArray<string>? ChildOrder = null,
     ulong SubtreeVersion = 0, ulong SnoozeVersion = 0, string? CancellationGroupId = null,
-    bool EmptyChecklist = false);
+    bool EmptyChecklist = false, CleanupRequest? Cleanup = null, string? ContentLanguage = null);
 public sealed record DeviceRegistration(Guid DeviceId, Guid MemberId, ulong LastTerminalSequence = 0,
     ulong AcknowledgedThrough = 0, string? RegistryPartition = null);
 public sealed record OperationReceipt(

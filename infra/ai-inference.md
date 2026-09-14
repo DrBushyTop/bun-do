@@ -19,10 +19,10 @@ content filtering remains enabled. `store: false` prevents Responses history
 storage, but does not claim an exemption from Azure's abuse-monitoring policy.
 
 The backend receives the v1 base URL and deployment names, never an account key.
-`AI__Enabled` remains `false` until the authenticated cleanup worker and safe
-result application pass their integration checks. Product quotas and token budgets
-are not enablement gates; their review waits until after V2. Provisioning the
-endpoint does not enable application AI.
+`AI__Enabled` enables the authenticated cleanup worker. Foreground and periodic
+sync process one durable request from the authenticated requester at a time. An
+expired inference lease offers Retry without automatically repeating the paid call.
+Product quotas and token budgets are not enablement gates; their review waits until after V2.
 
 ## Verification
 

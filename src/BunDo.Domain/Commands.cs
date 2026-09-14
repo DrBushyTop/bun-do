@@ -33,6 +33,17 @@ public sealed record AddChildren(string TaskId, TaskStateVersions Expected, stri
     : ChecklistCommand(TaskId, Expected, Items, ExpectedTitleHumanVersion, ExpectedDescriptionHumanVersion);
 public sealed record MoveTask(string TaskId, ulong ExpectedOrderVersion, ulong ExpectedDeletionVersion,
     string? ExpectedParentId = null, string? AfterTaskId = null, string? BeforeTaskId = null) : TaskCommand;
+public abstract record CleanupCommand(string TaskId, ulong TitleVersion, ulong DescriptionVersion,
+    ulong LifecycleVersion, ulong HierarchyVersion, ulong DeletionVersion, string? RequestId) : TaskCommand;
+public sealed record RequestCleanup(string TaskId, ulong TitleVersion, ulong DescriptionVersion,
+    ulong LifecycleVersion, ulong HierarchyVersion, ulong DeletionVersion, string? RequestId)
+    : CleanupCommand(TaskId, TitleVersion, DescriptionVersion, LifecycleVersion, HierarchyVersion, DeletionVersion, RequestId);
+public sealed record CancelCleanup(string TaskId, ulong TitleVersion, ulong DescriptionVersion,
+    ulong LifecycleVersion, ulong HierarchyVersion, ulong DeletionVersion, string? RequestId)
+    : CleanupCommand(TaskId, TitleVersion, DescriptionVersion, LifecycleVersion, HierarchyVersion, DeletionVersion, RequestId);
+public sealed record ApplyCleanup(string TaskId, ulong TitleVersion, ulong DescriptionVersion,
+    ulong LifecycleVersion, ulong HierarchyVersion, ulong DeletionVersion, string? RequestId)
+    : CleanupCommand(TaskId, TitleVersion, DescriptionVersion, LifecycleVersion, HierarchyVersion, DeletionVersion, RequestId);
 public sealed record DiscardBlockedIntent(ulong RejectedDependencySequence) : TaskCommand;
 
 /// <summary>Validated command identity. Production fingerprints cover the original wire bytes.</summary>
@@ -70,6 +81,9 @@ public sealed class FrozenOperation
         Dependencies = dependencies.ToArray();
         var kind = command switch
         {
+            RequestCleanup => "RequestCleanup",
+            CancelCleanup => "CancelCleanup",
+            ApplyCleanup => "ApplyCleanup",
             CreateTask => "CreateTask",
             EditTask => "EditTask",
             ClaimTask => "ClaimTask",

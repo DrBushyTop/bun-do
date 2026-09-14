@@ -19,6 +19,9 @@ internal data class SharedTaskAction(val kind: String, val displayed: String,
     val confirmedClaimant: String? = null, val after: String? = null, val before: String? = null, val until: String? = null)
 
 internal fun taskActionLabel(kind: String) = when (kind) {
+    "RequestCleanup" -> R.string.cleanup_request
+    "CancelCleanup" -> R.string.cleanup_cancel
+    "ApplyCleanup" -> R.string.cleanup_apply
     "ClaimTask" -> R.string.task_claim
     "UnclaimTask" -> R.string.task_unclaim
     "CompleteTask" -> R.string.task_complete
@@ -95,6 +98,7 @@ internal fun SharedTaskControls(task: JSONObject, ordered: List<JSONObject>, mem
                 onClick = { onAction(SharedTaskAction("RestoreTask", task.toString())) }) { Text(stringResource(R.string.task_restore)) }
             if (task.getJSONObject("deletion").optBoolean("purging")) Text(stringResource(R.string.task_purging))
         } else {
+            SharedCleanupControls(task, canAct, onAction)
             if (snoozed) Text(stringResource(R.string.task_snoozed))
             if (isChecklist) Text(stringResource(if (task.optBoolean("emptyChecklist")) R.string.checklist_empty else R.string.checklist_derived))
             if (open && !isChecklist) {

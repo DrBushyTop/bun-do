@@ -85,6 +85,38 @@ class SharedTaskUiTest {
         return data to state
     }
 
+    @Test fun cleanupPendingAndCancelStayUsableAtLargeFinnishText() {
+        fixture("fi", "light", fontScale = 2f)
+        compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
+        compose.onNodeWithTag("cleanup-request").performScrollTo().performClick()
+        compose.onNodeWithTag("cleanup-cancel").performScrollTo().assertIsEnabled()
+        screenshot("cleanup-fi-pending")
+        compose.onNodeWithTag("cleanup-cancel").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("cleanup-request").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("cleanup-request").performScrollTo().assertIsEnabled()
+    }
+
+    @Test fun cleanupSuggestionCanBeComparedAndAppliedInEnglish() {
+        val (data, state) = fixture("en", "light")
+        runBlocking {
+            val dao = data.database.shared()
+            val base = dao.base(state.scope).first { JSONObject(it.snapshot).optString("title") == "Vie paperit kierrätykseen" }
+            val task = JSONObject(base.snapshot).put("cleanup", JSONObject().put("id", "request-1").put("status", "READY")
+                .put("proposal", JSONObject().put("title", "Vie paperit keräykseen").put("description", "Myös pahvit")
+                    .put("language", "fi").put("needsReview", true)))
+            dao.saveBase(base.copy(snapshot = task.toString()))
+            dao.saveProjection(SharedProjection(state.scope, task.getString("id"), task.toString()))
+        }
+        compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
+        compose.onNodeWithTag("cleanup-compare").performScrollTo().performClick()
+        compose.onNodeWithTag("cleanup-apply").performScrollTo().assertIsEnabled()
+        screenshot("cleanup-en-compare")
+        compose.onNodeWithTag("cleanup-apply").performClick()
+        compose.waitUntil(5_000) {
+            runBlocking { data.database.shared().intents(state.scope).any { it.kind == "ApplyCleanup" } }
+        }
+    }
+
     @Test fun finnishChecklistPreviewProgressAndChildNavigationAtLargeText() {
         val (data, state) = fixture("fi", "light", fontScale = 2f)
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()

@@ -94,6 +94,13 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
                     ? "BLOCKED_DEPENDENCY"
                     : "INVALID_DEPENDENCY";
             }
+            else if (operation.Command is CleanupCommand cleanup)
+            {
+                state.Tasks.TryGetValue(cleanup.TaskId, out task);
+                (code, changed) = TaskCleanup.Request(state, task, cleanup, operation.OperationId,
+                    authenticatedMemberId, revision);
+                task = changed ?? task;
+            }
             else if (operation.Command is TaskTransition transition)
             {
                 var mutation = ChecklistTasks.Apply(state, operation, authenticatedMemberId, revision, acceptedAt);
@@ -218,12 +225,12 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
         return new(afterRevision, groups.IsEmpty ? afterRevision : groups[^1].Revision, state.Revision, groups);
     }
 
-    private static string ValidateText(TaskSnapshot task)
+    internal static string ValidateText(TaskSnapshot task)
     {
         if (string.IsNullOrWhiteSpace(task.Title) || task.Title.EnumerateRunes().Count() > 160)
             return "INVALID_TITLE";
         if (task.Description?.EnumerateRunes().Count() > 4000) return "INVALID_DESCRIPTION";
-        return JsonSerializer.SerializeToUtf8Bytes(task).Length > 16 * 1024 ? "TASK_TOO_LARGE" : "ACCEPTED";
+        return JsonSerializer.SerializeToUtf8Bytes(task with { Cleanup = null }).Length > 16 * 1024 ? "TASK_TOO_LARGE" : "ACCEPTED";
     }
 }
 
