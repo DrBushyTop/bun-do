@@ -16,7 +16,8 @@ import java.time.Instant
 import java.util.Date
 
 internal data class SharedTaskAction(val kind: String, val displayed: String,
-    val confirmedClaimant: String? = null, val after: String? = null, val before: String? = null, val until: String? = null)
+    val confirmedClaimant: String? = null, val after: String? = null, val before: String? = null, val until: String? = null,
+    val expectedOrder: List<String>? = null)
 
 internal fun taskActionLabel(kind: String) = when (kind) {
     "ConfigureRepeat" -> R.string.repeat_save
@@ -42,6 +43,9 @@ private fun member(membership: JSONObject?, id: String?): JSONObject? {
     return (0 until members.length()).map(members::getJSONObject).find { it.getString("id") == id }
 }
 
+internal fun taskClaimant(task: JSONObject, membership: JSONObject?): String? =
+    task.nullableString("claimantId")?.takeIf { member(membership, it)?.optBoolean("active") == true }
+
 @Composable
 internal fun memberName(membership: JSONObject?, id: String?): String {
     val person = member(membership, id)
@@ -57,7 +61,7 @@ internal fun SharedTaskSummary(task: JSONObject, membership: JSONObject?) {
     }
     SharedDueSummary(task)
     val lifecycle = task.optString("lifecycle", "OPEN")
-    val claimant = task.nullableString("claimantId")?.takeIf { member(membership, it)?.optBoolean("active") == true }
+    val claimant = taskClaimant(task, membership)
     if (lifecycle != "OPEN") {
         val actor = memberName(membership, task.nullableString("lifecycleActorId"))
         Text(stringResource(if (lifecycle == "COMPLETED") R.string.task_completed_by else R.string.task_cancelled_by, actor),
@@ -65,11 +69,9 @@ internal fun SharedTaskSummary(task: JSONObject, membership: JSONObject?) {
         val instant = task.nullableString("lifecycleAt")?.let { runCatching { Instant.parse(it) }.getOrNull() }
         if (instant != null) Text(DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT,
             LocalConfiguration.current.locales[0]).format(Date.from(instant)), style = MaterialTheme.typography.bodySmall)
-        else Text(stringResource(R.string.task_waiting_sync), style = MaterialTheme.typography.bodySmall)
-    } else if (claimant != null) Text(
-        if (claimant == membership?.optString("me")) stringResource(R.string.task_claimed_you)
-        else stringResource(R.string.task_claimed_by, memberName(membership, claimant)),
-        style = MaterialTheme.typography.bodyMedium)
+    }
+    ClaimantIllustration(task.getString("id"), claimant?.takeIf { lifecycle == "OPEN" },
+        if (claimant == null) "" else stringResource(R.string.task_claimed_by, memberName(membership, claimant)))
 }
 
 @Composable
@@ -79,7 +81,7 @@ internal fun SharedTaskControls(task: JSONObject, ordered: List<JSONObject>, mem
     val id = task.getString("id")
     val open = task.optString("lifecycle", "OPEN") == "OPEN"
     val me = membership?.optString("me")
-    val claimant = task.nullableString("claimantId")?.takeIf { member(membership, it)?.optBoolean("active") == true }
+    val claimant = taskClaimant(task, membership)
     var confirmation by remember(id) { mutableStateOf<SharedTaskAction?>(null) }
     val tasks = ordered.associateBy { it.getString("id") }
     val parentId = task.nullableString("parentId")
@@ -92,7 +94,6 @@ internal fun SharedTaskControls(task: JSONObject, ordered: List<JSONObject>, mem
     val index = active.indexOf(id)
     val canAct = enabled && me != null
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SharedTaskAttribution(task, membership)
         SharedTaskSummary(task, membership)
         if (failed) Text(stringResource(R.string.task_changed_retry), color = MaterialTheme.colorScheme.error)
         if (!task.isNull("deletion")) {
@@ -103,7 +104,6 @@ internal fun SharedTaskControls(task: JSONObject, ordered: List<JSONObject>, mem
                 onClick = { onAction(SharedTaskAction("RestoreTask", task.toString())) }) { Text(stringResource(R.string.task_restore)) }
             if (task.getJSONObject("deletion").optBoolean("purging")) Text(stringResource(R.string.task_purging))
         } else {
-            SharedCleanupControls(task, canAct, onAction)
             if (snoozed) Text(stringResource(R.string.task_snoozed))
             if (isChecklist) Text(stringResource(if (task.optBoolean("emptyChecklist")) R.string.checklist_empty else R.string.checklist_derived))
             if (open && !isChecklist) {
@@ -120,6 +120,7 @@ internal fun SharedTaskControls(task: JSONObject, ordered: List<JSONObject>, mem
             if (!open && (!isChecklist || !task.isNull("cancellationGroupId"))) OutlinedButton(enabled = canAct,
                 modifier = Modifier.testTag("task-reopen"),
                 onClick = { onAction(SharedTaskAction("ReopenTask", task.toString())) }) { Text(stringResource(R.string.task_reopen)) }
+            SharedCleanupControls(task, canAct, onAction)
             if (open) {
                 SharedSnoozePresets(task, membership, canAct, onAction)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

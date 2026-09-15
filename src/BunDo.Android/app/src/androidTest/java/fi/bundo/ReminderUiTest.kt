@@ -48,7 +48,7 @@ class ReminderUiTest {
         val translated = compose.activity.createConfigurationContext(config)
         compose.runOnUiThread {
             compose.activity.setContent {
-                CompositionLocalProvider(LocalContext provides translated, LocalConfiguration provides config,
+                CompositionLocalProvider(LocalContext provides translated, androidx.compose.ui.platform.LocalResources provides translated.resources, LocalConfiguration provides config,
                     LocalActivityResultRegistryOwner provides compose.activity) {
                     val density = LocalDensity.current
                     CompositionLocalProvider(LocalDensity provides Density(density.density, scale)) {
@@ -105,7 +105,8 @@ class ReminderUiTest {
         compose.runOnUiThread { compose.activity.setContent { BunDoTheme("light") { SharedWorkspaceScreen(data, state, "light", {}, {}) } } }
         // Compose can be idle while Room is still loading the initial projection.
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Overdue milk").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithTag("task-due-view").performScrollTo().performClick()
+        compose.onNodeWithTag("queue-views").performClick()
+        compose.onNodeWithTag("task-due-view").performClick()
         compose.onNodeWithTag("queue").performScrollToNode(hasText("Overdue milk"))
         compose.onNodeWithText("Overdue milk").assertExists()
         assertFalse(runBlocking { data.database.reminders().settings()?.enabled ?: false })
@@ -113,6 +114,8 @@ class ReminderUiTest {
     }
 
     private fun screenshot(name: String) {
+        compose.waitForIdle()
+        android.os.SystemClock.sleep(350) // Wait for the rendered buffer, not only the semantics tree.
         compose.waitForIdle()
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val image = instrumentation.uiAutomation.takeScreenshot()

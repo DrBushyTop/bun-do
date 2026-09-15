@@ -7,6 +7,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
@@ -20,6 +23,7 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -37,11 +41,13 @@ import fi.bundo.R
 import fi.bundo.data.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import org.json.JSONObject
 
 @Composable
 fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearance: String,
     onAppearance: (String) -> Unit, onAccount: () -> Unit) {
+    val resources = LocalResources.current
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
@@ -59,6 +65,10 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
     val taskStates by repository.taskStates.collectAsStateWithLifecycle(emptyList())
     val byId = taskStates.associateBy { it.getString("id") }
     val membership = current?.membership?.let(::JSONObject)
+    var feedback by remember { mutableStateOf<HouseholdFeedback?>(null) }
+    var completionTurn by rememberSaveable { mutableLongStateOf(0L) }
+    var views by remember { mutableStateOf(false) }
+    var tools by rememberSaveable { mutableStateOf(false) }
     var destination by rememberSaveable(selected.scope) { mutableStateOf("queue") }
     var history by rememberSaveable(selected.scope) { mutableStateOf(false) }
     var deleted by rememberSaveable(selected.scope) { mutableStateOf(false) }
@@ -102,14 +112,33 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
     }
     fun act(action: SharedTaskAction) {
         run {
-            val sequence = repository.act(action.kind, action.displayed, action.confirmedClaimant, action.after, action.before, action.until)
+            val sequence = repository.act(action.kind, action.displayed, action.confirmedClaimant, action.after, action.before, action.until, expectedOrder = action.expectedOrder)
             SharedSyncWorker.request(context, data)
-            if (action.kind == "DeleteTask") scope.launch {
+            val taskId = JSONObject(action.displayed).getString("id")
+            val message = when (action.kind) {
+                "DeleteTask" -> deletedMessage
+                "CompleteTask" -> resources.getString(R.string.feedback_completed)
+                "ClaimTask" -> resources.getString(R.string.feedback_claimed)
+                "MoveTask" -> {
+                    val order = repository.taskStates.first().filter { it.isNull("parentId") && it.isNull("deletion") && it.optString("lifecycle", "OPEN") == "OPEN" }
+                    resources.getString(R.string.queue_position, order.indexOfFirst { it.getString("id") == taskId } + 1, order.size)
+                }
+                else -> null
+            }
+            feedback = null
+            if (action.kind == "CompleteTask") feedback = HouseholdFeedback(++completionTurn, "complete")
+            if (action.kind == "ClaimTask") feedback = HouseholdFeedback(System.nanoTime(), "claim")
+            if (message != null) scope.launch {
                 snackbar.currentSnackbarData?.dismiss()
-                if (snackbar.showSnackbar(deletedMessage, undoLabel, withDismissAction = true,
-                        duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) run {
-                    repository.undoDelete(JSONObject(action.displayed).getString("id"), sequence)
-                    SharedSyncWorker.request(context, data)
+                val undo = action.kind in listOf("DeleteTask", "CompleteTask")
+                if (snackbar.showSnackbar(message, if (undo) undoLabel else null, withDismissAction = true,
+                        duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) {
+                    snapshotFlow { busy }.first { !it }
+                    run {
+                        if (action.kind == "DeleteTask") repository.undoDelete(taskId, sequence)
+                        else repository.undoCompletion(taskId, sequence)
+                        SharedSyncWorker.request(context, data)
+                    }
                 }
             }
         }
@@ -136,7 +165,7 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
         owner.lifecycle.addObserver(observer)
         onDispose { owner.lifecycle.removeObserver(observer); if (!data.lease.active) model.hide() }
     }
-    InboxApp(state, model, appearance, onAppearance, onAccount = onAccount, queueTitle = selected.name,
+    InboxApp(state, model, appearance, onAppearance, voice = data.voice, voiceTarget = VoiceTarget(selected.scope), onAccount = onAccount, queueTitle = selected.name,
         queueNavigation = { SharedHouseholdNavigation(destination) { destination = it } },
         queueContent = if (destination != "queue") ({ onOpen ->
             SharedProgressScreen(current?.progress?.takeIf { current?.blocked == null && recovery == null },
@@ -148,7 +177,23 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
             task.isNull("parentId") && !task.optBoolean("isChecklist") && task.optString("lifecycle", "OPEN") == "OPEN"
         } == true } == true) ({ model.closeEditor(true) { checklistId = it } }) else null,
         canEditTask = { id -> byId[id]?.isNull("deletion") == true },
-        snackbarHost = { SnackbarHost(snackbar) },
+        snackbarHost = { HouseholdSnackbar(snackbar, feedback) },
+        taskAttribution = { id -> byId[id]?.let { SharedTaskAttribution(it, membership) } },
+        onTaskSaved = { id, created -> if (created) run {
+            feedback = HouseholdFeedback(System.nanoTime(), "file")
+            snackbar.currentSnackbarData?.dismiss()
+            val message = resources.getString(if (repository.placement(id) == "EXPEDITED") R.string.detail_saved_priority else R.string.detail_saved_append)
+            scope.launch {
+                if (snackbar.showSnackbar(message, undoLabel, withDismissAction = true,
+                        duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) {
+                    snapshotFlow { busy }.first { !it }
+                    run {
+                        repository.undoCapture(id)
+                        SharedSyncWorker.request(context, data)
+                    }
+                }
+            }
+        } },
         rowSummary = { id -> byId[id]?.let { SharedTaskSummary(it, membership); ChecklistProgress(it, byId) } },
         taskControls = { id, onOpen -> byId[id]?.let { task ->
             SharedChecklist(task, byId, membership, !busy && current?.blocked == null && recovery == null,
@@ -165,18 +210,27 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
                 }
             }
         } },
-        queueHeader = {
+        queueList = { onOpen -> SharedQueue(queueRows, taskStates, membership,
+            !busy && current?.blocked == null && recovery == null, onOpen, ::act,
+            onFullQueue = { history = false; deleted = false; snoozed = false; dueOnly = false },
+            toolbar = {
+                Box {
+                    TextButton(onClick = { views = true }, modifier = Modifier.testTag("queue-views")) {
+                        Text(stringResource(when { dueOnly -> R.string.reminders_due; deleted -> R.string.task_deleted_view
+                            history -> R.string.task_history_view; snoozed -> R.string.task_snoozed_view; else -> R.string.task_active_view }))
+                    }
+                    DropdownMenu(views, { views = false }) {
+                        listOf("active" to R.string.task_active_view, "history" to R.string.task_history_view,
+                            "deleted" to R.string.task_deleted_view, "snoozed" to R.string.task_snoozed_view,
+                            "due" to R.string.reminders_due).forEach { (view, label) ->
+                            DropdownMenuItem(text = { Text(stringResource(label)) }, modifier = Modifier.testTag("task-$view-view"), onClick = {
+                                history = view == "history"; deleted = view == "deleted"; snoozed = view == "snoozed"; dueOnly = view == "due"; views = false
+                            })
+                        }
+                    }
+                }
+            }, notices = {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-            FilterChip(selected = !history && !deleted && !snoozed && !dueOnly, onClick = { history = false; deleted = false; snoozed = false; dueOnly = false }, modifier = Modifier.testTag("task-active-view"),
-                label = { Text(stringResource(R.string.task_active_view)) })
-            FilterChip(selected = history && !deleted && !dueOnly, onClick = { history = true; deleted = false; snoozed = false; dueOnly = false }, modifier = Modifier.testTag("task-history-view"),
-                label = { Text(stringResource(R.string.task_history_view)) })
-            FilterChip(selected = deleted && !dueOnly, onClick = { deleted = true; dueOnly = false }, modifier = Modifier.testTag("task-deleted-view"),
-                label = { Text(stringResource(R.string.task_deleted_view)) })
-            FilterChip(selected = snoozed && !deleted && !history && !dueOnly, onClick = { snoozed = true; deleted = false; history = false; dueOnly = false },
-                modifier = Modifier.testTag("task-snoozed-view"), label = { Text(stringResource(R.string.task_snoozed_view)) })
-            FilterChip(selected = dueOnly, onClick = { dueOnly = true; deleted = false; history = false; snoozed = false },
-                modifier = Modifier.testTag("task-due-view"), label = { Text(stringResource(R.string.reminders_due)) })
             if (dueOnly && queueRows.isEmpty()) Text(stringResource(R.string.reminders_due_empty))
             if (deleted) Text(stringResource(if (queueRows.isEmpty()) R.string.task_deleted_empty else R.string.task_deleted_retention))
             recovery?.let { recovering ->
@@ -191,6 +245,8 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
             }
             if (current?.blocked != null) Text(stringResource(R.string.shared_access_lost),
                 color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 8.dp).testTag("shared-blocked"))
+            TextButton(onClick = { tools = !tools }, modifier = Modifier.testTag("queue-tools")) { Text(stringResource(R.string.queue_tools)) }
+            if (tools) {
             Row(Modifier.fillMaxWidth()) {
                 TextButton(onClick = { run { data.selectHousehold(null) } }, enabled = !busy,
                     modifier = Modifier.testTag("shared-local")) { Text(stringResource(R.string.shared_local)) }
@@ -203,14 +259,15 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
             Row {
                 TextButton(onClick = { SharedSyncWorker.request(context, data) }, enabled = current?.blocked == null,
                     modifier = Modifier.testTag("shared-refresh")) { Text(stringResource(R.string.household_refresh)) }
+            }
+            }
                 if (problems.isNotEmpty()) TextButton(onClick = { showProblems = true },
                     modifier = Modifier.testTag("shared-recovery")) {
                     Text(stringResource(R.string.shared_review, problems.size))
                 }
-            }
             if (failed) Text(stringResource(R.string.shared_action_failed), color = MaterialTheme.colorScheme.error)
         }
-    })
+    }) })
     checklistDraft?.takeUnless { dictatingSteps || current?.blocked != null }?.let { draft -> ChecklistEditor(draft, busy || current?.blocked != null, failed,
         repository::saveChecklistDraft,
         onSave = { latest -> run {

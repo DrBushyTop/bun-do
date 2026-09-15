@@ -3,7 +3,7 @@
     <string name="app_name" translatable="false">Bun Do</string>
     <string name="inbox">Oma jono</string>
     <string name="local_only">Vain tällä puhelimella</string>
-    <string name="local_explanation">Tehtävät säilyvät tällä puhelimella. Niitä ei vielä varmuuskopioida tai jaeta.</string>
+    <string name="local_explanation">Tämä lista on vain tällä puhelimella. Avaa kotitalous ja tuo sinne tehtävät, jotka haluat jakaa.</string>
     <string name="empty_title">Mitä pitäisi tehdä?</string>
     <string name="empty_body">Kirjoita yksi asia muistiin. Voit palata siihen myöhemmin, myös ilman verkkoyhteyttä.</string>
     <string name="type_task">Kirjoita tehtävä</string>
@@ -33,9 +33,6 @@
     <string name="finnish">Suomi</string>
     <string name="english">English</string>
     <string name="system_default">Järjestelmän mukaan</string>
-    <string name="appearance">Ulkoasu</string>
-    <string name="light">Vaalea</string>
-    <string name="dark">Tumma</string>
     <string name="original_text">Alkuperäinen teksti</string>
     <string name="show_original">Näytä alkuperäinen teksti</string>
     <string name="hide_original">Piilota alkuperäinen teksti</string>

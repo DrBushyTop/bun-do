@@ -54,7 +54,7 @@ class ProgressUiTest {
             }
         }
         compose.runOnUiThread { compose.activity.setContent {
-            CompositionLocalProvider(LocalContext provides translated, LocalConfiguration provides config) {
+            CompositionLocalProvider(LocalContext provides translated, androidx.compose.ui.platform.LocalResources provides translated.resources, LocalConfiguration provides config) {
                 val density = LocalDensity.current
                 CompositionLocalProvider(LocalDensity provides Density(density.density, scale)) {
                     BunDoTheme("light") {
@@ -112,6 +112,8 @@ class ProgressUiTest {
         compose.onNodeWithTag("progress-period-count").assertDoesNotExist()
     }
     private fun screenshot(name: String) {
+        compose.waitForIdle()
+        android.os.SystemClock.sleep(350) // Wait for the rendered buffer, not only the semantics tree.
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val bitmap = instrumentation.uiAutomation.takeScreenshot()
         try { File(instrumentation.targetContext.getExternalFilesDir(null), "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG,100,it) } }

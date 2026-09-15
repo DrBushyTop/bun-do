@@ -49,8 +49,7 @@ internal fun SharedTaskAttribution(task: JSONObject, membership: JSONObject?) {
         task.optJSONObject("creation")?.let { creation ->
             val captured = creation.nullableString("capturedAt")?.let(::time) ?: stringResource(R.string.detail_unknown_capture)
             val actor = creation.nullableString("actorId")
-            Text(if (creation.isNull("acceptedAt")) stringResource(R.string.detail_pending_created, captured)
-                else if (actor == null) stringResource(R.string.detail_anonymous_created, captured)
+            Text(if (actor == null) stringResource(R.string.detail_anonymous_created, captured)
                 else stringResource(R.string.detail_created, memberName(membership, actor), captured),
                 style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("task-creation"))
         }

@@ -3,7 +3,7 @@
     <string name="account_inbox">Account inbox</string>
     <string name="account_signed_in">Your account on this device</string>
     <string name="account_anonymous">Not signed in</string>
-    <string name="account_local_notice">Tasks stay on this device. Sign-in does not join a household. Sync is not available yet.</string>
+    <string name="account_local_notice">Household tasks sync when connected. Tasks in the local inbox stay on this device until you choose to import them.</string>
     <string name="account_installation_reset">The installation identity was missing or did not match. Unexpected files are quarantined. Sign in for a new device registration. Encrypted files cannot be opened without their original device key.</string>
     <string name="account_pending">Text records: %1$d · Recordings: %2$d</string>
     <string name="account_operation_failed">The operation failed. Source data is unchanged. Try again.</string>

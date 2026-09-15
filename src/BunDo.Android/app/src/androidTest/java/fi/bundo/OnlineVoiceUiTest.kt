@@ -26,6 +26,7 @@ import org.junit.runner.RunWith
 import java.io.File
 import java.util.Locale
 import java.util.UUID
+import org.json.JSONObject
 
 @RunWith(AndroidJUnit4::class)
 class OnlineVoiceUiTest {
@@ -34,6 +35,80 @@ class OnlineVoiceUiTest {
 
     @Test fun englishCloudCaptureWithoutModelAndTypedFallback() = screen("en", 1f, false)
     @Test fun finnishRecoverableErrorAtDoubleFontSize() = screen("fi", 2f, true)
+
+    @Test fun recoveredHouseholdAudioCannotTargetAnotherHouseholdsSameTaskId() = recoveryDestination("household", "other")
+    @Test fun recoveredHouseholdAudioCannotTargetLocalInbox() = recoveryDestination("household", "local")
+    @Test fun recoveredLocalAudioCannotTargetHousehold() = recoveryDestination("local", "household")
+    @Test fun recoveredChecklistAudioCannotTargetHouseholdCapture() = recoveryDestination("checklist", "household")
+    @Test fun recoveredAudioInItsOriginalHouseholdStillOpensTheSavedTask() = recoveryDestination("household", "household")
+    @Test fun recoveredChecklistAudioInItsOriginalDraftStillRefreshesInstructions() = recoveryDestination("checklist", "checklist")
+
+    private fun recoveryDestination(recorded: String, visible: String) = runBlocking {
+        val context = compose.activity
+        val name = "speech-destination-${UUID.randomUUID()}.db"
+        val root = File(context.cacheDir, name).apply { mkdirs() }
+        val db = InboxDatabase.open(context, name)
+        val lease = DataLease()
+        val store = RecordingStore(db, File(root, "audio"), lease)
+        val registration = UUID.randomUUID().toString()
+        val source = SharedWorkspace("source", UUID.randomUUID().toString(), UUID.randomUUID().toString(), registration, "Source",
+            membership = JSONObject().put("me", UUID.randomUUID().toString()).toString())
+        val other = source.copy(scope = "other", workspaceId = UUID.randomUUID().toString(), name = "Other")
+        db.shared().saveWorkspace(source)
+        db.shared().saveWorkspace(other)
+        val otherRepository = SharedRepository(db, lease, other.scope, registration)
+        val otherId = otherRepository.commit(EditorDraft(InboxRepository.NEW_DRAFT, "Unrelated other-household task", ""))
+        val otherSnapshot = db.shared().task(other.scope, otherId)!!.snapshot
+        db.shared().saveDraft(SharedDraft(source.scope, "checklist:parent", "", "", System.currentTimeMillis(), details = "{}"))
+        fun target(kind: String): VoiceTarget? = when (kind) {
+            "local" -> null
+            "other" -> VoiceTarget(other.scope)
+            "checklist" -> VoiceTarget(source.scope, "parent")
+            else -> VoiceTarget(source.scope)
+        }
+        var opened: String? = null
+        lateinit var controller: VoiceController
+        try {
+            compose.runOnUiThread {
+                controller = VoiceController(context, store, ModelInstaller(File(root, "models"), loadSpeechManifest(context)),
+                    online = { "Recovered task" }, connected = { true })
+            }
+            compose.waitUntil(15_000) { controller.state.value.loaded }
+            val row = store.begin(target = target(recorded))
+            store.output(row.id).use { it.write(byteArrayOf(0, 1)) }
+            store.failed(row.id, "INTERRUPTED")
+            val config = Configuration(context.resources.configuration).apply { setLocale(Locale.ENGLISH) }
+            val translated = context.createConfigurationContext(config)
+            compose.runOnUiThread { context.setContent {
+                CompositionLocalProvider(LocalActivityResultRegistryOwner provides context,
+                    LocalContext provides translated, LocalResources provides translated.resources, LocalConfiguration provides config) {
+                    BunDoTheme("light") { VoiceSheet(controller, {}, {}, { opened = it }, target(visible)) }
+                }
+            } }
+            compose.waitUntil(5_000) { controller.state.value.recordings.any { it.id == row.id } }
+            compose.onNodeWithText(translated.getString(R.string.retry)).performScrollTo().performClick()
+            compose.waitUntil(15_000) { !controller.state.value.busy && controller.state.value.message == "SAVED" && controller.state.value.saved == null }
+            val actualId = when (recorded) {
+                "local" -> db.inbox().intents().single().taskId
+                "checklist" -> {
+                    assertEquals("Recovered task", JSONObject(db.shared().draft(source.scope, "checklist:parent")!!.details!!).getString("instructions"))
+                    "checklist:${source.scope}:parent"
+                }
+                else -> db.shared().intents(source.scope).single().taskId.also {
+                    assertEquals("The collision must be real for this regression", otherId, it)
+                }
+            }
+            if (recorded == visible) assertEquals(actualId, opened) else {
+                assertNull("No wrong-screen navigation or Undo callback", opened)
+                compose.onNodeWithText(translated.getString(R.string.voice_saved_elsewhere)).performScrollTo().assertIsDisplayed()
+            }
+            assertEquals(otherSnapshot, db.shared().task(other.scope, otherId)!!.snapshot)
+            assertEquals(listOf("CreateTask"), db.shared().intents(other.scope).map { it.kind })
+        } finally {
+            compose.runOnUiThread { controller.close() }
+            db.close(); context.deleteDatabase(name); root.deleteRecursively()
+        }
+    }
 
     private fun screen(language: String, scale: Float, failure: Boolean) = runBlocking {
         val context = compose.activity

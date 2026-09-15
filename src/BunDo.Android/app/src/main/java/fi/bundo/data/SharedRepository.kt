@@ -32,8 +32,9 @@ class SharedRepository(
 
     /** The displayed snapshot binds confirmation and dependencies to what the user actually saw. */
     suspend fun act(kind: String, displayed: String, confirmedClaimant: String? = null,
-        after: String? = null, before: String? = null, until: String? = null, instructions: String? = null) =
-        recordAction(kind, displayed, confirmedClaimant, after, before, until, instructions)
+        after: String? = null, before: String? = null, until: String? = null, instructions: String? = null,
+        expectedOrder: List<String>? = null) =
+        recordAction(kind, displayed, confirmedClaimant, after, before, until, instructions, expectedOrder = expectedOrder)
 
     /** A successful server round trip is required before admitting a schedule change.
      * Once admitted, its immutable outbox entry survives an ambiguous delivery like other commands. */
@@ -44,12 +45,19 @@ class SharedRepository(
 
     private suspend fun recordAction(kind: String, displayed: String, confirmedClaimant: String? = null,
         after: String? = null, before: String? = null, until: String? = null, instructions: String? = null,
-        repeat: String? = null, schedule: Boolean = false) = lease.access {
+        repeat: String? = null, schedule: Boolean = false, expectedOrder: List<String>? = null) = lease.access {
         require(kind in SharedTaskActions.kinds && kind !in SharedChecklistActions.splitKinds &&
             (kind !in SharedTaskActions.repeatKinds || schedule))
         database.withTransaction {
             val state = current()
             check(state.blocked == null && dao.recoveryState(scope) == null)
+            if (expectedOrder != null) {
+                require(kind == "MoveTask")
+                val roots = SharedTaskActions.ordered(dao.projectionRows(scope, state.projectionGeneration), dao.intents(scope), state)
+                    .filter { it.isNull("parentId") && it.isNull("deletion") && it.optString("lifecycle", "OPEN") == "OPEN" }
+                    .map { it.getString("id") }
+                check(roots == expectedOrder) { "Queue changed" }
+            }
             val task = JSONObject(displayed)
             check(if (kind == "RestoreTask") task.optJSONObject("deletion")?.optBoolean("purging") == false
                 else task.isNull("deletion"))
@@ -196,6 +204,49 @@ class SharedRepository(
         act("RestoreTask", displayed)
     }
 
+    /** Undo belongs to this completion, never to a later completion by this or another client. */
+    suspend fun undoCompletion(id: String, sequence: String) {
+        val displayed = lease.access {
+            database.withTransaction {
+                val state = current()
+                val task = JSONObject(checkNotNull(dao.task(scope, id)).snapshot)
+                check(task.optString("lifecycle") == "COMPLETED" && task.isNull("deletion"))
+                val intents = dao.intents(scope)
+                val completion = checkNotNull(intents.find { it.sequence == sequence && it.taskId == id && it.kind == "CompleteTask" })
+                check(completion.status in listOf("PENDING", "SUBMITTED", "ACCEPTED"))
+                val tasks = projected(state)
+                val pendingLifecycle = intents.filter { SharedTaskActions.pending(it, state.revision) &&
+                    "lifecycle" in SharedChecklistActions.writes(it, task, tasks) }
+                val receipt = completion.receipt?.let(::JSONObject)?.let { SharedChecklistActions.receiptTask(it, id) }
+                if (receipt == null) check(pendingLifecycle.lastOrNull()?.sequence == sequence)
+                else {
+                    check(task.optString("lifecycleVersion") == receipt.optString("lifecycleVersion"))
+                    check(pendingLifecycle.none { it.sequence.toULong() > sequence.toULong() })
+                }
+                task.toString()
+            }
+        }
+        // recordAction rechecks the exact snapshot and all domain preconditions after the read.
+        act("ReopenTask", displayed)
+    }
+
+    /** Undo a new capture only while nobody has changed or started using it. */
+    suspend fun undoCapture(id: String) {
+        val displayed = lease.access {
+            database.withTransaction {
+                current()
+                check(dao.intents(scope).any { it.taskId == id && it.kind == "CreateTask" &&
+                    it.status in listOf("PENDING", "SUBMITTED", "ACCEPTED") &&
+                    SharedProtocol.taskId(registration, it.sequence) == id })
+                val task = JSONObject(checkNotNull(dao.task(scope, id)).snapshot)
+                check(task.isNull("lastChange") && task.isNull("deletion") && task.isNull("claimantId") &&
+                    task.optString("lifecycle", "OPEN") == "OPEN" && !task.optBoolean("isChecklist") && task.isNull("repeat"))
+                task.toString()
+            }
+        }
+        act("DeleteTask", displayed)
+    }
+
     /** Only terminal variants can be dismissed. Pending identities must still obtain their outcome. */
     suspend fun dismiss(sequence: String) = lease.access {
         database.withTransaction {
@@ -282,46 +333,57 @@ class SharedRepository(
     override suspend fun commit(draft: EditorDraft): String = commit(draft, removeDraft = true)
 
     private suspend fun commit(draft: EditorDraft, removeDraft: Boolean): String = lease.access {
+        database.withTransaction { commitInTransaction(draft, removeDraft) }
+    }
+
+    /** RecordingStore already holds this account lease and transaction. Keep text and its
+     * committed-audio marker in that same transaction without reacquiring the lease mutex. */
+    internal suspend fun captureRecordingInTransaction(text: String, capturedAt: Long): String {
+        check(database.inTransaction())
+        lease.check()
+        val title = text.substring(0, text.offsetByCodePoints(0, minOf(InboxLimits.length(text), InboxLimits.TITLE)))
+        return commitInTransaction(EditorDraft(InboxRepository.NEW_DRAFT, title, if (title == text) "" else text), removeDraft = false, captureContext = SharedProtocol.context(java.time.Instant.ofEpochMilli(capturedAt)))
+    }
+
+    private suspend fun commitInTransaction(draft: EditorDraft, removeDraft: Boolean, captureContext: String? = null): String {
         require(InboxLimits.valid(draft.title, draft.description) && SharedTaskDetails.valid(draft.details))
-        database.withTransaction {
-            val state = current()
-            check(state.blocked == null)
-            val sequence = state.nextSequence.toULong()
-            check(sequence < ULong.MAX_VALUE)
-            val creating = draft.key == InboxRepository.NEW_DRAFT
-            val id = if (creating) SharedProtocol.taskId(registration, sequence.toString()) else draft.key
-            val saved = if (creating) null else dao.draft(scope, id)
-            // A pre-baseline draft remains exportable but cannot be silently rebased on a new shared value.
-            val basis = if (creating) null else if (saved != null) JSONObject(checkNotNull(saved.basis))
-                else editBasis(id, state)
-            val old = basis?.getJSONObject("task")
-            val titleChanged = creating || old!!.getString("title") != draft.title
-            val descriptionChanged = creating || old!!.nullableString("description").orEmpty() != draft.description
-            val detailEdit = SharedTaskDetails.intent(draft, old, basis, SharedTaskActions.ordered(dao.projectionRows(scope, state.projectionGeneration), dao.intents(scope), state), state)
-            if (!titleChanged && !descriptionChanged && detailEdit == null) { dao.deleteDraft(scope, draft.key); return@withTransaction id }
-            val prior = dao.intents(scope).lastOrNull { it.taskId == id && it.status in listOf("PENDING", "SUBMITTED", "ACCEPTED") &&
-                (it.receipt == null || JSONObject(it.receipt).decimal("effectRevision") > state.revision.toULong()) }
-            val intent = SharedIntent(scope, sequence.toString(), id, if (creating) "CreateTask" else "EditTask",
-                draft.title, draft.description, titleChanged, descriptionChanged,
-                old?.human("title") ?: "0", old?.human("description") ?: "0", old?.decimal("deletionVersion")?.toString() ?: "0",
-                prior?.sequence, SharedProtocol.context(),
-                titleAfterSequence = basis?.nullableString("titleAfterSequence"),
-                descriptionAfterSequence = basis?.nullableString("descriptionAfterSequence"),
-                deletionAfterSequence = basis?.nullableString("deletionAfterSequence"), details = detailEdit)
-            dao.saveIntent(intent)
-            dao.saveWorkspace(state.copy(nextSequence = (sequence + 1u).toString(), journalVersion = state.journalVersion + 1))
-            if (removeDraft) dao.deleteDraft(scope, draft.key)
-            if (dao.recoveryState(scope) == null) rebuild(state)
-            else {
-                val visible = if (creating) SharedProtocol.optimistic(intent)
-                    else JSONObject(checkNotNull(dao.task(scope, id)).snapshot)
-                        .put("title", draft.title).put("description", draft.description)
-                if (!creating) SharedTaskDetails.projectEdit(visible, intent)
-                dao.saveProjection(SharedProjection(scope, id, visible.toString(), state.projectionGeneration))
-            }
-            lease.check()
-            id
+        val state = current()
+        check(state.blocked == null)
+        val sequence = state.nextSequence.toULong()
+        check(sequence < ULong.MAX_VALUE)
+        val creating = draft.key == InboxRepository.NEW_DRAFT
+        val id = if (creating) SharedProtocol.taskId(registration, sequence.toString()) else draft.key
+        val saved = if (creating) null else dao.draft(scope, id)
+        // A pre-baseline draft remains exportable but cannot be silently rebased on a new shared value.
+        val basis = if (creating) null else if (saved != null) JSONObject(checkNotNull(saved.basis))
+            else editBasis(id, state)
+        val old = basis?.getJSONObject("task")
+        val titleChanged = creating || old!!.getString("title") != draft.title
+        val descriptionChanged = creating || old!!.nullableString("description").orEmpty() != draft.description
+        val detailEdit = SharedTaskDetails.intent(draft, old, basis, SharedTaskActions.ordered(dao.projectionRows(scope, state.projectionGeneration), dao.intents(scope), state), state)
+        if (!titleChanged && !descriptionChanged && detailEdit == null) { dao.deleteDraft(scope, draft.key); return id }
+        val prior = dao.intents(scope).lastOrNull { it.taskId == id && it.status in listOf("PENDING", "SUBMITTED", "ACCEPTED") &&
+            (it.receipt == null || JSONObject(it.receipt).decimal("effectRevision") > state.revision.toULong()) }
+        val intent = SharedIntent(scope, sequence.toString(), id, if (creating) "CreateTask" else "EditTask",
+            draft.title, draft.description, titleChanged, descriptionChanged,
+            old?.human("title") ?: "0", old?.human("description") ?: "0", old?.decimal("deletionVersion")?.toString() ?: "0",
+            prior?.sequence, captureContext ?: SharedProtocol.context(),
+            titleAfterSequence = basis?.nullableString("titleAfterSequence"),
+            descriptionAfterSequence = basis?.nullableString("descriptionAfterSequence"),
+            deletionAfterSequence = basis?.nullableString("deletionAfterSequence"), details = detailEdit)
+        dao.saveIntent(intent)
+        dao.saveWorkspace(state.copy(nextSequence = (sequence + 1u).toString(), journalVersion = state.journalVersion + 1))
+        if (removeDraft) dao.deleteDraft(scope, draft.key)
+        if (dao.recoveryState(scope) == null) rebuild(state)
+        else {
+            val visible = if (creating) SharedProtocol.optimistic(intent)
+                else JSONObject(checkNotNull(dao.task(scope, id)).snapshot)
+                    .put("title", draft.title).put("description", draft.description)
+            if (!creating) SharedTaskDetails.projectEdit(visible, intent)
+            dao.saveProjection(SharedProjection(scope, id, visible.toString(), state.projectionGeneration))
         }
+        lease.check()
+        return id
     }
 
     /** Imports copy selected text into new commands; never copy old envelopes, IDs or sequences. */

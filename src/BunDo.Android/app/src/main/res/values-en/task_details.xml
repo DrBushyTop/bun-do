@@ -18,9 +18,8 @@
     <string name="detail_created">Created by %1$s · %2$s</string>
     <string name="detail_anonymous_created">Original capture · %1$s</string>
     <string name="detail_changed">Changed by %1$s · %2$s</string>
-    <string name="detail_ai_changed">AI change · %1$s</string>
     <string name="detail_pending_changed">Local change, %1$s · %2$s</string>
-    <string name="detail_pending_created">Saved locally · %1$s</string>
+    <string name="detail_ai_changed">AI change · %1$s</string>
     <string name="detail_snooze_until">Snoozed until %1$s</string>
     <string name="detail_snooze_choose">Choose when snooze ends</string>
     <string name="detail_snooze_tomorrow">Until tomorrow morning</string>

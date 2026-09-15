@@ -823,6 +823,85 @@ class SharedTaskActionsTest {
         context.deleteDatabase(name)
     }
 
+    @Test fun completionUndoSurvivesRestartButCannotUndoALaterCompletion() = runBlocking {
+        fixture { db, state, repository ->
+            val first = task("Milk")
+            val id = first.getString("id")
+            val poll = repository.prepare(1000, 1)!!
+            repository.apply(poll, reply(poll, listOf(first, order(id))))
+            val completion = repository.act("CompleteTask", repository.taskStates.first().single().toString())
+            val restarted = SharedRepository(db, DataLease(), state.scope, state.registration)
+            restarted.undoCompletion(id, completion)
+            assertEquals("OPEN", restarted.taskStates.first().single().getString("lifecycle"))
+            val later = restarted.act("CompleteTask", restarted.taskStates.first().single().toString())
+            assertTrue(runCatching { restarted.undoCompletion(id, completion) }.isFailure)
+            restarted.undoCompletion(id, later)
+            assertEquals("OPEN", restarted.taskStates.first().single().getString("lifecycle"))
+        }
+    }
+
+    @Test fun acceptedCompletionUndoRejectsANewerRemoteLifecycle() = runBlocking {
+        fixture { _, _, repository ->
+            val first = task("Milk")
+            val id = first.getString("id")
+            val poll = repository.prepare(1000, 1)!!
+            repository.apply(poll, reply(poll, listOf(first, order(id))))
+            val completion = repository.act("CompleteTask", first.toString())
+            val request = repository.prepare(1001, 1)!!
+            val completed = JSONObject(first.toString()).put("lifecycle", "COMPLETED").put("lifecycleVersion", "2")
+                .put("lifecycleActorId", me).put("lifecycleAt", "2026-09-15T10:00:00Z")
+            repository.apply(request, reply(request, listOf(completed), receipt(request, completed)))
+            val remote = repository.prepare(1002, 1)!!
+            val newer = JSONObject(completed.toString()).put("lifecycleVersion", "3")
+            repository.apply(remote, reply(remote, listOf(newer)))
+            assertTrue(runCatching { repository.undoCompletion(id, completion) }.isFailure)
+            assertEquals("COMPLETED", repository.taskStates.first().single().getString("lifecycle"))
+        }
+    }
+
+    @Test fun fullQueueMoveRejectsChangedOrderWithoutWritingAnyIntent() = runBlocking {
+        fixture { db, state, repository ->
+            val tasks = listOf(task("One"), task("Two"), task("Snoozed").put("snoozedUntil", "2099-01-01T00:00:00Z"))
+            val ids = tasks.map { it.getString("id") }
+            val poll = repository.prepare(1000, 1)!!
+            repository.apply(poll, reply(poll, tasks + order(*ids.toTypedArray())))
+            assertTrue(runCatching { repository.act("MoveTask", tasks[1].toString(), before = ids[0], expectedOrder = ids.take(2)) }.isFailure)
+            assertTrue(db.shared().intents(state.scope).isEmpty())
+            repository.act("MoveTask", tasks[1].toString(), before = ids[0], expectedOrder = ids)
+            assertEquals(listOf("Two", "One", "Snoozed"), repository.tasks.first().map { it.title })
+            assertTrue(runCatching { repository.act("MoveTask", tasks[0].toString(), after = ids[2], expectedOrder = ids) }.isFailure)
+            assertEquals(1, db.shared().intents(state.scope).size)
+        }
+    }
+
+    @Test fun sharedVoiceMigrationPreservesEarlierRecordingsAndSavedTasks() {
+        val name = "shared-voice-migration-${UUID.randomUUID()}.db"
+        migrations.createDatabase(name, 11).apply {
+            execSQL("INSERT INTO voice_recordings VALUES ('kept',1,9999999999999,'FAILED','INTERRUPTED',NULL,NULL)")
+            execSQL("INSERT INTO inbox_tasks VALUES ('kept','Milk','','Milk','',1,1)")
+            close()
+        }
+        migrations.runMigrationsAndValidate(name, 12, true, InboxDatabase.MIGRATION_11_12).apply {
+            query("SELECT workspaceScope, committedTaskId, reason FROM voice_recordings WHERE id='kept'").use {
+                assertTrue(it.moveToFirst()); assertTrue(it.isNull(0)); assertTrue(it.isNull(1)); assertEquals("INTERRUPTED", it.getString(2))
+            }
+            query("SELECT title FROM inbox_tasks WHERE id='kept'").use { assertTrue(it.moveToFirst()); assertEquals("Milk", it.getString(0)) }
+            close()
+        }
+        context.deleteDatabase(name)
+    }
+
+    @Test fun captureUndoRefusesToDeleteWorkSomeoneHasChanged() = runBlocking {
+        fixture { _, _, repository ->
+            val poll = repository.prepare(1000, 1)!!
+            repository.apply(poll, reply(poll, emptyList()))
+            val id = repository.commit(repository.draft(InboxRepository.NEW_DRAFT).copy(title = "Apples"))
+            repository.commit(repository.draft(id).copy(description = "Keep this new information"))
+            assertTrue(runCatching { repository.undoCapture(id) }.isFailure)
+            assertTrue(repository.taskStates.first().single().isNull("deletion"))
+        }
+    }
+
     private fun deletion(group: String) = JSONObject().put("groupId", group)
         .put("deletedAt", "2026-09-13T12:00:00Z").put("purging", false)
 

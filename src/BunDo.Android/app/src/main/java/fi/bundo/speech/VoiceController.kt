@@ -9,6 +9,7 @@ import fi.bundo.data.SpeechStorageFull
 import fi.bundo.data.RecordingStorageFull
 import fi.bundo.data.RecordingStore
 import fi.bundo.data.VoiceRecording
+import fi.bundo.data.SavedRecording
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,10 +40,11 @@ data class VoiceState(
     val seconds: Int = 0,
     val level: Float = 0f,
     val message: String = "",
-    val savedTaskId: String? = null,
+    val saved: SavedRecording? = null,
     val recordings: List<VoiceRecording> = emptyList(),
 ) {
     val busy: Boolean get() = phase != "IDLE"
+    val savedTaskId: String? get() = saved?.taskId
 }
 
 /** App-owned work survives rotation. Process death is recovered from Room and PCM files. */
@@ -100,7 +102,7 @@ class VoiceController(
     }
 
     fun permissionDenied() { mutable.update { it.copy(message = "PERMISSION") } }
-    fun acknowledgeSaved() { mutable.update { it.copy(savedTaskId = null) } }
+    fun acknowledgeSaved() { mutable.update { it.copy(saved = null) } }
 
     fun install() = start("INSTALLING") {
         if ("arm64-v8a" !in Build.SUPPORTED_ABIS) error("Unsupported speech ABI")
@@ -222,7 +224,7 @@ class VoiceController(
                     InboxLimits.length(text) > InboxLimits.DESCRIPTION -> store.failed(id, "TOO_LONG")
                     else -> {
                         val saved = store.commit(id, text)
-                        mutable.update { it.copy(savedTaskId = saved) }
+                        mutable.update { it.copy(saved = saved) }
                     }
                 }
                 mutable.update { it.copy(message = when {

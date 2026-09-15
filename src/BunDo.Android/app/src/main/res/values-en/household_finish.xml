@@ -1,0 +1,21 @@
+<resources>
+    <string name="voice_saved_elsewhere">Saved to the original recording destination. Open it there to view or edit it.</string>
+    <string name="dismiss_confirmation">Dismiss confirmation</string>
+    <string name="decorative_motion">Small action animations</string>
+    <string name="motion_system_override">Your device’s reduced-motion setting takes priority. Confirmations and Undo stay available.</string>
+    <string name="filter_all">All</string>
+    <string name="filter_unclaimed">Unclaimed</string>
+    <string name="filter_mine">Mine</string>
+    <string name="reorder_queue">Reorder the full queue</string>
+    <string name="reorder_done">Done</string>
+    <string name="reorder_help">All open tasks, including snoozed tasks. Hold a handle to drag, or use the move buttons or arrow keys. Moves save on release. Back or Escape cancels a drag.</string>
+    <string name="reorder_cancel_drag">Cancel drag</string>
+    <string name="reorder_changed">The queue changed. The drag was cancelled.</string>
+    <string name="queue_position">Position %1$d of %2$d</string>
+    <string name="queue_tools">Queue options</string>
+    <string name="feedback_completed">Task completed</string>
+    <string name="feedback_claimed">You claimed this task</string>
+    <string name="account_recovery_details">Saved work and recovery</string>
+    <string name="account_diagnostics">Connection details</string>
+    <string name="account_recovery_needed">Some saved work could not be opened. Sign in to check what can be recovered.</string>
+</resources>

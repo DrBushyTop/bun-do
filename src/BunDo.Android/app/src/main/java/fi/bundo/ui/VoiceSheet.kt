@@ -53,8 +53,14 @@ fun VoiceSheet(controller: VoiceController, onDismiss: () -> Unit, onType: () ->
     val state by controller.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current
-    LaunchedEffect(state.savedTaskId) {
-        state.savedTaskId?.let { controller.acknowledgeSaved(); onSaved(it) }
+    var savedElsewhere by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(state.saved) {
+        state.saved?.let {
+            controller.acknowledgeSaved()
+            // IDs are only unique within a household. Never navigate or offer Undo
+            // through this screen's repository for another recording destination.
+            if (it.target == target) onSaved(it.taskId) else savedElsewhere = true
+        }
     }
     var exportId by rememberSaveable { mutableStateOf<String?>(null) }
     var notices by rememberSaveable { mutableStateOf(false) }
@@ -85,12 +91,13 @@ fun VoiceSheet(controller: VoiceController, onDismiss: () -> Unit, onType: () ->
                 .verticalScroll(rememberScrollState()).padding(horizontal = 24.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(stringResource(if (target == null) R.string.voice_capture else R.string.split_dictate), style = MaterialTheme.typography.headlineSmall,
+            Text(stringResource(if (target?.taskId == null) R.string.voice_capture else R.string.split_dictate), style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.semantics { heading() })
             Text(stringResource(if (state.onlineConfigured) R.string.voice_online_private else R.string.voice_private),
                 style = MaterialTheme.typography.bodyMedium)
             if (state.message.isNotEmpty()) {
-                Text(stringResource(messageResource(state.message)), modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+                Text(stringResource(if (state.message == "SAVED" && savedElsewhere) R.string.voice_saved_elsewhere else messageResource(state.message)),
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
             }
             when (state.phase) {
                 "CHECKING" -> {

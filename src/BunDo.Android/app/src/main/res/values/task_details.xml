@@ -18,9 +18,8 @@
     <string name="detail_created">Luonut %1$s · %2$s</string>
     <string name="detail_anonymous_created">Alkuperäinen tallennus · %1$s</string>
     <string name="detail_changed">Muuttanut %1$s · %2$s</string>
-    <string name="detail_ai_changed">Tekoälyn muutos · %1$s</string>
     <string name="detail_pending_changed">Paikallinen muutos, %1$s · %2$s</string>
-    <string name="detail_pending_created">Tallennettu paikallisesti · %1$s</string>
+    <string name="detail_ai_changed">Tekoälyn muutos · %1$s</string>
     <string name="detail_snooze_until">Lykätty: %1$s</string>
     <string name="detail_snooze_choose">Valitse lykkäyksen päättyminen</string>
     <string name="detail_snooze_tomorrow">Huomisaamuun</string>

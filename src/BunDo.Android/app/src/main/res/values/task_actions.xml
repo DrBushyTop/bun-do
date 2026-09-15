@@ -7,14 +7,12 @@
     <string name="task_move">Siirrä tehtävää</string>
     <string name="task_earlier">Siirrä aiemmaksi</string>
     <string name="task_later">Siirrä myöhemmäksi</string>
-    <string name="task_claimed_you">Sinulla työn alla</string>
     <string name="task_claimed_by">%1$s tekee tätä</string>
     <string name="task_completed_by">Valmis · %1$s</string>
     <string name="task_cancelled_by">Peruttu · %1$s</string>
     <string name="task_former_member">Entinen jäsen</string>
     <string name="task_household_member">Talouden jäsen</string>
     <string name="task_confirm_other">%1$s tekee tätä tehtävää. Merkitäänkö se silti valmiiksi?</string>
-    <string name="task_waiting_sync">Tallennettu tälle laitteelle</string>
     <string name="task_changed_retry">Tehtävä muuttui tai toiminto ei onnistunut. Tarkista tilanne ja yritä uudelleen.</string>
     <string name="task_active_view">Tehtävät</string>
     <string name="task_history_view">Valmiit ja perutut</string>

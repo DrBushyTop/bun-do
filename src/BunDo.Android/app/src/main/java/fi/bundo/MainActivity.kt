@@ -55,6 +55,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Native date/time pickers follow the same light-only V1 direction as Compose.
+        delegate.localNightMode = androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO
         super.onCreate(savedInstanceState)
         acceptInvitation(intent)
         enableEdgeToEdge()
@@ -69,7 +71,8 @@ class MainActivity : AppCompatActivity() {
             }
             val signIn: SignInModel = viewModel()
             var appearance by remember { mutableStateOf(preferences.getString("theme", "system")!!) }
-            BunDoTheme(appearance) {
+            fi.bundo.ui.HouseholdMotionProvider {
+            BunDoTheme("light") {
                 val lightBars = MaterialTheme.colorScheme.surface.luminance() > 0.5f
                 SideEffect {
                     WindowCompat.getInsetsController(window, window.decorView).apply {
@@ -116,6 +119,7 @@ class MainActivity : AppCompatActivity() {
                 )
                 }
                 }
+            }
             }
         }
     }

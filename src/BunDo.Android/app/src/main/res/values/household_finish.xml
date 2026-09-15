@@ -1,0 +1,21 @@
+<resources>
+    <string name="voice_saved_elsewhere">Tallennettu äänityksen alkuperäiseen kohteeseen. Avaa se siellä, jos haluat tarkastella tai muokata sitä.</string>
+    <string name="dismiss_confirmation">Sulje vahvistus</string>
+    <string name="decorative_motion">Pienet toimintoanimaatiot</string>
+    <string name="motion_system_override">Laitteen vähennetyn liikkeen asetus ohittaa valinnan. Vahvistukset ja Kumoa pysyvät käytettävissä.</string>
+    <string name="filter_all">Kaikki</string>
+    <string name="filter_unclaimed">Vapaat</string>
+    <string name="filter_mine">Minulla</string>
+    <string name="reorder_queue">Järjestä koko jono</string>
+    <string name="reorder_done">Valmis</string>
+    <string name="reorder_help">Kaikki avoimet tehtävät, myös lykätyt. Pidä kahvaa pohjassa ja vedä tai käytä siirtopainikkeita tai nuolinäppäimiä. Siirto tallentuu irrottaessa. Takaisin tai Escape peruu vedon.</string>
+    <string name="reorder_cancel_drag">Peru veto</string>
+    <string name="reorder_changed">Jono muuttui. Veto peruttiin.</string>
+    <string name="queue_position">Paikka %1$d / %2$d</string>
+    <string name="queue_tools">Jonon valinnat</string>
+    <string name="feedback_completed">Tehtävä valmis</string>
+    <string name="feedback_claimed">Otit tehtävän itsellesi</string>
+    <string name="account_recovery_details">Tallennetut työt ja palautus</string>
+    <string name="account_diagnostics">Yhteyden tiedot</string>
+    <string name="account_recovery_needed">Osaa tallennetuista töistä ei voitu avata. Kirjaudu tarkistamaan, mitä voidaan palauttaa.</string>
+</resources>

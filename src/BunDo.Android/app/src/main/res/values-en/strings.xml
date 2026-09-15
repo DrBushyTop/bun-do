@@ -2,7 +2,7 @@
 <resources>
     <string name="inbox">My queue</string>
     <string name="local_only">Only on this phone</string>
-    <string name="local_explanation">Tasks stay on this phone. They are not backed up or shared yet.</string>
+    <string name="local_explanation">This inbox is private to this phone. Open a household to import and share the tasks you choose.</string>
     <string name="empty_title">What needs doing?</string>
     <string name="empty_body">Write down one thing. Come back to it later, even without a connection.</string>
     <string name="type_task">Type a task</string>
@@ -32,9 +32,6 @@
     <string name="finnish">Suomi</string>
     <string name="english">English</string>
     <string name="system_default">Use system setting</string>
-    <string name="appearance">Appearance</string>
-    <string name="light">Light</string>
-    <string name="dark">Dark</string>
     <string name="original_text">Original text</string>
     <string name="show_original">Show original text</string>
     <string name="hide_original">Hide original text</string>

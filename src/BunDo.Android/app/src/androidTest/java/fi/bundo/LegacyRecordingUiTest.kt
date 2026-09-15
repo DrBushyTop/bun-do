@@ -69,9 +69,9 @@ class LegacyRecordingUiTest {
             val translated = context.createConfigurationContext(config)
             val data = accounts.active.value!!
             val content: @Composable () -> Unit = {
-                    CompositionLocalProvider(LocalContext provides translated, LocalConfiguration provides config,
+                    CompositionLocalProvider(LocalContext provides translated, androidx.compose.ui.platform.LocalResources provides translated.resources, LocalConfiguration provides config,
                         LocalActivityResultRegistryOwner provides (picker ?: compose.activity)) {
-                        BunDoTheme(appearance) {
+                        BunDoTheme("light") {
                             val density = LocalDensity.current
                             CompositionLocalProvider(LocalDensity provides Density(density.density, 1.3f)) {
                                 Surface {
@@ -120,7 +120,7 @@ class LegacyRecordingUiTest {
         assertTrue(runBlocking { accounts.legacyAudio.preview(accounts.active.value!!).recordings.isEmpty() })
     }
 
-    @Test fun englishDarkDeleteRequiresConfirmationAndKeepsSourceWhenCanceled() = fixture("en", "dark") { accounts ->
+    @Test fun englishLightDeleteRequiresConfirmationAndKeepsSourceWhenCanceled() = fixture("en", "light") { accounts ->
         compose.onNodeWithTag("legacy-delete").performClick()
         compose.onNodeWithText("Permanently delete this recording? Export it first if you want to keep it.").assertIsDisplayed()
         compose.onNodeWithText("Back").performClick()
@@ -166,6 +166,7 @@ class LegacyRecordingUiTest {
     }
 
     @Test fun accountNavigationSurvivesActivityRecreation() {
+        compose.onNodeWithTag("settings").performClick()
         compose.onNodeWithTag("account").performClick()
         compose.onNodeWithTag("account-households").assertExists()
         compose.activityRule.scenario.recreate()
@@ -181,6 +182,8 @@ class LegacyRecordingUiTest {
     }
 
     private fun screenshot(name: String) {
+        compose.waitForIdle()
+        android.os.SystemClock.sleep(350) // Wait for the rendered buffer, not only the semantics tree.
         compose.waitForIdle()
         val bitmap = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
         File(compose.activity.filesDir, name).outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }

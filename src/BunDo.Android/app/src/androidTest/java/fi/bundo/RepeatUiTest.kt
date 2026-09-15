@@ -43,7 +43,7 @@ class RepeatUiTest {
         val config = Configuration(compose.activity.resources.configuration).apply { setLocale(Locale.forLanguageTag(language)); fontScale = scale }
         val translated = compose.activity.createConfigurationContext(config)
         compose.runOnUiThread { compose.activity.setContent {
-            CompositionLocalProvider(LocalContext provides translated, LocalConfiguration provides config) {
+            CompositionLocalProvider(LocalContext provides translated, androidx.compose.ui.platform.LocalResources provides translated.resources, LocalConfiguration provides config) {
                 val density = LocalDensity.current
                 CompositionLocalProvider(LocalDensity provides Density(density.density, scale)) {
                     BunDoTheme("light") { Column(Modifier.imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 48.dp)) {
@@ -63,11 +63,13 @@ class RepeatUiTest {
         compose.onNodeWithTag("repeat-day-5").performScrollTo().performClick()
         compose.onNodeWithTag("repeat-title").performScrollTo().performTextReplacement("Friday milk")
         compose.onNodeWithTag("repeat-save").performScrollTo().performClick()
+        compose.waitUntil(5_000) { saved != null }
         val value = JSONObject(saved!!)
         assertEquals("WEEKLY", value.getString("frequency")); assertEquals(5, value.getInt("weekday"))
         assertEquals("Friday milk", value.getString("title"))
         screenshot("repeat-en")
         compose.onNodeWithTag("repeat-stop").performScrollTo().performClick()
+        compose.waitUntil(5_000) { stopped }
         assertTrue(stopped)
     }
     @Test fun finnishDoubleFontDailySetupIsScrollableAndLabelled() {
@@ -76,6 +78,7 @@ class RepeatUiTest {
         compose.onNodeWithTag("repeat-title").performScrollTo().assertIsDisplayed()
         screenshot("repeat-fi-large")
         compose.onNodeWithText("Tallenna toisto verkossa").performScrollTo().performClick()
+        compose.waitUntil(5_000) { saved != null }
         assertEquals("DAILY", JSONObject(saved!!).getString("frequency"))
         assertTrue(JSONObject(saved!!).isNull("weekday"))
     }
@@ -89,11 +92,14 @@ class RepeatUiTest {
             }
         }
         compose.onNodeWithTag("repeat-save").performScrollTo().performClick()
+        compose.waitUntil(5_000) { saved != null && observed != null }
         assertEquals("2", JSONObject(observed!!).getJSONObject("repeat").getString("version"))
         assertEquals("My draft", JSONObject(saved!!).getString("title"))
     }
 
     private fun screenshot(name: String) {
+        compose.waitForIdle()
+        android.os.SystemClock.sleep(350) // Wait for the rendered buffer, not only the semantics tree.
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         instrumentation.uiAutomation.takeScreenshot().useBitmap { bitmap ->
             File(instrumentation.targetContext.getExternalFilesDir(null), "$name.png").outputStream().use {

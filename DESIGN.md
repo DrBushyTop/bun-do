@@ -138,29 +138,37 @@ Use 200 ms state transitions and 150 ms fades. The selected study extends the si
 
 Release review must use native emulator/device captures of the light-only V1 interface, Finnish and English, font scales 1.0, 1.3, and 2.0, TalkBack, and contrast checks. Use two Android emulator profiles on this Mac for gestures, voice fixtures, interruptions and functional tests. The vivo X300 Ultra and OnePlus 13 remain target phones, but their performance and Finnish recognition quality are unmeasured owner-accepted assumptions; the skipped benchmark is not a hidden release gate. Impeccable's HTML/CSS detector does not validate Compose. Build fully, inspect once, batch corrections, then confirm once before the skill's independent finish review. Validate the approved logo's Android integration and finalize the UI token sidecar from that evidence.
 
-## Implemented shell
+## Shell contracts
 
-The shell has a local queue, typed capture/edit, offline voice capture, task
-detail with original text, and language/appearance settings. It has no shared
-navigation, completion animation, claim state or sync badge. Those belong to
-later slices. A Type text action remains reachable below the scrolling queue,
-beside a native microphone floating action button. Type becomes Resume draft
-when a new-task draft exists.
+The compact app bar keeps the approved rabbit beside the Bun Do wordmark.
+Settings holds language, decorative motion and the account entry. Shared work
+uses Queue, Activity and Together destinations. Type and voice capture remain
+adjacent below the list. Type becomes Resume draft when a new-task draft exists.
 
-The queue uses flat rows and a neutral local-only notice. Editors and settings
-scroll within a 640 dp maximum width. The queue gets 16 dp gutters below 600 dp,
-24 dp above, and a 360 dp queue/detail split from 840 dp when a task is selected.
-Without a selection the queue uses the available width. Below 480 dp height,
-the notice keeps its local-only label while Settings retains the full explanation.
-Tablet release behavior
-remains unverified; both current evidence profiles are phones. Native Material
-components supply focus, pressed, disabled and transition behavior. No custom
-animation or completion bow ships in this slice.
+Queue rows are flat, with a visual task cue, title and useful state rather than
+a description excerpt. A count and All/Unclaimed/Mine menu precede the list.
+Completed, deleted, snoozed and due views remain in the queue-view menu.
+Actionable recovery stays visible; import, local inbox and refresh are explicit
+queue options. Recovery exports and connection diagnostics have named entries
+in the account screen rather than permanent warnings.
 
-The shipped rabbit is a VectorDrawable conversion of the approved compound path.
-It keeps the original view box and path, with exact evergreen or paper tint.
-There are no generated raster assets in the Android shell. Review screenshots
-are emulator evidence, not product assets.
+Reorder mode shows the full open queue, including snoozed tasks. A handle drag
+previews order until release; Back, Escape and pointer cancellation discard
+that preview. Move buttons and keyboard arrows commit each move immediately.
+Concurrent queue changes cancel a stale drag. Swipe completion is unavailable
+while reordering. The same completion confirmation protects the row action,
+swipe and task detail.
+
+Details show a full title, compact creation/change attribution, description and
+editing before the task controls. Selected royal Bun illustrations are local,
+optional header artwork with a continuous paper fade. The approved uncrowned
+logo remains a separate unchanged vector. Artwork provenance lives in
+`assets/illustrations/ARTWORK.md`.
+
+Editors and settings scroll within a 640 dp maximum width. Screen gutters are
+16 dp below 600 dp and 24 dp otherwise. At 840 dp, a selected task may share the
+screen with a 360 dp queue. Large text wraps and scrolls; no fixed-height text
+containers substitute for that behavior.
 
 ## Components
 
@@ -178,7 +186,11 @@ text and native progress indicators. Recording uses the error color for the
 elapsed-time label and microphone level, with a full-width Stop and transcribe
 button. Permission denial, silence and cancellation use localized messages;
 status messages have polite accessibility live-region semantics. Successful
-transcription commits a local task and opens its detail for review and editing.
+transcription commits locally before opening the task for review. Recording
+from a household fixes that household as the destination when recording starts.
+Retrying never redirects a recording into a different household or the local
+inbox. A failed save retains the recording; text and its committed marker share
+one database transaction.
 
 Saved recordings form a flat list separated by dividers. Each entry names its
 creation time, expiry and recovery reason, followed by retry, export and delete
@@ -186,8 +198,7 @@ actions. The sheet explains retention and warns about the export destination
 before the Android file picker opens. Recovery actions disable during active
 work; committed recordings awaiting audio cleanup cannot be retried or exported.
 
-Phone-emulator captures cover English light, Finnish dark at 2.0 font scale,
-landscape, recording, silence, cancellation, interrupted-recording recovery and
-permission denial. Large text scrolls rather than shrinking. These captures do
-not validate tablets or physical-phone performance. The separate authenticated
-online speech path has no control in this sheet yet.
+Online transcription uses the authenticated MAI path, with installed Parakeet
+as the offline fallback. The sheet explains the selected path and keeps retry,
+export, deletion and typing available when recognition cannot finish. Speech
+transcription never doubles as AI cleanup.

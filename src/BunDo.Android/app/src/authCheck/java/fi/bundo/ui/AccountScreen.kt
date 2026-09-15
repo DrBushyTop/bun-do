@@ -38,6 +38,8 @@ fun AccountScreen(accounts: AccountStore, model: SignInModel, onHouseholds: () -
     val data by accounts.active.collectAsState()
     val selectedWorkspace = data?.selectedWorkspace?.collectAsState()?.value
     val scope = rememberCoroutineScope()
+    var recoveryDetails by remember { mutableStateOf(false) }
+    var diagnostics by remember { mutableStateOf(false) }
     var records by remember(data) { mutableStateOf<List<RecoveryText>>(emptyList()) }
     var recordings by remember(data) { mutableIntStateOf(0) }
     var ready by remember(data) { mutableStateOf(false) }
@@ -123,15 +125,18 @@ fun AccountScreen(accounts: AccountStore, model: SignInModel, onHouseholds: () -
                 if (signedIn) ReminderSettingsSection(current)
                 LegacyRecordingsSection(accounts, current, onClose)
             }
-            Text(stringResource(R.string.account_local_notice))
-            if (accounts.unexpectedFiles) Text(stringResource(R.string.account_installation_reset),
+            TextButton(onClick = { recoveryDetails = !recoveryDetails }, modifier = Modifier.testTag("account-recovery-details")) {
+                Text(stringResource(R.string.account_recovery_details))
+            }
+            if (recoveryDetails) Text(stringResource(R.string.account_local_notice))
+            if (accounts.unexpectedFiles) Text(stringResource(if (diagnostics) R.string.account_installation_reset else R.string.account_recovery_needed),
                 color = MaterialTheme.colorScheme.error)
-            if (ready) Text(stringResource(R.string.account_pending, records.size, recordings))
-            Text(stringResource(model.status), Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+            if (ready && recoveryDetails) Text(stringResource(R.string.account_pending, records.size, recordings))
+            if (diagnostics || model.busy || model.errorCode.isNotEmpty() || model.status == R.string.identity_failed) Text(stringResource(model.status), Modifier.semantics { liveRegion = LiveRegionMode.Polite })
             if (model.busy || working || !ready) LinearProgressIndicator(Modifier.fillMaxWidth())
             if (failure) Text(stringResource(R.string.account_operation_failed), color = MaterialTheme.colorScheme.error)
             if (exported) Text(stringResource(R.string.account_exported))
-            if (signedIn || records.isNotEmpty()) {
+            if (recoveryDetails && (signedIn || records.isNotEmpty())) {
                 Text(stringResource(R.string.account_export_warning))
                 val parts = remember(records) { runCatching { RecoveryExport.parts(records) }.getOrDefault(emptyList()) }
                 parts.forEachIndexed { index, part ->
@@ -152,7 +157,8 @@ fun AccountScreen(accounts: AccountStore, model: SignInModel, onHouseholds: () -
                     enabled = !working && !model.busy, modifier = Modifier.fillMaxWidth()) {
                     Text(stringResource(R.string.shared_import_file))
                 }
-                OutlinedButton(onClick = { model.refresh() }, enabled = !model.busy && !working,
+                TextButton(onClick = { diagnostics = !diagnostics }, modifier = Modifier.testTag("account-diagnostics")) { Text(stringResource(R.string.account_diagnostics)) }
+                if (diagnostics) OutlinedButton(onClick = { model.refresh() }, enabled = !model.busy && !working,
                     modifier = Modifier.fillMaxWidth().testTag("account-refresh")) { Text(stringResource(R.string.identity_refresh)) }
                 OutlinedButton(onClick = {
                     scope.launch {

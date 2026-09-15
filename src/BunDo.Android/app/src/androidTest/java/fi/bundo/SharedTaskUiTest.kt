@@ -9,6 +9,9 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -29,6 +32,7 @@ import java.io.File
 import java.util.Locale
 import java.util.UUID
 
+@OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
 class SharedTaskUiTest {
     private val compose = createAndroidComposeRule<MainActivity>()
@@ -64,24 +68,21 @@ class SharedTaskUiTest {
         val configuration = Configuration(compose.activity.resources.configuration).apply {
             setLocale(Locale.forLanguageTag(language)); this.fontScale = fontScale
         }
-        // Dialog windows read the activity resources rather than only the composition overrides.
-        @Suppress("DEPRECATION")
-        compose.activity.resources.updateConfiguration(configuration, compose.activity.resources.displayMetrics)
         val translated = compose.activity.createConfigurationContext(configuration)
         compose.runOnUiThread {
             compose.activity.setContent {
-                CompositionLocalProvider(LocalContext provides translated, LocalConfiguration provides configuration,
+                CompositionLocalProvider(LocalContext provides translated, androidx.compose.ui.platform.LocalResources provides translated.resources, LocalConfiguration provides configuration,
                     LocalActivityResultRegistryOwner provides compose.activity) {
-                    BunDoTheme(appearance) {
+                    fi.bundo.ui.HouseholdMotionProvider { BunDoTheme("light") {
                         val density = LocalDensity.current
                         CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
                             SharedWorkspaceScreen(data, state, appearance, {}, {})
                         }
-                    }
+                    } }
                 }
             }
         }
-        compose.waitUntil(10_000) { compose.onAllNodesWithText("Vie paperit kierrätykseen").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(10_000) { runCatching { compose.onAllNodesWithText("Vie paperit kierrätykseen").fetchSemanticsNodes().isNotEmpty() }.getOrDefault(false) }
         return data to state
     }
 
@@ -143,6 +144,27 @@ class SharedTaskUiTest {
         compose.onNodeWithTag("task-claim").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithTag("task-last-change").performScrollTo().assertExists()
         screenshot("details-fi-snoozed")
+    }
+
+    @Test fun localModificationTimeIsDistinctFromAcceptedHistory() {
+        val (data, state) = fixture("en", "light")
+        val id = runBlocking {
+            data.database.shared().base(state.scope).map { JSONObject(it.snapshot) }
+                .first { it.optString("title") == "Vie paperit kierrätykseen" }.getString("id")
+        }
+        val repository = SharedRepository(data.database, data.lease, state.scope, data.registrationId!!)
+        runBlocking { repository.commit(repository.draft(id).copy(description = "Offline edit")) }
+        compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("task-last-change").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("task-last-change").assertTextContains("Local change, Alice", substring = true)
+        runBlocking {
+            val row = data.database.shared().task(state.scope, id)!!
+            val task = JSONObject(row.snapshot)
+            task.getJSONObject("lastChange").put("source", "HUMAN").put("at", "2026-09-15T08:00:00Z")
+            data.database.shared().saveProjection(row.copy(snapshot = task.toString()))
+        }
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("Changed by Alice", substring = true).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("task-last-change").assertTextContains("Changed by Alice", substring = true)
     }
 
     @Test fun englishSplitInstructionsCanBeQueuedAndCancelledWithoutChangingParent() {
@@ -229,6 +251,7 @@ class SharedTaskUiTest {
         fixture("fi", "light", fontScale = 2f)
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
         compose.onNodeWithTag("cleanup-request").performScrollTo().performClick()
+        compose.waitUntil(5000) { compose.onAllNodes(hasTestTag("cleanup-cancel") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("cleanup-cancel").performScrollTo().assertIsEnabled()
         screenshot("cleanup-fi-pending")
         compose.onNodeWithTag("cleanup-cancel").performClick()
@@ -289,14 +312,15 @@ class SharedTaskUiTest {
         val (data, state) = fixture("fi", "light")
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
         compose.onNodeWithTag("task-claim").performScrollTo().performClick()
-        compose.waitUntil(10_000) { compose.onAllNodesWithText("Sinulla työn alla").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Sinulla työn alla").performScrollTo().assertIsDisplayed()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Alice tekee tätä").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Alice tekee tätä").performScrollTo().assertIsDisplayed()
         screenshot("tasks-fi-light.png")
         compose.onNodeWithTag("task-complete").performScrollTo().performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithTag("task-reopen").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("task-reopen").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("back").performClick()
-        compose.onNodeWithTag("task-history-view").performScrollTo().performClick()
+        compose.onNodeWithTag("queue-views").performClick()
+        compose.onNodeWithTag("task-history-view").performClick()
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
         compose.onNodeWithTag("task-reopen").performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithTag("task-claim").fetchSemanticsNodes().isNotEmpty() }
@@ -306,11 +330,11 @@ class SharedTaskUiTest {
     }
 
     @Test fun englishConfirmationRejectsAChangedClaimAndMoveButtonsNeedNoDragging() {
-        val (data, state) = fixture("en", "dark", claimed = true)
+        val (data, state) = fixture("en", "light", claimed = true)
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
         compose.onNodeWithTag("task-complete").performScrollTo().performClick()
         compose.onNodeWithText("Bob is working on this task. Mark it complete anyway?").assertIsDisplayed()
-        screenshot("tasks-en-dark-confirm.png")
+        screenshot("tasks-en-light-confirm.png")
         runBlocking {
             val row = data.database.shared().base(state.scope).first {
                 it.id != SharedTaskActions.ORDER_ID && JSONObject(it.snapshot).getString("title") == "Vie paperit kierrätykseen"
@@ -339,7 +363,8 @@ class SharedTaskUiTest {
         compose.onNodeWithTag("edit").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithTag("back").performClick()
         compose.onNodeWithText("Vie paperit kierrätykseen").assertDoesNotExist()
-        compose.onNodeWithTag("task-deleted-view").performScrollTo().performClick()
+        compose.onNodeWithTag("queue-views").performClick()
+        compose.onNodeWithTag("task-deleted-view").performClick()
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().assertIsDisplayed()
         screenshot("deletion-recovery-en.png")
         compose.onNodeWithText("Vie paperit kierrätykseen").performClick()
@@ -353,11 +378,193 @@ class SharedTaskUiTest {
         fixture("fi", "light", fontScale = 2.0f)
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
         compose.onNodeWithTag("task-delete").performScrollTo().performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("task-restore").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("task-restore").performScrollTo().assertIsDisplayed()
         screenshot("deletion-detail-fi.png")
     }
 
+    @Test fun compactFiltersReorderFullQueueWithKeyboardAndAccessibleButtons() {
+        val (data, state) = fixture("en", "light", fontScale = 1f)
+        val repository = SharedRepository(data.database, data.lease, state.scope, data.registrationId!!)
+        val ids = runBlocking { repository.taskStates.first().map { it.getString("id") } }
+        runBlocking { repository.act("ClaimTask", repository.taskStates.first().first().toString()) }
+        compose.onNodeWithTag("queue-filter").performClick()
+        compose.onNodeWithTag("filter-mine").performClick()
+        compose.onNodeWithText("Järjestä hylly").assertDoesNotExist()
+        compose.onNodeWithTag("queue-reorder").performClick()
+        compose.onNodeWithText("Järjestä hylly").assertExists()
+        compose.onNodeWithTag("queue-filter").assertIsNotEnabled()
+        screenshot("finish-en-reorder.png")
+        compose.onNodeWithTag("reorder-handle-${ids[1]}").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        compose.onNodeWithTag("reorder-handle-${ids[1]}").performKeyInput { pressKey(Key.DirectionUp) }
+        compose.waitUntil(5000) { runBlocking { repository.taskStates.first().first().getString("id") == ids[1] } }
+        compose.onNodeWithTag("reorder-later-${ids[1]}").performClick()
+        compose.waitUntil(5000) { runBlocking { repository.taskStates.first().first().getString("id") == ids[0] } }
+        compose.onNodeWithTag("reorder-handle-${ids[0]}").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        compose.onNodeWithTag("reorder-handle-${ids[0]}").performKeyInput { pressKey(Key.Escape) }
+        compose.onNodeWithTag("reorder-done").assertDoesNotExist()
+        compose.waitUntil(5000) { compose.onAllNodes(hasTestTag("queue-reorder") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("queue-reorder").performClick()
+        compose.onNodeWithTag("reorder-done").assertExists()
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.onNodeWithTag("queue-filter").assertIsEnabled()
+        compose.onNodeWithTag("queue-filter").performClick()
+        compose.onNodeWithTag("filter-unclaimed").performClick()
+        compose.onNodeWithText("Vie paperit kierrätykseen").assertDoesNotExist()
+        compose.onNodeWithText("Järjestä hylly").assertExists()
+        assertEquals(listOf("ClaimTask", "MoveTask", "MoveTask"), runBlocking { data.database.shared().intents(state.scope).map { it.kind } })
+    }
+
+    @Test fun queueSwipeRequiresOtherClaimConfirmationAndUndoIsImmediate() {
+        val (data, state) = fixture("en", "light", claimed = true, fontScale = 1f)
+        val repository = SharedRepository(data.database, data.lease, state.scope, data.registrationId!!)
+        val id = runBlocking { repository.taskStates.first().first().getString("id") }
+        compose.onNodeWithTag("queue-row-$id").performTouchInput { swipeRight() }
+        compose.onNodeWithText("Bob is working on this task. Mark it complete anyway?").assertIsDisplayed()
+        assertTrue(runBlocking { data.database.shared().intents(state.scope).isEmpty() })
+        compose.onNodeWithTag("queue-confirm-complete").performClick()
+        compose.onNodeWithText("Undo").performClick()
+        compose.waitUntil(5000) { runBlocking { data.database.shared().intents(state.scope).size == 2 } }
+        compose.onNodeWithText("Vie paperit kierrätykseen").assertExists()
+        assertEquals(listOf("CompleteTask", "ReopenTask"), runBlocking { data.database.shared().intents(state.scope).map { it.kind } })
+        screenshot("finish-en-queue.png")
+    }
+
+    @Test fun handleDragCanCancelOrCommitWithoutCompletingTask() {
+        val (data, state) = fixture("en", "light", fontScale = 1f)
+        val repository = SharedRepository(data.database, data.lease, state.scope, data.registrationId!!)
+        val ids = runBlocking { repository.taskStates.first().map { it.getString("id") } }
+        compose.onNodeWithTag("queue-reorder").performClick()
+        val first = compose.onNodeWithTag("reorder-handle-${ids[0]}").fetchSemanticsNode().boundsInRoot.center
+        val second = compose.onNodeWithTag("reorder-handle-${ids[1]}").fetchSemanticsNode().boundsInRoot.center
+        compose.onRoot().performTouchInput { down(first); advanceEventTime(700); moveTo(second); cancel() }
+        compose.waitForIdle()
+        assertTrue(runBlocking { data.database.shared().intents(state.scope).isEmpty() })
+        compose.onRoot().performTouchInput { down(first); advanceEventTime(700); moveTo(second); advanceEventTime(100); up() }
+        compose.waitUntil(5000) { runBlocking { data.database.shared().intents(state.scope).isNotEmpty() } }
+        assertEquals(listOf("MoveTask"), runBlocking { data.database.shared().intents(state.scope).map { it.kind } })
+        compose.onNodeWithTag("reorder-done").performClick()
+    }
+
+    @Test fun finnishLargeTextHasIllustratedDetailAndMotionInsteadOfThemeSwitch() {
+        val (data, state) = fixture("fi", "light", fontScale = 2f)
+        val repository = SharedRepository(data.database, data.lease, state.scope, data.registrationId!!)
+        val id = runBlocking { repository.commit(repository.draft(InboxRepository.NEW_DRAFT).copy(title = "Varaa pyörän huolto", description = "Tarkista jarrut ja vaihteet.")) }
+        compose.waitUntil(5000) { compose.onAllNodesWithText("Varaa pyörän huolto").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("queue").performScrollToNode(hasText("Varaa pyörän huolto"))
+        compose.onNodeWithText("Varaa pyörän huolto").performClick()
+        compose.onNodeWithTag("task-creation").assertExists()
+        compose.onNodeWithTag("task-last-change").assertDoesNotExist()
+        screenshot("finish-fi-large-art.png")
+        compose.onNodeWithTag("edit").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("back").performClick()
+        compose.onNodeWithTag("settings").performClick()
+        compose.onNodeWithTag("decorative-motion").performClick()
+        compose.onNodeWithTag("decorative-motion").assertIsOff()
+        compose.onNodeWithText("Tumma").assertDoesNotExist()
+        screenshot("finish-fi-large-settings.png")
+        compose.onNodeWithTag("decorative-motion").performClick()
+        compose.onNodeWithTag("back").performClick()
+        assertTrue(runBlocking { repository.taskStates.first().any { it.getString("id") == id } })
+    }
+
+    @Test fun newCaptureHasImmediateUndoWithoutDeletingAnEditedTask() {
+        val (data, state) = fixture("en", "light", fontScale = 1f)
+        compose.onNodeWithTag("capture").performClick()
+        compose.onNodeWithTag("title").performTextInput("Buy apples")
+        compose.onNodeWithTag("save").performClick()
+        compose.waitUntil(5000) { compose.onAllNodesWithText("Undo").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Undo").performClick()
+        compose.waitUntil(5000) { runBlocking { data.database.shared().intents(state.scope).size == 2 } }
+        compose.onNodeWithText("Buy apples").assertDoesNotExist()
+        assertEquals(listOf("CreateTask", "DeleteTask"), runBlocking { data.database.shared().intents(state.scope).map { it.kind } })
+    }
+
+    @Test fun claimFiltersIncludeChecklistStepsAndTreatDepartedClaimsAsUnclaimed() {
+        val (data, state) = fixture("en", "light", fontScale = 1f)
+        val repository = SharedRepository(data.database, data.lease, state.scope, data.registrationId!!)
+        runBlocking {
+            val root = repository.taskStates.first().first().getString("id")
+            repository.saveChecklistDraft(repository.checklistDraft(root).copy(text = "Collect paper"))
+            repository.commitChecklist(root)
+            val child = repository.taskStates.first().single { it.nullableString("parentId") == root }
+            repository.act("ClaimTask", child.toString())
+        }
+        compose.onNodeWithTag("queue-filter").performClick()
+        compose.onNodeWithTag("filter-mine").performClick()
+        compose.onNodeWithText("Vie paperit kierrätykseen").assertExists()
+        compose.onNodeWithText("Järjestä hylly").assertDoesNotExist()
+        compose.onNodeWithTag("queue-filter").performClick()
+        compose.onNodeWithTag("filter-unclaimed").performClick()
+        compose.onNodeWithText("Vie paperit kierrätykseen").assertDoesNotExist()
+        runBlocking {
+            val dao = data.database.shared()
+            val second = dao.base(state.scope).first { JSONObject(it.snapshot).optString("title") == "Järjestä hylly" }
+            val task = JSONObject(second.snapshot).put("claimantId", bob)
+            dao.saveBase(second.copy(snapshot = task.toString()))
+            dao.saveProjection(SharedProjection(state.scope, second.id, task.toString()))
+            val current = dao.workspace(state.scope)!!
+            val members = JSONObject(current.membership!!)
+            members.getJSONArray("members").getJSONObject(1).put("active", false)
+            dao.saveWorkspace(current.copy(membership = members.toString()))
+        }
+        compose.waitUntil(5000) { compose.onAllNodesWithText("Järjestä hylly").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Järjestä hylly").assertExists()
+    }
+
+    @androidx.test.filters.LargeTest
+    @Test fun talkBackExposesNamedReorderActionsAndCanMoveWithoutTouchDragging() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val automation = instrumentation.getUiAutomation(android.app.UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES)
+        val resolver = compose.activity.contentResolver
+        val previousServices = android.provider.Settings.Secure.getString(resolver, "enabled_accessibility_services")
+        val previousEnabled = android.provider.Settings.Secure.getInt(resolver, "accessibility_enabled", 0)
+        fun shell(command: String) { automation.executeShellCommand(command).use { android.os.ParcelFileDescriptor.AutoCloseInputStream(it).readBytes() } }
+        val talkBack = "com.google.android.marvin.talkback"
+        val notificationPermission = "android.permission.POST_NOTIFICATIONS"
+        val notificationsGranted = compose.activity.packageManager.checkPermission(notificationPermission, talkBack) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        val service = "$talkBack/com.google.android.marvin.talkback.TalkBackService"
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 33 && !notificationsGranted) shell("pm grant $talkBack $notificationPermission")
+            shell("settings put secure enabled_accessibility_services $service")
+            shell("settings put secure accessibility_enabled 1")
+            val manager = compose.activity.getSystemService(android.view.accessibility.AccessibilityManager::class.java)
+            compose.waitUntil(10_000) { manager.getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+                .any { it.resolveInfo.serviceInfo.packageName == "com.google.android.marvin.talkback" } }
+            android.os.SystemClock.sleep(1000)
+            compose.activityRule.scenario.recreate()
+            val (data, state) = fixture("en", "light", fontScale = 1.3f)
+            val repository = SharedRepository(data.database, data.lease, state.scope, data.registrationId!!)
+            val ids = runBlocking { repository.taskStates.first().map { it.getString("id") } }
+            compose.onNodeWithTag("queue-reorder").performSemanticsAction(SemanticsActions.OnClick) { it() }
+            fun find(node: android.view.accessibility.AccessibilityNodeInfo?): android.view.accessibility.AccessibilityNodeInfo? {
+                if (node == null) return null
+                if (node.viewIdResourceName == "reorder-handle-${ids[1]}") return node
+                for (index in 0 until node.childCount) find(node.getChild(index))?.let { return it }
+                return null
+            }
+            var handle: android.view.accessibility.AccessibilityNodeInfo? = null
+            compose.waitUntil(10_000) { handle = find(automation.rootInActiveWindow); handle != null }
+            assertTrue(handle!!.contentDescription.toString().contains("Järjestä hylly"))
+            val move = handle!!.actionList.single { it.label?.toString() == "Move earlier" }
+            assertTrue(handle!!.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS))
+            assertTrue(handle!!.performAction(move.id))
+            compose.waitUntil(5000) { runBlocking { repository.taskStates.first().first().getString("id") == ids[1] } }
+            val bitmap = automation.takeScreenshot()
+            File(compose.activity.filesDir, "finish-talkback-reorder.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            bitmap.recycle()
+        } finally {
+            if (previousServices.isNullOrEmpty()) shell("settings delete secure enabled_accessibility_services")
+            else shell("settings put secure enabled_accessibility_services '$previousServices'")
+            shell("settings put secure accessibility_enabled $previousEnabled")
+            if (android.os.Build.VERSION.SDK_INT >= 33 && !notificationsGranted) shell("pm revoke $talkBack $notificationPermission")
+            android.os.SystemClock.sleep(500)
+        }
+    }
+
     private fun screenshot(name: String) {
+        compose.waitForIdle()
+        android.os.SystemClock.sleep(350) // Wait for the rendered buffer, not only the semantics tree.
         compose.waitForIdle()
         val bitmap = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
         File(compose.activity.filesDir, name).outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }

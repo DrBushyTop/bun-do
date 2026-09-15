@@ -52,6 +52,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -86,6 +87,7 @@ fun InboxApp(
     appearance: String,
     onAppearance: (String) -> Unit,
     voice: VoiceController? = null,
+    voiceTarget: fi.bundo.data.VoiceTarget? = null,
     onAccount: (() -> Unit)? = null,
     queueTitle: String? = null,
     queueHeader: (@Composable () -> Unit)? = null,
@@ -98,11 +100,16 @@ fun InboxApp(
     onSplit: (() -> Unit)? = null,
     queueNavigation: (@Composable () -> Unit)? = null,
     queueContent: (@Composable ((String) -> Unit) -> Unit)? = null,
+    queueList: (@Composable ((String) -> Unit) -> Unit)? = null,
+    taskAttribution: (@Composable (String) -> Unit)? = null,
+    onTaskSaved: ((String, Boolean) -> Unit)? = null,
 ) {
+    var feedback by remember { mutableStateOf<HouseholdFeedback?>(null) }
     var settings by rememberSaveable { mutableStateOf(false) }
     var showVoice by rememberSaveable { mutableStateOf(false) }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     val queueScroll = rememberLazyListState()
+    val queueState = rememberSaveableStateHolder()
     val selected = state.tasks.find { it.id == selectedId }
     val editor = state.editor
     val back: () -> Unit = {
@@ -123,7 +130,10 @@ fun InboxApp(
             topBar = {
                 TopAppBar(
                     title = {
-                        Text(
+                        if (editor == null && !settings && selected == null) Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(painterResource(R.drawable.bun_do), null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.primary)
+                            Text("Bun Do", Modifier.padding(start = 8.dp), style = MaterialTheme.typography.titleLarge)
+                        } else Text(
                             if (editor == null && !settings && (selected == null || wide) && queueTitle != null) queueTitle else stringResource(
                                 when {
                                     editor != null -> if (editor.key == InboxRepository.NEW_DRAFT) R.string.new_task else R.string.edit_task
@@ -144,14 +154,17 @@ fun InboxApp(
                         }
                     },
                     actions = {
-                        if (onAccount != null && editor == null) {
+                        if (onAccount != null && settings) {
                             TextButton(onClick = onAccount, modifier = Modifier.testTag("account")) {
                                 Text(stringResource(R.string.account_title))
                             }
                         }
                         if (editor != null) {
                             TextButton(
-                                onClick = { model.closeEditor(commit = true) },
+                                onClick = { model.closeEditor(commit = true) {
+                                    if (onTaskSaved != null) onTaskSaved(it, editor.key == InboxRepository.NEW_DRAFT)
+                                    else feedback = HouseholdFeedback(System.nanoTime(), "file")
+                                } },
                                 enabled = canEdit && !state.working && InboxLimits.valid(editor.title, editor.description),
                                 modifier = Modifier.testTag("save").padding(end = 8.dp).heightIn(min = 48.dp),
                             ) { Text(stringResource(R.string.save)) }
@@ -170,7 +183,7 @@ fun InboxApp(
                     settings -> Settings(appearance, onAppearance, Modifier.align(Alignment.TopCenter).widthIn(max = 640.dp).fillMaxWidth(), queueTitle == null)
                     selected != null && (!wide || queueContent != null) -> TaskDetail(
                         selected, { model.openEditor(selected.id) }, state, model::retry, Modifier.fillMaxSize(), queueTitle == null,
-                        taskControls, canEdit && canEditTask(selected.id), { selectedId = it },
+                        taskControls, canEdit && canEditTask(selected.id), { selectedId = it }, taskAttribution,
                     )
                     queueContent != null -> queueContent { selectedId = it }
                     else -> Row(Modifier.fillMaxSize()) {
@@ -186,10 +199,12 @@ fun InboxApp(
                             header = queueHeader,
                             canEdit = canEdit,
                             summary = rowSummary,
+                            customList = queueList?.let { content -> { open -> queueState.SaveableStateProvider("queue") { content(open) } } },
+                            feedback = feedback,
                             modifier = if (wide && selected != null) Modifier.width(360.dp) else Modifier.weight(1f),
                         )
                         if (wide && selected != null) {
-                            TaskDetail(selected, { model.openEditor(selected.id) }, state, model::retry, Modifier.weight(1f), queueTitle == null, taskControls, canEdit && canEditTask(selected.id), { selectedId = it })
+                            TaskDetail(selected, { model.openEditor(selected.id) }, state, model::retry, Modifier.weight(1f), queueTitle == null, taskControls, canEdit && canEditTask(selected.id), { selectedId = it }, taskAttribution)
                         }
                     }
                 }
@@ -198,9 +213,13 @@ fun InboxApp(
         if (showVoice && voice != null) {
             VoiceSheet(
                 voice,
+                target = voiceTarget,
                 onDismiss = { showVoice = false },
                 onType = { showVoice = false; model.openEditor() },
-                onSaved = { showVoice = false; selectedId = it },
+                onSaved = {
+                    showVoice = false; selectedId = it
+                    if (onTaskSaved != null) onTaskSaved(it, true) else feedback = HouseholdFeedback(System.nanoTime(), "file")
+                },
             )
         }
     }
@@ -220,31 +239,23 @@ private fun Queue(
     canEdit: Boolean,
     summary: (@Composable (String) -> Unit)?,
     modifier: Modifier,
+    customList: (@Composable ((String) -> Unit) -> Unit)?,
+    feedback: HouseholdFeedback?,
 ) {
     val hasDraft = state.drafts.any {
         it.key == InboxRepository.NEW_DRAFT && (it.title.isNotEmpty() || it.description.isNotEmpty())
     }
     Column(modifier.fillMaxSize()) {
-        LazyColumn(
+        if (customList != null && state.loaded && !state.readFailed && !state.writeFailed) {
+            Box(Modifier.weight(1f)) { customList(onOpen) }
+        } else LazyColumn(
             Modifier.weight(1f).testTag("queue"),
             state = scroll,
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
             item {
-                if (header != null) header() else Surface(color = MaterialTheme.colorScheme.surfaceContainerLow) {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = gutter, vertical = 12.dp)) {
-                        Text(stringResource(R.string.local_only), style = MaterialTheme.typography.labelLarge)
-                        // Settings keeps the full explanation available on short screens.
-                        if (!compactNotice) {
-                            Text(
-                                stringResource(R.string.local_explanation),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 4.dp),
-                            )
-                        }
-                    }
-                }
+                if (header != null) header() else Text(stringResource(R.string.local_only),
+                    Modifier.padding(horizontal = gutter, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
             }
             if (state.savedPlacement != null) item {
                 Text(stringResource(if (state.savedPlacement == "EXPEDITED") R.string.detail_saved_priority else R.string.detail_saved_append),
@@ -313,7 +324,8 @@ private fun Queue(
         }
         Row(Modifier.padding(gutter).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(
+            ActionIllustration(feedback)
+            OutlinedButton(
                 onClick = onType,
                 enabled = canEdit && state.loaded && !state.working && !state.readFailed,
                 modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("capture"),
@@ -394,6 +406,7 @@ private fun TaskDetail(
     controls: (@Composable (String, (String) -> Unit) -> Unit)? = null,
     editable: Boolean = true,
     onOpenTask: (String) -> Unit = {},
+    attribution: (@Composable (String) -> Unit)? = null,
 ) {
     var original by rememberSaveable(task.id) { mutableStateOf(false) }
     Column(
@@ -401,13 +414,13 @@ private fun TaskDetail(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         if (state.writeFailed) ErrorNotice(R.string.open_failed, onRetry)
-        Text(task.title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
-        controls?.invoke(task.id, onOpenTask)
+        IllustratedTaskHeader(task.title) { attribution?.invoke(task.id) }
         if (localOnly) Text(stringResource(R.string.local_only), style = MaterialTheme.typography.labelLarge)
         Text(task.description.ifEmpty { stringResource(R.string.no_description) }, style = MaterialTheme.typography.bodyLarge)
         Button(onClick = onEdit, enabled = editable && !state.working, modifier = Modifier.heightIn(min = 48.dp).testTag("edit")) {
             Text(stringResource(R.string.edit_task))
         }
+        controls?.invoke(task.id, onOpenTask)
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         TextButton(onClick = { original = !original }, modifier = Modifier.heightIn(min = 48.dp)) {
             Text(stringResource(if (original) R.string.hide_original else R.string.show_original))
@@ -432,12 +445,7 @@ private fun ErrorNotice(message: Int, retry: () -> Unit) {
 private fun Settings(appearance: String, onAppearance: (String) -> Unit, modifier: Modifier, localOnly: Boolean) {
     val language = AppCompatDelegate.getApplicationLocales().toLanguageTags()
     Column(modifier.verticalScroll(rememberScrollState()).padding(16.dp)) {
-        Text(stringResource(R.string.appearance), style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
-        Choices(
-            appearance,
-            listOf("system" to R.string.system_default, "light" to R.string.light, "dark" to R.string.dark),
-            onAppearance,
-        )
+        MotionPreference()
         Spacer(Modifier.height(24.dp))
         Text(stringResource(R.string.language), style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
         Text(stringResource(R.string.language_hint), Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodyMedium)

@@ -41,7 +41,7 @@ class HumanSpeechDeviceTest {
                 source.copyTo(store.audio(recording.id))
                 val text = LocalSpeech().transcribe(model, store.audio(recording.id))
                 assertTrue("No text for private sample $number", text.isNotBlank())
-                val id = store.commit(recording.id, text)
+                val id = store.commit(recording.id, text).taskId
                 val task = checkNotNull(database.inbox().task(id))
                 assertEquals(text.trim(), if (task.originalDescription.isEmpty()) task.originalTitle else task.originalDescription)
                 assertFalse(store.audio(recording.id).exists())

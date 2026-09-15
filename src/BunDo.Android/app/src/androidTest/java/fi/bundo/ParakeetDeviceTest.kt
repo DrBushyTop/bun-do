@@ -51,7 +51,7 @@ class ParakeetDeviceTest {
                 // This checks a working language/audio pipeline, not exact spelling or phone quality.
                 // Whole-transcript agreement is stronger than two incidental matching keywords.
                 assertTrue("Public/test $language fixture exceeded 20% word error: $text", wordErrorRate(reference, text) <= 0.2)
-                val id = store.commit(record.id, text)
+                val id = store.commit(record.id, text).taskId
                 assertNotNull(database.inbox().task(id))
                 assertFalse(store.audio(record.id).exists())
             }

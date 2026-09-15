@@ -50,7 +50,7 @@ class SharedRecoveryUiTest {
         }
         compose.runOnUiThread {
             compose.activity.setContent {
-                BunDoTheme(appearance) {
+                BunDoTheme("light") {
                     val density = LocalDensity.current
                     CompositionLocalProvider(LocalDensity provides Density(density.density, 1.3f)) {
                         SharedWorkspaceScreen(data, state, appearance, {}, {})
@@ -64,6 +64,8 @@ class SharedRecoveryUiTest {
 
     private fun text(id: Int) = compose.activity.getString(id)
     private fun screenshot(name: String) {
+        compose.waitForIdle()
+        android.os.SystemClock.sleep(350) // Wait for the rendered buffer, not only the semantics tree.
         compose.waitForIdle()
         val bitmap = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
         File(compose.activity.filesDir, name).outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
@@ -103,14 +105,14 @@ class SharedRecoveryUiTest {
     }
 
     @Test fun conflictShowsCurrentAndRetainedTextAndDismissKeepsTheJournal() {
-        val (data, state) = fixture(false, "dark")
+        val (data, state) = fixture(false, "light")
         compose.onNodeWithTag("shared-recovery").performClick()
         compose.onNodeWithText("Siivoa varaston alahylly").assertIsDisplayed()
         val currentTitle = compose.activity.getString(R.string.shared_current, "Järjestä varaston hyllyt")
         compose.waitUntil(10_000) { compose.onAllNodesWithText(currentTitle).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText(currentTitle).performScrollTo().assertIsDisplayed()
         compose.onNodeWithText(text(R.string.shared_reapply)).performScrollTo().assertIsDisplayed()
-        screenshot("recovery-conflict-dark.png")
+        screenshot("recovery-conflict-light.png")
         compose.onNodeWithText(text(R.string.shared_dismiss)).performScrollTo().performClick()
         compose.waitUntil(10_000) { runBlocking { data.database.shared().intents(state.scope).single().status == "DISMISSED" } }
         assertEquals("Siivoa varaston alahylly", runBlocking { data.database.shared().intents(state.scope).single().title })
