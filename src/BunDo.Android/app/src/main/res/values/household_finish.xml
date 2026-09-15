@@ -1,4 +1,8 @@
 <resources>
+    <string name="show_world">Bunin puutarha</string>
+    <string name="show_world_hint">Näytä kuvitus tehtävälistan yllä. Pienellä näytöllä ja suurella tekstillä tila varataan tehtäville.</string>
+    <string name="speak_task">Puhu tehtävä</string>
+    <string name="account_reminder_settings">Muistutukset</string>
     <string name="voice_saved_elsewhere">Tallennettu äänityksen alkuperäiseen kohteeseen. Avaa se siellä, jos haluat tarkastella tai muokata sitä.</string>
     <string name="dismiss_confirmation">Sulje vahvistus</string>
     <string name="decorative_motion">Pienet toimintoanimaatiot</string>

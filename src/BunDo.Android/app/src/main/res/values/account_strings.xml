@@ -11,7 +11,7 @@
     <string name="account_exported">Teksti viety. Alkuperäiset tiedot säilyvät.</string>
     <string name="account_export_json">Vie JSON, osa %1$d</string>
     <string name="account_export_text">Vie teksti, osa %1$d</string>
-    <string name="account_import_preview">Valitse anonyymejä luonnoksia</string>
+    <string name="account_import_preview">Tuo ennen kirjautumista tallennetut tehtävät</string>
     <string name="account_import_notice">Valitut tekstit kopioidaan uusina paikallisina tehtävinä. Alkuperäiset säilyvät. Kotitalouteen siirto vaatii myöhemmin erillisen valinnan.</string>
     <string name="account_import_selected">Kopioi valitut tekstit</string>
     <string name="account_delete_sign_out">Poista tämän tilin paikalliset tiedot ja kirjaudu ulos</string>

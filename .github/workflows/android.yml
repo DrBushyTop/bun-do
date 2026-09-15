@@ -17,7 +17,7 @@ jobs:
         uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v5.0.0
         with:
           distribution: temurin
-          java-version: '17.0.20.1+1'
+          java-version: '17'
       - name: Install selected Android SDK packages
         # Hosted Android runners have accepted SDK licenses. EOF fails rather
         # than silently accepting a newly required license.

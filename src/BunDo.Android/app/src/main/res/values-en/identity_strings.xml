@@ -1,17 +1,17 @@
 <resources>
     <string name="identity_loading">Preparing sign-in…</string>
     <string name="identity_ready">Ready to sign in.</string>
-    <string name="identity_cached">A Microsoft session is saved. Verify it with a fresh token.</string>
+    <string name="identity_cached">You are signed in. Saved work is available offline.</string>
     <string name="identity_browser">Finish signing in through the Microsoft browser window.</string>
-    <string name="identity_refreshing">Requesting a fresh token from Microsoft…</string>
-    <string name="identity_verifying">Microsoft sign-in succeeded. Checking backend access…</string>
+    <string name="identity_refreshing">Checking your connection…</string>
+    <string name="identity_verifying">Microsoft sign-in succeeded. Connecting to Bun Do…</string>
     <string name="identity_verified">Sign-in verified. The backend accepted your Microsoft account.</string>
     <string name="identity_refreshed">Token refresh verified. The backend accepted the fresh token.</string>
     <string name="identity_cancelled">Sign-in cancelled. You can try again.</string>
     <string name="identity_signed_out">Signed out of Bun Do. The browser may remember your Microsoft account.</string>
-    <string name="identity_failed">Microsoft sign-in failed. Try again, or close and reopen this check.</string>
-    <string name="identity_api_rejected">The backend rejected access. Check its identity configuration, then retry with a fresh token.</string>
-    <string name="identity_api_unavailable">Backend verification failed. Check that the local backend is running, then retry with a fresh token.</string>
+    <string name="identity_failed">Microsoft sign-in failed. Check your connection and try signing in again.</string>
+    <string name="identity_api_rejected">Bun Do could not verify your access. Try signing in again. Saved work stays on this phone.</string>
+    <string name="identity_api_unavailable">Bun Do could not connect. Check your internet connection and try again. Saved work stays on this phone.</string>
     <string name="identity_sign_in">Sign in with Microsoft</string>
     <string name="identity_refresh">Verify token refresh</string>
     <string name="identity_sign_out">Sign out</string>

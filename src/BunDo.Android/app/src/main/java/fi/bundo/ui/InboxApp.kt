@@ -335,8 +335,10 @@ private fun Queue(
                 Text(stringResource(if (hasDraft) R.string.resume_draft else R.string.type_task))
             }
             if (onVoice != null) {
-                FloatingActionButton(onClick = onVoice, modifier = Modifier.testTag("voice")) {
-                    Icon(painterResource(R.drawable.microphone), stringResource(R.string.voice_capture), Modifier.size(24.dp))
+                Button(onClick = onVoice, modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("voice")) {
+                    Icon(painterResource(R.drawable.microphone), null, Modifier.size(24.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.speak_task))
                 }
             }
         }
@@ -446,6 +448,8 @@ private fun Settings(appearance: String, onAppearance: (String) -> Unit, modifie
     val language = AppCompatDelegate.getApplicationLocales().toLanguageTags()
     Column(modifier.verticalScroll(rememberScrollState()).padding(16.dp)) {
         MotionPreference()
+        Spacer(Modifier.height(16.dp))
+        WorldPreference()
         Spacer(Modifier.height(24.dp))
         Text(stringResource(R.string.language), style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
         Text(stringResource(R.string.language_hint), Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodyMedium)

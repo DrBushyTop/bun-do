@@ -92,7 +92,9 @@ due/snooze/repeat/reminder setup, real AI pending/failure/stale previews,
 account/join flows and offline reconciliation. These already belong to v1;
 their absence from the browser study does not defer them.
 
-The optional [Bun world and quests study](bun-world-and-quests.md) is post-core/V3
+The owner adopted the bundled static dojo garden for V1 on September 15, 2026. It can be hidden in Settings and yields its space to tasks during reorder, on short screens and with large text. It has no quest entry, sampled progress or inferred mood.
+
+The interactive [Bun world and quests study](bun-world-and-quests.md) is post-core/V3
 exploration. It does not add a release blocker, XP system or autonomous agent
 to V1.
 

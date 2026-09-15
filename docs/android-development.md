@@ -6,8 +6,7 @@ SDK, and test configuration. The application source owns its current features.
 
 Use [development sign-in](identity-development.md) for Microsoft and Local
 identity checks. Use [speech comparison](android-speech-comparison.md) only for
-the opt-in recognizer experiment. The app does not yet synchronize work between
-devices, so two working inboxes are not sync evidence.
+the opt-in recognizer experiment. Shared household tasks synchronize; the private local inbox does not. Two working private inboxes are not sync evidence.
 
 ## Install and check
 
@@ -103,7 +102,7 @@ On each profile:
 3. Force-stop and reopen the app to check local durability.
 4. Rotate with unfinished editor text and check draft recovery.
 5. Check Finnish and English plus a large font setting.
-6. Confirm work entered on one profile does not appear on the other.
+6. In a shared household, reconnect each profile in both orders and confirm accepted work converges without losing offline edits. Check private inbox and account isolation separately.
 
 Record the serials, image revisions, checks actually run, and results in the
 owning slice issue. A compiled APK is not device-test evidence. Physical-phone

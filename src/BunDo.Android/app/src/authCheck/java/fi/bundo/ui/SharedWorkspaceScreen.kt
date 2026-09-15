@@ -214,20 +214,23 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
             !busy && current?.blocked == null && recovery == null, onOpen, ::act,
             onFullQueue = { history = false; deleted = false; snoozed = false; dueOnly = false },
             toolbar = {
-                Box {
-                    TextButton(onClick = { views = true }, modifier = Modifier.testTag("queue-views")) {
-                        Text(stringResource(when { dueOnly -> R.string.reminders_due; deleted -> R.string.task_deleted_view
-                            history -> R.string.task_history_view; snoozed -> R.string.task_snoozed_view; else -> R.string.task_active_view }))
-                    }
-                    DropdownMenu(views, { views = false }) {
-                        listOf("active" to R.string.task_active_view, "history" to R.string.task_history_view,
-                            "deleted" to R.string.task_deleted_view, "snoozed" to R.string.task_snoozed_view,
-                            "due" to R.string.reminders_due).forEach { (view, label) ->
-                            DropdownMenuItem(text = { Text(stringResource(label)) }, modifier = Modifier.testTag("task-$view-view"), onClick = {
-                                history = view == "history"; deleted = view == "deleted"; snoozed = view == "snoozed"; dueOnly = view == "due"; views = false
-                            })
+                Row(Modifier.fillMaxWidth()) {
+                    Box {
+                        TextButton(onClick = { views = true }, modifier = Modifier.testTag("queue-views")) {
+                            Text(stringResource(when { dueOnly -> R.string.reminders_due; deleted -> R.string.task_deleted_view
+                                history -> R.string.task_history_view; snoozed -> R.string.task_snoozed_view; else -> R.string.task_active_view }))
+                        }
+                        DropdownMenu(views, { views = false }) {
+                            listOf("active" to R.string.task_active_view, "history" to R.string.task_history_view,
+                                "deleted" to R.string.task_deleted_view, "snoozed" to R.string.task_snoozed_view,
+                                "due" to R.string.reminders_due).forEach { (view, label) ->
+                                DropdownMenuItem(text = { Text(stringResource(label)) }, modifier = Modifier.testTag("task-$view-view"), onClick = {
+                                    history = view == "history"; deleted = view == "deleted"; snoozed = view == "snoozed"; dueOnly = view == "due"; views = false
+                                })
+                            }
                         }
                     }
+                    TextButton(onClick = { tools = !tools }, modifier = Modifier.testTag("queue-tools")) { Text(stringResource(R.string.queue_tools)) }
                 }
             }, notices = {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
@@ -245,7 +248,6 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
             }
             if (current?.blocked != null) Text(stringResource(R.string.shared_access_lost),
                 color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 8.dp).testTag("shared-blocked"))
-            TextButton(onClick = { tools = !tools }, modifier = Modifier.testTag("queue-tools")) { Text(stringResource(R.string.queue_tools)) }
             if (tools) {
             Row(Modifier.fillMaxWidth()) {
                 TextButton(onClick = { run { data.selectHousehold(null) } }, enabled = !busy,

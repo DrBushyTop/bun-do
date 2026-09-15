@@ -103,6 +103,7 @@ internal fun SharedQueue(
             true
         } else false
     }) {
+        if (!reorder) HouseholdWorld()
         // Outside the scrolling list so controls remain reachable during a long reorder.
         Column(Modifier.padding(horizontal = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

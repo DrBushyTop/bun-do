@@ -66,6 +66,30 @@ class HouseholdAccessibilityTest {
         screenshot("finish-account-details.png")
     }
 
+    @Test fun offlineSignInFailureIsVisibleWithoutOpeningDiagnostics() {
+        val app = compose.activity.application as BunDoApplication
+        lateinit var model: fi.bundo.identity.SignInModel
+        compose.runOnUiThread {
+            val provider = object : fi.bundo.identity.TokenProvider {
+                override val issuer = "urn:bun-do:local"
+                override val choices = listOf("Alice")
+                override suspend fun restore() = false
+                override suspend fun signIn(activity: android.app.Activity, choice: String?): String =
+                    throw java.io.IOException("Synthetic offline sign-in")
+                override suspend fun refresh(): String = error("Not signed in")
+                override suspend fun signOut() = Unit
+            }
+            model = fi.bundo.identity.SignInModel(app, provider, { error("No token while offline") })
+            compose.activity.setContent {
+                fi.bundo.ui.BunDoTheme("light") { fi.bundo.ui.AccountScreen(app.accounts, model, onClose = {}) }
+            }
+            model.signIn(compose.activity, "Alice")
+        }
+        compose.onNodeWithText(compose.activity.getString(R.string.identity_api_unavailable))
+            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("account-refresh").assertDoesNotExist()
+    }
+
     @Test fun nativeDatePickerStaysLightEvenWhenNightModeIsRequested() {
         val previous = androidx.appcompat.app.AppCompatDelegate.getDefaultNightMode()
         var dialog: android.app.DatePickerDialog? = null

@@ -11,7 +11,7 @@
     <string name="account_exported">Text exported. Original data is unchanged.</string>
     <string name="account_export_json">Export JSON, part %1$d</string>
     <string name="account_export_text">Export text, part %1$d</string>
-    <string name="account_import_preview">Choose anonymous drafts</string>
+    <string name="account_import_preview">Import tasks saved before sign-in</string>
     <string name="account_import_notice">Selected text is copied into new local tasks. Originals stay unchanged. Moving it into a household will require a separate selection.</string>
     <string name="account_import_selected">Copy selected text</string>
     <string name="account_delete_sign_out">Delete this account\'s local data and sign out</string>

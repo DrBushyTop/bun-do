@@ -38,6 +38,7 @@ fun AccountScreen(accounts: AccountStore, model: SignInModel, onHouseholds: () -
     val data by accounts.active.collectAsState()
     val selectedWorkspace = data?.selectedWorkspace?.collectAsState()?.value
     val scope = rememberCoroutineScope()
+    var reminderDetails by remember { mutableStateOf(false) }
     var recoveryDetails by remember { mutableStateOf(false) }
     var diagnostics by remember { mutableStateOf(false) }
     var records by remember(data) { mutableStateOf<List<RecoveryText>>(emptyList()) }
@@ -117,12 +118,28 @@ fun AccountScreen(accounts: AccountStore, model: SignInModel, onHouseholds: () -
                 Text(stringResource(R.string.identity_selected,
                     if (current!!.identity!!.subject == "alice") "Alice" else "Bob"))
             }
+            model.choices.ifEmpty { listOf("") }.forEach { choice ->
+                OutlinedButton(enabled = !model.busy && !working && ready,
+                    modifier = Modifier.fillMaxWidth().testTag("account-use-${choice.lowercase()}"),
+                    onClick = {
+                        val action = { model.signIn(activity, choice.ifEmpty { null }) }
+                        if (signedIn) pendingAction = action else action()
+                    }) {
+                    Text(if (choice.isEmpty()) stringResource(R.string.identity_sign_in)
+                    else stringResource(R.string.identity_choose, choice))
+                }
+            }
             if (signedIn) Button(onClick = onHouseholds, enabled = !model.busy,
                 modifier = Modifier.fillMaxWidth().testTag("account-households")) {
                 Text(stringResource(R.string.households_title))
             }
             if (current != null) key(current.lease.generation) {
-                if (signedIn) ReminderSettingsSection(current)
+                if (signedIn) {
+                    TextButton(onClick = { reminderDetails = !reminderDetails }, modifier = Modifier.testTag("account-reminders")) {
+                        Text(stringResource(R.string.account_reminder_settings))
+                    }
+                    if (reminderDetails) ReminderSettingsSection(current)
+                }
                 LegacyRecordingsSection(accounts, current, onClose)
             }
             TextButton(onClick = { recoveryDetails = !recoveryDetails }, modifier = Modifier.testTag("account-recovery-details")) {
@@ -132,7 +149,10 @@ fun AccountScreen(accounts: AccountStore, model: SignInModel, onHouseholds: () -
             if (accounts.unexpectedFiles) Text(stringResource(if (diagnostics) R.string.account_installation_reset else R.string.account_recovery_needed),
                 color = MaterialTheme.colorScheme.error)
             if (ready && recoveryDetails) Text(stringResource(R.string.account_pending, records.size, recordings))
-            if (diagnostics || model.busy || model.errorCode.isNotEmpty() || model.status == R.string.identity_failed) Text(stringResource(model.status), Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+            val actionableStatus = model.status in listOf(R.string.identity_failed, R.string.identity_api_unavailable,
+                R.string.identity_api_rejected, R.string.identity_registration_failed, R.string.identity_cancelled)
+            if (diagnostics || model.busy || model.errorCode.isNotEmpty() || actionableStatus)
+                Text(stringResource(model.status), Modifier.semantics { liveRegion = LiveRegionMode.Polite })
             if (model.busy || working || !ready) LinearProgressIndicator(Modifier.fillMaxWidth())
             if (failure) Text(stringResource(R.string.account_operation_failed), color = MaterialTheme.colorScheme.error)
             if (exported) Text(stringResource(R.string.account_exported))
@@ -153,14 +173,14 @@ fun AccountScreen(accounts: AccountStore, model: SignInModel, onHouseholds: () -
                 if (parts.isEmpty()) Text(stringResource(R.string.account_operation_failed))
             }
             if (signedIn) {
-                OutlinedButton(onClick = { importOwner = current; openRecovery.launch(arrayOf("application/json", "text/plain")) },
+                if (recoveryDetails) OutlinedButton(onClick = { importOwner = current; openRecovery.launch(arrayOf("application/json", "text/plain")) },
                     enabled = !working && !model.busy, modifier = Modifier.fillMaxWidth()) {
                     Text(stringResource(R.string.shared_import_file))
                 }
                 TextButton(onClick = { diagnostics = !diagnostics }, modifier = Modifier.testTag("account-diagnostics")) { Text(stringResource(R.string.account_diagnostics)) }
                 if (diagnostics) OutlinedButton(onClick = { model.refresh() }, enabled = !model.busy && !working,
                     modifier = Modifier.fillMaxWidth().testTag("account-refresh")) { Text(stringResource(R.string.identity_refresh)) }
-                OutlinedButton(onClick = {
+                if (recoveryDetails) OutlinedButton(onClick = {
                     scope.launch {
                         working = true
                         try { importPreview = withContext(Dispatchers.IO) { accounts.anonymousPreview(current!!) } }
@@ -207,17 +227,6 @@ fun AccountScreen(accounts: AccountStore, model: SignInModel, onHouseholds: () -
                 OutlinedButton(onClick = { model.refresh() }, enabled = !model.busy,
                     modifier = Modifier.fillMaxWidth().testTag("account-refresh")) {
                     Text(stringResource(R.string.identity_refresh))
-                }
-            }
-            model.choices.ifEmpty { listOf("") }.forEach { choice ->
-                OutlinedButton(enabled = !model.busy && !working && ready,
-                    modifier = Modifier.fillMaxWidth().testTag("account-use-${choice.lowercase()}"),
-                    onClick = {
-                        val action = { model.signIn(activity, choice.ifEmpty { null }) }
-                        if (signedIn) pendingAction = action else action()
-                    }) {
-                    Text(if (choice.isEmpty()) stringResource(R.string.identity_sign_in)
-                    else stringResource(R.string.identity_choose, choice))
                 }
             }
             if (model.errorCode == "registration_retired") {

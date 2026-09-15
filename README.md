@@ -1,8 +1,8 @@
 # Bun Do
 
-Bun Do is implementing the shared typed command model for task creation and editing. The model keeps command validation, deterministic state changes, and sync behavior testable without Android UI, network calls, or Azure services.
+Bun Do is a native Android household task queue. Capture work by typing or speaking, share it, and finish it together. Everyday task edits work offline and synchronize when connected. Microsoft sign-in, account-isolated storage and recovery protect retained work.
 
-The implementation follows the repository's [implementation plan](docs/implementation-plan.md) and the contracts in [docs/architecture](docs/architecture/README.md). Android supports offline typed and voice capture, Microsoft sign-in, and encrypted account-local storage. A separate Local build supplies Alice and Bob for unattended development. Household membership, cloud sync and production readiness remain separate gates. See [Android development](docs/android-development.md) and [development sign-in](docs/identity-development.md) for tests and limits.
+The [implementation plan](docs/implementation-plan.md) links the live release gates. [Architecture contracts](docs/architecture/README.md) define behavior. See [Android development](docs/android-development.md), [development sign-in](docs/identity-development.md) and [Azure development](docs/azure-development.md) for setup. The separate Local build supplies fictional Alice and Bob accounts for unattended development; it is not the installable cloud release.
 
 ## Local verification
 
@@ -26,5 +26,4 @@ deployed in Sweden Central. Live checks verified correlated redacted failures,
 useful request context and all three complete AI schemas under managed identity.
 Controlled redeployments preserved resource identities and checked policies.
 See [Azure development](docs/azure-development.md) for the scoped deployment
-commands, costs and remaining live checks. This does not yet provide an
-authenticated cloud backend or task sync.
+commands, costs and remaining live checks. Release verification must still exercise the installed Android artifact against the configured services.

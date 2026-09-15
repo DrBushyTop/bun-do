@@ -1,17 +1,17 @@
 <resources>
     <string name="identity_loading">Valmistellaan kirjautumista…</string>
     <string name="identity_ready">Valmis kirjautumaan.</string>
-    <string name="identity_cached">Microsoft-istunto on tallennettu. Tarkista se uudella tunnisteella.</string>
+    <string name="identity_cached">Olet kirjautunut sisään. Tallennetut tehtävät ovat käytettävissä ilman verkkoyhteyttä.</string>
     <string name="identity_browser">Kirjaudu Microsoftin selainikkunassa.</string>
-    <string name="identity_refreshing">Pyydetään uutta tunnistetta Microsoftilta…</string>
-    <string name="identity_verifying">Microsoft-kirjautuminen onnistui. Tarkistetaan palvelinyhteys…</string>
+    <string name="identity_refreshing">Tarkistetaan yhteyttä…</string>
+    <string name="identity_verifying">Microsoft-kirjautuminen onnistui. Yhdistetään Bun Do -palveluun…</string>
     <string name="identity_verified">Kirjautuminen tarkistettu. Palvelin hyväksyi Microsoft-tilisi.</string>
     <string name="identity_refreshed">Tunniste uusittu. Palvelin hyväksyi uuden tunnisteen.</string>
     <string name="identity_cancelled">Kirjautuminen peruttu. Voit yrittää uudelleen.</string>
     <string name="identity_signed_out">Kirjauduttu ulos Bun Dosta. Selain voi muistaa Microsoft-tilisi.</string>
-    <string name="identity_failed">Microsoft-kirjautuminen epäonnistui. Yritä uudelleen tai sulje ja avaa testi.</string>
-    <string name="identity_api_rejected">Palvelin hylkäsi pääsyn. Tarkista kirjautumisasetukset ja yritä uudella tunnisteella.</string>
-    <string name="identity_api_unavailable">Palvelintarkistus epäonnistui. Tarkista, että paikallinen palvelin on käynnissä, ja yritä uudella tunnisteella.</string>
+    <string name="identity_failed">Microsoft-kirjautuminen epäonnistui. Tarkista verkkoyhteys ja yritä kirjautua uudelleen.</string>
+    <string name="identity_api_rejected">Bun Do ei voinut vahvistaa käyttöoikeuttasi. Yritä kirjautua uudelleen. Tallennetut tehtävät säilyvät tässä puhelimessa.</string>
+    <string name="identity_api_unavailable">Bun Do ei saanut yhteyttä palveluun. Tarkista verkkoyhteys ja yritä uudelleen. Tallennetut tehtävät säilyvät tässä puhelimessa.</string>
     <string name="identity_sign_in">Kirjaudu Microsoft-tilillä</string>
     <string name="identity_refresh">Tarkista tunnisteen uusiminen</string>
     <string name="identity_sign_out">Kirjaudu ulos</string>

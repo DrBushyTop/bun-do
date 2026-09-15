@@ -106,6 +106,34 @@ class SharedTaskUiTest {
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().assertExists()
     }
 
+    @Test fun staticGardenCanBeHiddenAndNeverCompetesWithReordering() {
+        val preferences = compose.activity.getSharedPreferences("appearance", 0)
+        val previous = preferences.getBoolean("world", true)
+        preferences.edit().putBoolean("world", true).commit()
+        try {
+            fixture("en", "light", fontScale = 1f)
+            compose.onNodeWithTag("household-world").assertIsDisplayed()
+            compose.onNodeWithTag("voice").assertTextContains("Speak a task", substring = true)
+            compose.onNodeWithText("Adventure").assertDoesNotExist()
+            screenshot("walkthrough-en-garden.png")
+            compose.onNodeWithTag("queue-reorder").performClick()
+            compose.onNodeWithTag("household-world").assertDoesNotExist()
+            compose.onNodeWithTag("reorder-done").performClick()
+            compose.onNodeWithTag("settings").performClick()
+            compose.onNodeWithTag("show-world").performScrollTo().performClick()
+            compose.onNodeWithTag("back").performClick()
+            compose.onNodeWithTag("household-world").assertDoesNotExist()
+        } finally { preferences.edit().putBoolean("world", previous).commit() }
+    }
+
+    @Test fun finnishGardenKeepsCaptureAndQueueWithinReach() {
+        fixture("fi", "light", fontScale = 1f)
+        compose.onNodeWithTag("voice").assertTextContains("Puhu tehtävä", substring = true)
+        compose.onNodeWithTag("capture").assertIsDisplayed()
+        compose.onNodeWithText("Vie paperit kierrätykseen").assertIsDisplayed()
+        screenshot("walkthrough-fi-garden.png")
+    }
+
     @Test fun tomorrowCaptureExplainsPlacementAndPersistsUrgencyInEnglish() {
         val (data, state) = fixture("en", "light")
         compose.onNodeWithTag("capture").performClick()

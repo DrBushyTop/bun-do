@@ -88,26 +88,25 @@ def main():
     def restart():
         adb("shell", "am", "force-stop", package)
         adb("shell", "am", "start", "-W", "-n", f"{package}/fi.bundo.MainActivity")
-        wait_for(tag="account")
+        wait_for(tag="settings")
 
     def account_page():
+        tap(tag="settings")
         tap(tag="account")
 
     def inbox():
         adb("shell", "input", "keyevent", "4")
-        wait_for(tag="account")
+        wait_for(tag="capture")
 
     def sign_out():
         tap(tag="account-sign-out")
         tap(key="account_continue")
-        wait_for(key="identity_signed_out")
         wait_for(key="account_anonymous", scroll=True)
 
     def choose(account, switching=False):
         tap(tag=f"account-use-{account.lower()}")
         if switching:
             tap(key="account_continue")
-        wait_for(key="identity_verified", scroll=True)
         wait_for(key="identity_selected", account=account, scroll=True)
 
     def capture(title):
@@ -141,6 +140,7 @@ def main():
         inbox()
         capture(alice)
         account_page()
+        tap(tag="account-diagnostics")
         tap(tag="account-refresh")
         wait_for(key="identity_refreshed", scroll=True)
         choose("Bob", switching=True)
@@ -155,6 +155,7 @@ def main():
         absent(alice)
         capture(offline)
         account_page()
+        tap(tag="account-diagnostics")
         tap(tag="account-refresh")
         wait_for(key="identity_api_unavailable", scroll=True)
         wait_for(key="identity_selected", account="Bob", scroll=True)

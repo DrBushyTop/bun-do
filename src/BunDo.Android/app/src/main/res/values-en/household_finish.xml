@@ -1,4 +1,8 @@
 <resources>
+    <string name="show_world">Bun garden</string>
+    <string name="show_world_hint">Show artwork above the task list. Small screens and large text reserve the space for tasks.</string>
+    <string name="speak_task">Speak a task</string>
+    <string name="account_reminder_settings">Reminders</string>
     <string name="voice_saved_elsewhere">Saved to the original recording destination. Open it there to view or edit it.</string>
     <string name="dismiss_confirmation">Dismiss confirmation</string>
     <string name="decorative_motion">Small action animations</string>

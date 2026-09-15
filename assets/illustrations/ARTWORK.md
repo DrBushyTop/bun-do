@@ -2,10 +2,7 @@
 
 Generated September 13, 2026 with Azure Foundry through the bundled
 `foundry-imagegen` CLI and Azure CLI authentication. Deployment `gpt-image-2-1`,
-1536 × 1024 pixels, high quality. No credentials are stored here. The initial
-images were generated, then the six bunny scenes were edited for the royal
-martial-arts direction. The garden environment has no generated character;
-the study overlays the approved rabbit vector.
+1536 × 1024 pixels, high quality. No credentials are stored here. The initial images were generated, then the bunny scenes were edited for the royal martial-arts direction. The later dojo garden includes an illustrated Bun. These scenes do not replace the approved app mark.
 
 Selected app assets are WebP derivatives resized to 960 × 640 at quality 82.
 They are illustrative examples, not output generated from users' task data.
@@ -53,3 +50,11 @@ Edit the provided illustration. Preserve the composition, props, activity, paper
 ### Dojo storage
 
 Use case: illustration-story. Asset type: illustration for an optional household adventure called the storage trial, no text drawn in the image. A dignified rabbit monarch and martial-arts master quietly organizing a modest timber dojo storeroom. Ivory martial-arts gi, dark evergreen tied belt with clear knot, small restrained ochre crown, calm narrow eyes and long upright ears. The rabbit practices a precise grounded stance while lifting an ordinary cardboard box onto a low shelf. Two neatly folded training cloths, rolled plain mat and one broom. Everyday chores as the Way of the Bun, subtle humor, no combat. A small storeroom doorway frames the right-side vignette, no dark dungeon. Composition: illustration entirely in RIGHT 45 percent, LEFT 55 percent is empty flat warm ivory paper #F8F9F4, no objects or marks behind future UI text. Hand-drawn ink-and-wash editorial cartoon, confident evergreen brush contours, soft sage, sand and muted brick-red accent; restrained Japanese-inspired domestic architecture, secular. Same kind of warm adult-friendly drawing as a quiet illustrated story, NOT babyish, NOT glossy, NOT photorealistic. Lots of negative space. No text, no letters, no numbers, no logos, no watermark, no UI, no religious symbols, no torii, no swords, no gold treasure, no costume spectacle. Wide horizontal composition with subject fully visible, not cropped.
+
+## Static garden
+
+`dojo_garden.webp` is copied byte-for-byte from `dojo-garden.webp` in the same pinned reference. It is decorative, not quest or household-progress state.
+
+### Dojo garden
+
+Use case: illustration-story. Asset type: wide background behind the top of the Bun Do household task app. Create an original calm Japanese-inspired martial-arts dojo courtyard, secular and domestic rather than a shrine or temple. Low timber practice hall with open sliding wooden screens at LEFT, a swept stone path through a spare moss garden in the lower half, a maple branch and a low bench with a teapot at RIGHT. The architecture is modest, functional, no ornate roofs. A small dignified white rabbit martial-arts master, compact body, long upright ears, calm narrow eye, ivory gi and tied dark evergreen belt, a tiny restrained ochre three-point crown, quietly sweeping the courtyard with a straw broom near the RIGHT side. The gentle joke is that a king still sweeps his own floor. The top 30 percent is pale warm ivory sky/paper with no detail behind app controls. Landscape composition, main scene within the middle and lower half, clear readable silhouette, lots of breathing room. Ink-and-wash editorial cartoon, confident fine evergreen brush contours, flat soft sage and sand, tiny muted brick-red accent, modest washi texture. Adult-friendly and slightly wry, not nursery illustration, not magical fantasy, not a realistic painting. No text, no calligraphy, no lettering, no UI, no logos, no watermark, no religious symbols, no torii, no Buddha, no swords, no combat, no cherry blossom shower, no decorative sparkle. The character is not a replacement for the app logo.
