@@ -130,20 +130,21 @@ class InboxViewModel(private val repository: TaskEditorRepository, private val s
         state.value.editor?.let(::persist)
     }
 
-    fun closeEditor(commit: Boolean) {
+    fun closeEditor(commit: Boolean, onSaved: ((String) -> Unit)? = null) {
         val draft = state.value.editor ?: return
         if (state.value.working || (commit && (!InboxLimits.valid(draft.title, draft.description) || !fi.bundo.data.SharedTaskDetails.valid(draft.details)))) return
         mutableState.update { it.copy(working = true, writeFailed = false) }
         writes.trySend(Write(perform = {
             // Explicit Back is a durability boundary, just like Save.
-            val placement = if (commit) repository.commit(draft).let { if (draft.key == InboxRepository.NEW_DRAFT) repository.placement(it) else null }
-                else { repository.saveDraft(draft); null }
+            val id = if (commit) repository.commit(draft) else { repository.saveDraft(draft); null }
+            val placement = if (id != null && draft.key == InboxRepository.NEW_DRAFT) repository.placement(id) else null
             savedState.remove<String>("editorKey")
             mutableState.update {
                 it.copy(editor = null, working = false, draftSaved = true, writeFailed = false, savedPlacement = placement)
             }
+            if (id != null) onSaved?.invoke(id)
         }, failed = {
-            retryWrite = { closeEditor(commit) }
+            retryWrite = { closeEditor(commit, onSaved) }
             mutableState.update { it.copy(working = false, writeFailed = true, draftSaved = false) }
         }))
     }

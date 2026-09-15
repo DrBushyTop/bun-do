@@ -8,7 +8,7 @@ import org.json.JSONArray
 import java.util.UUID
 
 data class SharedRequest(val worker: String, val workspace: SharedWorkspace, val envelope: String?)
-data class ChecklistDraft(val taskId: String, val title: String, val text: String)
+data class ChecklistDraft(val taskId: String, val title: String, val text: String, val details: String? = null)
 
 /** No transaction spans a network call. The Room worker token fences every response apply. */
 class SharedRepository(
@@ -32,7 +32,7 @@ class SharedRepository(
 
     /** The displayed snapshot binds confirmation and dependencies to what the user actually saw. */
     suspend fun act(kind: String, displayed: String, confirmedClaimant: String? = null,
-        after: String? = null, before: String? = null, until: String? = null) = lease.access {
+        after: String? = null, before: String? = null, until: String? = null, instructions: String? = null) = lease.access {
         require(kind in SharedTaskActions.kinds && kind !in SharedChecklistActions.splitKinds)
         database.withTransaction {
             val state = current()
@@ -50,6 +50,7 @@ class SharedRepository(
                 SharedChecklistActions.writes(it, task, tasks).isNotEmpty() }
             val payload = JSONObject().put("taskId", id)
             if (kind in SharedTaskActions.cleanupKinds) payload.put("requestId", task.optJSONObject("cleanup")?.opt("id") ?: JSONObject.NULL)
+            if (kind == "RequestSplit") payload.put("instructions", instructions ?: JSONObject.NULL)
             if (kind == "CompleteTask") payload.put("confirmedClaimantId", confirmedClaimant ?: JSONObject.NULL)
             if (kind == "MoveTask") payload.put("expectedParentId", task.opt("parentId") ?: JSONObject.NULL)
                 .put("afterTaskId", after ?: JSONObject.NULL).put("beforeTaskId", before ?: JSONObject.NULL)
@@ -75,7 +76,7 @@ class SharedRepository(
             check(state.blocked == null && dao.recoveryState(scope) == null)
             val key = "checklist:$id"
             val saved = dao.draft(scope, key)
-            if (saved != null) return@withTransaction ChecklistDraft(id, saved.title, saved.description)
+            if (saved != null) return@withTransaction ChecklistDraft(id, saved.title, saved.description, saved.details)
             val tasks = projected(state)
             val task = checkNotNull(tasks[id])
             check(task.isNull("parentId") && task.isNull("deletion"))
@@ -94,7 +95,7 @@ class SharedRepository(
         database.withTransaction {
             check(current().blocked == null)
             val saved = checkNotNull(dao.draft(scope, "checklist:${draft.taskId}"))
-            dao.saveDraft(saved.copy(description = draft.text, savedAt = System.currentTimeMillis()))
+            dao.saveDraft(saved.copy(description = draft.text, details = draft.details, savedAt = System.currentTimeMillis()))
         }
     }
 
@@ -103,11 +104,12 @@ class SharedRepository(
             val state = current()
             check(state.blocked == null && dao.recoveryState(scope) == null)
             val saved = checkNotNull(dao.draft(scope, "checklist:$id"))
-            val items = saved.description.lines().map(String::trim).filter(String::isNotEmpty)
-            require(items.size in 1..SharedChecklistActions.MAX_ITEMS && items.all { InboxLimits.valid(it, "") })
+            val items = SharedSplitPreview.items(ChecklistDraft(id, saved.title, saved.description, saved.details))
+            require(SharedSplitPreview.valid(items))
             val basis = JSONObject(checkNotNull(saved.basis))
             val action = basis.getJSONObject("action")
             action.getJSONObject("payload").put("items", JSONArray(items))
+            saved.details?.let { action.put("preview", JSONObject(it)) }
             val sequence = state.nextSequence.toULong()
             check(sequence < ULong.MAX_VALUE)
             val intent = SharedIntent(scope, sequence.toString(), id, basis.getString("kind"), saved.title,
@@ -118,6 +120,47 @@ class SharedRepository(
             rebuild(next)
             dao.deleteDraft(scope, saved.key)
             lease.check()
+        }
+    }
+
+    suspend fun requestSplit(draft: ChecklistDraft) {
+        saveChecklistDraft(draft)
+        val instructions = draft.details?.let(::JSONObject)?.optString("instructions").orEmpty()
+        require(InboxLimits.length(instructions) <= 2000)
+        val displayed = lease.access { checkNotNull(dao.task(scope, draft.taskId)).snapshot }
+        act("RequestSplit", displayed, instructions = instructions)
+    }
+
+    suspend fun manualChecklist(draft: ChecklistDraft): ChecklistDraft = lease.access {
+        database.withTransaction {
+            val state = current()
+            check(state.blocked == null && dao.recoveryState(scope) == null)
+            val saved = checkNotNull(dao.draft(scope, "checklist:${draft.taskId}"))
+            val tasks = projected(state)
+            val task = checkNotNull(tasks[draft.taskId])
+            check(task.isNull("parentId") && task.isNull("deletion") && task.optString("lifecycle", "OPEN") == "OPEN")
+            val kind = if (task.optBoolean("isChecklist")) "AddChildren" else "SplitTask"
+            val action = SharedTaskActions.capture(kind, task, dao.intents(scope).filter { SharedTaskActions.pending(it, state.revision) },
+                JSONObject().put("taskId", draft.taskId), JSONObject(checkNotNull(state.membership)).getString("me"), tasks, registration)
+            val details = draft.details?.let(::JSONObject) ?: JSONObject()
+            val text = SharedSplitPreview.items(draft).joinToString("\n")
+            details.remove("rows"); details.remove("sourceDescription")
+            val updated = saved.copy(title = task.getString("title"), description = text, details = details.toString(),
+                basis = JSONObject().put("kind", kind).put("action", JSONObject(action)).toString())
+            dao.saveDraft(updated)
+            ChecklistDraft(draft.taskId, updated.title, updated.description, updated.details)
+        }
+    }
+
+    suspend fun adoptSplit(id: String): ChecklistDraft = lease.access {
+        database.withTransaction {
+            val state = current()
+            check(state.blocked == null && dao.recoveryState(scope) == null)
+            val task = JSONObject(checkNotNull(dao.task(scope, id)).snapshot)
+            val saved = checkNotNull(dao.draft(scope, "checklist:$id"))
+            val updated = SharedSplitPreview.adopt(saved, task, JSONObject(checkNotNull(state.membership)).getString("me"), registration)
+            dao.saveDraft(updated)
+            ChecklistDraft(id, updated.title, updated.description, updated.details)
         }
     }
 
@@ -314,6 +357,7 @@ class SharedRepository(
                     continue
                 }
                 dao.saveIntent(intent.copy(receipt = receipt,
+                    taskAction = if (reason == "FORBIDDEN") SharedSplitPreview.forbiddenAction(intent.taskAction) else intent.taskAction,
                     title = if (reason == "FORBIDDEN" && !intent.titleChanged) "" else intent.title,
                     description = if (reason == "FORBIDDEN" && !intent.descriptionChanged && intent.kind !in SharedChecklistActions.splitKinds) null else intent.description,
                     status = if (quarantine) "QUARANTINED" else intent.status,
@@ -326,9 +370,10 @@ class SharedRepository(
                 for (draft in dao.allDrafts().filter { it.scope == scope }) {
                     val checklist = draft.key.startsWith("checklist:")
                     val original = draft.basis?.let(::JSONObject)?.optJSONObject("task")
-                    dao.saveDraft(draft.copy(basis = null, details = SharedTaskDetails.authoredDraft(draft.details, original),
+                    val retained = if (checklist) SharedSplitPreview.forbiddenDraft(draft) else draft
+                    dao.saveDraft(retained.copy(basis = null, details = SharedTaskDetails.authoredDraft(retained.details, original),
                         title = if (checklist || original?.getString("title") == draft.title) "" else draft.title,
-                        description = if (!checklist && original?.nullableString("description").orEmpty() == draft.description) "" else draft.description))
+                        description = if (!checklist && original?.nullableString("description").orEmpty() == draft.description) "" else retained.description))
                 }
             }
             dao.clearProjection(scope)

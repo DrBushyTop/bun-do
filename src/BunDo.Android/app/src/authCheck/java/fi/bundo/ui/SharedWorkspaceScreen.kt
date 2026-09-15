@@ -66,6 +66,7 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
     LaunchedEffect(selected.scope) { while (true) { kotlinx.coroutines.delay(30_000); now = java.time.Instant.now() } }
     var checklistId by rememberSaveable(selected.scope) { mutableStateOf<String?>(null) }
     var checklistDraft by remember { mutableStateOf<ChecklistDraft?>(null) }
+    var dictatingSteps by rememberSaveable { mutableStateOf(false) }
     val snackbar = remember(selected.scope) { SnackbarHostState() }
     val deletedMessage = stringResource(R.string.task_deleted)
     val undoLabel = stringResource(R.string.task_undo)
@@ -113,7 +114,13 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
     }
     LaunchedEffect(selected.scope, current?.nextSequence) { SharedSyncWorker.request(context, data) }
     LaunchedEffect(current?.blocked) {
-        if (current?.blocked == "FORBIDDEN") model.hide()
+        if (current?.blocked == "FORBIDDEN") {
+            model.hide()
+            checklistId = null
+            checklistDraft = null
+            dictatingSteps = false
+            reapply = null
+        }
     }
     DisposableEffect(owner, data.lease.generation, selected.scope) {
         val observer = LifecycleEventObserver { _, event ->
@@ -124,6 +131,9 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
     }
     InboxApp(state, model, appearance, onAppearance, onAccount = onAccount, queueTitle = selected.name,
         canEdit = current?.blocked == null, queueTasks = queueRows,
+        onSplit = if (state.editor?.let { it.key == InboxRepository.NEW_DRAFT || byId[it.key]?.let { task ->
+            task.isNull("parentId") && !task.optBoolean("isChecklist") && task.optString("lifecycle", "OPEN") == "OPEN"
+        } == true } == true) ({ model.closeEditor(true) { checklistId = it } }) else null,
         canEditTask = { id -> byId[id]?.isNull("deletion") == true },
         snackbarHost = { SnackbarHost(snackbar) },
         rowSummary = { id -> byId[id]?.let { SharedTaskSummary(it, membership); ChecklistProgress(it, byId) } },
@@ -175,7 +185,7 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
             if (failed) Text(stringResource(R.string.shared_action_failed), color = MaterialTheme.colorScheme.error)
         }
     })
-    checklistDraft?.let { draft -> ChecklistEditor(draft, busy || current?.blocked != null, failed,
+    checklistDraft?.takeUnless { dictatingSteps || current?.blocked != null }?.let { draft -> ChecklistEditor(draft, busy || current?.blocked != null, failed,
         repository::saveChecklistDraft,
         onSave = { latest -> run {
             repository.saveChecklistDraft(latest)
@@ -183,7 +193,22 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
             checklistId = null; checklistDraft = null
             SharedSyncWorker.request(context, data)
         } },
-        onClose = { latest -> run { repository.saveChecklistDraft(latest); checklistId = null; checklistDraft = null } }) }
+        onClose = { latest -> run { repository.saveChecklistDraft(latest); checklistId = null; checklistDraft = null } },
+        request = byId[draft.taskId]?.optJSONObject("cleanup"),
+        canGenerate = byId[draft.taskId]?.let { !it.optBoolean("isChecklist") && it.isNull("parentId") && it.isNull("deletion") && it.optString("lifecycle", "OPEN") == "OPEN" } == true,
+        onGenerate = { latest -> run { repository.requestSplit(latest); SharedSyncWorker.request(context, data) } },
+        onAdopt = { run { checklistDraft = repository.adoptSplit(draft.taskId) } },
+        onManual = { latest -> run { checklistDraft = repository.manualChecklist(latest) } },
+        onCancel = { latest -> run {
+            repository.saveChecklistDraft(latest)
+            repository.act("CancelCleanup", checkNotNull(byId[draft.taskId]).toString())
+            SharedSyncWorker.request(context, data)
+        } },
+        onDictate = { latest -> run { repository.saveChecklistDraft(latest); dictatingSteps = true } }) }
+    if (dictatingSteps && checklistId != null && current?.blocked == null) VoiceSheet(data.voice,
+        onDismiss = { dictatingSteps = false }, onType = { dictatingSteps = false },
+        onSaved = { run { dictatingSteps = false; checklistDraft = repository.checklistDraft(checkNotNull(checklistId)) } },
+        target = VoiceTarget(selected.scope, checkNotNull(checklistId)))
     imports?.let { texts ->
         AlertDialog(onDismissRequest = { if (!busy) imports = null },
             title = { Text(stringResource(R.string.shared_import)) },

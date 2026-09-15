@@ -1,0 +1,17 @@
+<resources>
+    <string name="split_generate">Suggest steps with AI</string>
+    <string name="split_retry">Try suggesting steps again</string>
+    <string name="split_instructions">How should this task be split?</string>
+    <string name="split_dictate">Dictate instructions</string>
+    <string name="split_pending">Suggestions are being prepared. You can keep writing your own steps.</string>
+    <string name="split_failed">Suggestions could not be prepared. Your task and draft are saved. Try again or write the steps yourself.</string>
+    <string name="split_review">Review suggested steps</string>
+    <string name="split_preview_title">Choose checklist steps</string>
+    <string name="split_review_help">Edit the steps and select the ones to add. Nothing changes until you save.</string>
+    <string name="split_select">Include %1$s</string>
+    <string name="split_step">Step %1$d</string>
+    <string name="split_manual">Write steps myself</string>
+    <string name="split_invalid">Select 1–16 different steps. Each needs a short title.</string>
+    <string name="split_save_first">Save and choose steps</string>
+    <string name="split_cancel">Cancel suggestions</string>
+</resources>

@@ -48,7 +48,9 @@ public static class ChecklistTasks
             if (task.Lifecycle != "OPEN" && !(command is AddChildren && task.EmptyChecklist)) return Fail("TASK_NOT_OPEN");
             if (command is SplitTask && task.IsChecklist || command is AddChildren && !task.IsChecklist)
                 return Fail("HIERARCHY_CONFLICT");
-            if (split.ExpectedTitleHumanVersion != task.TitleVersion.Human ||
+            if (split.ExpectedTitleFieldVersion is { } titleField && titleField != task.TitleVersion.Server ||
+                split.ExpectedDescriptionFieldVersion is { } descriptionField && descriptionField != task.DescriptionVersion.Server ||
+                split.ExpectedTitleHumanVersion != task.TitleVersion.Human ||
                 split.ExpectedDescriptionHumanVersion != task.DescriptionVersion.Human) return Fail("FIELD_CONFLICT");
             if (split.Items.Length == 0 || split.Items.Length + items.Length > MaximumChildren) return Fail("CHECKLIST_LIMIT");
             if (state.TaskCount + split.Items.Length > 1024) return Fail("TASK_LIMIT");
@@ -64,6 +66,7 @@ public static class ChecklistTasks
                     OrderIntentVersion: revision, ParentId: task.Id));
             }
             var root = task with {
+                Cleanup = task.Cleanup?.Mode == "SPLIT" ? task.Cleanup with { Status = "APPLIED", Proposal = null, SplitSource = null, Instructions = null } : task.Cleanup,
                 IsChecklist = true, ChildOrder = (task.ChildOrder ?? []).AddRange(effects.Select(child => child.Id)),
                 HierarchyVersion = revision, SubtreeVersion = revision,
                 ClaimantId = null, ClaimVersion = task.ClaimantId is null ? task.ClaimVersion : revision,

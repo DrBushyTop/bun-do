@@ -44,6 +44,10 @@ internal object SharedChecklistActions {
         if (intent.kind in listOf("ClaimTask", "CompleteTask") && snoozed(task, tasks)) return "TASK_SNOOZED"
         if (task.optBoolean("isChecklist") && intent.kind in listOf("ClaimTask", "UnclaimTask", "CompleteTask")) return "CHECKLIST_ROOT"
         if (intent.kind in splitKinds) {
+            val source = intent.taskAction?.let(::JSONObject)?.optJSONObject("sourceText")
+            if (source != null && (task.getString("title") != source.getString("title") || task.nullableString("description") != source.nullableString("description"))) return "FIELD_CONFLICT"
+            val exact = intent.taskAction?.let(::JSONObject)?.optJSONObject("exactText")
+            if (exact != null && listOf("title", "description").any { task.field(it).toString() != exact.getString(it) }) return "FIELD_CONFLICT"
             if (parent != null) return "CHECKLIST_DEPTH"
             if (task.optString("lifecycle", "OPEN") != "OPEN" && !(intent.kind == "AddChildren" && task.optBoolean("emptyChecklist"))) return "TASK_NOT_OPEN"
             if ((intent.kind == "SplitTask") == task.optBoolean("isChecklist")) return "HIERARCHY_CONFLICT"
@@ -80,6 +84,8 @@ internal object SharedChecklistActions {
                     .put("parentId", task.getString("id"))
                 tasks[ids[index]] = child
             }
+            if (task.optJSONObject("cleanup")?.optString("mode") == "SPLIT") task.getJSONObject("cleanup")
+                .put("status", "APPLIED").put("proposal", JSONObject.NULL).put("splitSource", JSONObject.NULL)
             task.put("isChecklist", true).put("childOrder", JSONArray(childIds(before) + ids)).put("claimantId", JSONObject.NULL)
         }
         if (intent.kind == "SetSnooze" || intent.kind == "ClearSnooze") {

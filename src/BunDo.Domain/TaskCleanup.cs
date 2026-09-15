@@ -2,11 +2,11 @@ using System.Text.Json;
 
 namespace BunDo.Domain;
 
-public sealed record CleanupProposal(string Title, string? Description, string Language, bool NeedsReview, TaskDue? Due = null);
+public sealed record CleanupProposal(string Title, string? Description, string Language, bool NeedsReview, TaskDue? Due = null, string[]? Items = null);
 public sealed record CleanupRequest(string Id, Guid Requester, Guid Epoch, string Status,
     string? InputTitle, string? InputDescription, ulong TitleVersion, ulong DescriptionVersion,
     ulong LifecycleVersion, ulong HierarchyVersion, ulong DeletionVersion,
-    Guid? Lease = null, DateTimeOffset? LeaseUntil = null, CleanupProposal? Proposal = null, string? Error = null, ulong? ExpectedDueVersion = null);
+    Guid? Lease = null, DateTimeOffset? LeaseUntil = null, CleanupProposal? Proposal = null, string? Error = null, ulong? ExpectedDueVersion = null, string Mode = "CLEANUP", string? Instructions = null, SplitSource? SplitSource = null);
 
 public static class TaskCleanup
 {
@@ -20,15 +20,18 @@ public static class TaskCleanup
         if (task.Cleanup?.Id != command.RequestId) return ("CLEANUP_CONFLICT", null);
         if (command is CancelCleanup)
             return ("ACCEPTED", task with { Cleanup = task.Cleanup is { } old
-                ? old with { Status = "SUPERSEDED", Lease = null, LeaseUntil = null, InputTitle = null, InputDescription = null } : null });
+                ? old with { Status = "SUPERSEDED", Lease = null, LeaseUntil = null, InputTitle = null, InputDescription = null, Instructions = null } : null });
         if (task.TitleVersion.Server != command.TitleVersion || task.DescriptionVersion.Server != command.DescriptionVersion ||
             command.ExpectedDueVersion is { } expectedDue && (task.DueVersion?.Server ?? 0) != expectedDue)
             return ("FIELD_CONFLICT", null);
         if (task.LifecycleVersion != command.LifecycleVersion || task.HierarchyVersion != command.HierarchyVersion ||
             task.DeletionVersion != command.DeletionVersion) return ("LIFECYCLE_CONFLICT", null);
         if (task.Lifecycle != "OPEN") return ("TASK_NOT_OPEN", null);
+        if (command is RequestSplit split && (task.ParentId is not null || task.IsChecklist ||
+            split.Instructions?.EnumerateRunes().Count() > 2000)) return ("SPLIT_UNAVAILABLE", null);
         if (command is ApplyCleanup)
         {
+            if (task.Cleanup?.Mode == "SPLIT") return ("CLEANUP_UNAVAILABLE", null);
             if (task.Cleanup is not { Status: "READY", Proposal: { } proposal } || !Valid(proposal) ||
                 WorkspaceServer.ValidateText(Patch(task, proposal, revision, human: true)) != "ACCEPTED" ||
                 proposal.Due is not null && command.ExpectedDueVersion is null)
@@ -39,7 +42,9 @@ public static class TaskCleanup
         }
         return ("ACCEPTED", task with { Cleanup = new(id, member, state.StateEpoch, "PENDING", task.Title,
             task.Description, task.TitleVersion.Server, task.DescriptionVersion.Server, task.LifecycleVersion,
-            task.HierarchyVersion, task.DeletionVersion, ExpectedDueVersion: command.ExpectedDueVersion) });
+            task.HierarchyVersion, task.DeletionVersion, ExpectedDueVersion: command.ExpectedDueVersion,
+            Mode: command is RequestSplit ? "SPLIT" : "CLEANUP", Instructions: (command as RequestSplit)?.Instructions,
+            SplitSource: command is RequestSplit ? new(ChecklistTasks.Versions(task), task.TitleVersion, task.DescriptionVersion, task.Title, task.Description) : null) });
     }
 
     public static bool Current(WorkspaceState state, TaskSnapshot task, CleanupRequest request) =>
@@ -55,20 +60,20 @@ public static class TaskCleanup
             return task;
         if (state.StateEpoch != request.Epoch || !state.Membership.CanRead(request.Requester) || task.Deletion is not null) return task;
         var permitted = Current(state, task, request);
-        if (proposal is not null && (!Valid(proposal) ||
-            WorkspaceServer.ValidateText(Patch(task, proposal, revision, human: false)) != "ACCEPTED"))
+        if (proposal is not null && (request.Mode == "SPLIT" ? !TaskSplit.Valid(proposal) :
+            !Valid(proposal) || WorkspaceServer.ValidateText(Patch(task, proposal, revision, human: false)) != "ACCEPTED"))
         { proposal = null; error = "INVALID_OUTPUT"; }
         if (proposal?.Due is not null && task.Capture?.Context.ValueKind != JsonValueKind.Object)
             proposal = proposal with { NeedsReview = true };
         if (proposal?.Due is { } due && TaskDates.TryNormalize(due, out var normalized)) proposal = proposal with { Due = normalized };
-        var automatic = permitted && proposal is { NeedsReview: false } &&
+        var automatic = request.Mode == "CLEANUP" && permitted && proposal is { NeedsReview: false } &&
             (proposal.Due is null || request.ExpectedDueVersion is { } expectedDue && (task.DueVersion?.Server ?? 0) == expectedDue) &&
             task.TitleVersion.Server == request.TitleVersion && task.DescriptionVersion.Server == request.DescriptionVersion;
         var result = automatic ? Patch(task, proposal!, revision, human: false) : task;
         if (result != task) result = result with { LastChange = new(null, now, "AI") };
         return result with { Cleanup = request with {
             Status = automatic ? "APPLIED" : proposal is not null ? "READY" : "FAILED",
-            InputTitle = null, InputDescription = null, Lease = null, LeaseUntil = null,
+            InputTitle = null, InputDescription = null, Instructions = null, Lease = null, LeaseUntil = null,
             Proposal = automatic ? null : proposal, Error = error,
         } };
     }

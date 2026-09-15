@@ -10,6 +10,8 @@ namespace BunDo.Functions.AI;
 public interface ICleanupProvider
 {
     Task<CleanupProposal> GenerateAsync(string title, string? description, CancellationToken ct, JsonElement? captureContext = null);
+    Task<CleanupProposal> GenerateSplitAsync(string title, string? description, string? instructions, CancellationToken ct) =>
+        throw new CleanupProviderException("PROVIDER_UNAVAILABLE");
 }
 
 /// <summary>Foreground and periodic sync resume durable intent, one inference per sync.
@@ -43,22 +45,25 @@ public sealed class CleanupWorker(IHouseholdDocuments documents, ICleanupProvide
             if (task.Cleanup is not { } request || request.Requester != member) return task;
             if (request.Status == "RUNNING" && request.LeaseUntil <= clock.GetUtcNow())
                 return task with { Cleanup = request with { Status = "FAILED", Error = "INTERRUPTED",
-                    InputTitle = null, InputDescription = null, Lease = null, LeaseUntil = null } };
+                    InputTitle = null, InputDescription = null, Instructions = null, Lease = null, LeaseUntil = null } };
             if (request.Status != "PENDING") return task;
             if (!TaskCleanup.Current(state, task, request)) return task with { Cleanup = request with {
-                Status = "SUPERSEDED", InputTitle = null, InputDescription = null } };
+                Status = "SUPERSEDED", InputTitle = null, InputDescription = null, Instructions = null } };
             return task with { Cleanup = request with { Status = "RUNNING", Lease = lease,
                 LeaseUntil = clock.GetUtcNow().AddMinutes(2) } };
         }, ct);
         if (claimed?.Cleanup is not { Status: "RUNNING" } owned || owned.Lease != lease) return;
         CleanupProposal? proposal = null;
         string? error = null;
-        try { proposal = await provider.GenerateAsync(owned.InputTitle!, owned.InputDescription, ct, claimed.Capture?.Context); }
+        try { proposal = owned.Mode == "SPLIT"
+            ? await provider.GenerateSplitAsync(owned.InputTitle!, owned.InputDescription, owned.Instructions, ct)
+            : await provider.GenerateAsync(owned.InputTitle!, owned.InputDescription, ct, claimed.Capture?.Context); }
         catch (CleanupProviderException failure) { error = failure.Code; }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested) { error = "PROVIDER_TIMEOUT"; }
         catch (HttpRequestException) { error = "PROVIDER_UNAVAILABLE"; }
         // Cancellation leaves the persisted lease for the next authenticated sync to expose Retry.
         ct.ThrowIfCancellationRequested();
+        Activity.Current?.SetTag("ai.mode", owned.Mode);
         Activity.Current?.SetTag("ai.result", error ?? "VALID_OUTPUT");
         await Change(member, workspace, epoch, taskId, (state, task, revision) =>
             TaskCleanup.Finish(state, task, lease, proposal, error, revision, clock.GetUtcNow()), ct);

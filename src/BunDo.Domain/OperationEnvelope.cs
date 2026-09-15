@@ -63,10 +63,11 @@ public static class OperationEnvelope
                         groups.Contains("due") ? new(Due(payload.GetProperty("due")), Version(observed, "due")) : null,
                         groups.Contains("urgent") ? new(payload.GetProperty("urgent").GetBoolean(), ExactVersion(observed, "urgent")) : null);
                     break;
+                case "RequestSplit":
                 case "RequestCleanup":
                 case "CancelCleanup":
                 case "ApplyCleanup":
-                    Fields(payload, ["taskId", "requestId"]);
+                    Fields(payload, ["taskId", "requestId"], root.GetProperty("command").GetString() == "RequestSplit" ? ["instructions"] : []);
                     Fields(observed, ["title", "description", "lifecycle", "hierarchy", "deletion"], ["due"]);
                     var cleanupId = Uuid(payload.GetProperty("taskId")).ToString("D");
                     var requestId = NullableText(payload.GetProperty("requestId"));
@@ -76,6 +77,8 @@ public static class OperationEnvelope
                     var del = ExactVersion(observed, "deletion");
                     command = root.GetProperty("command").GetString() switch {
                         "RequestCleanup" => new RequestCleanup(cleanupId, tv, dv, lv, hv, del, requestId),
+                        "RequestSplit" => new RequestSplit(cleanupId, tv, dv, lv, hv, del, requestId,
+                            payload.TryGetProperty("instructions", out var instructions) ? NullableText(instructions) : null),
                         "CancelCleanup" => new CancelCleanup(cleanupId, tv, dv, lv, hv, del, requestId),
                         _ => new ApplyCleanup(cleanupId, tv, dv, lv, hv, del, requestId),
                     };
@@ -139,6 +142,11 @@ public static class OperationEnvelope
                     break;
                 default: throw new EnvelopeException("UNSUPPORTED_COMMAND");
             }
+            if (command is ChecklistCommand listCommand)
+            {
+                ulong? Field(string group) => observed.GetProperty(group).TryGetProperty("fieldVersion", out var field) ? Decimal(field) : null;
+                command = listCommand with { ExpectedTitleFieldVersion = Field("title"), ExpectedDescriptionFieldVersion = Field("description") };
+            }
             return new(workspace, epoch, device, sequence, command, 1, 1, bytes.ToArray(), dependencies)
                 { CaptureContext = root.GetProperty("occurredAtContext").Clone() };
         }
@@ -178,7 +186,7 @@ public static class OperationEnvelope
     private static ulong Version(JsonElement observed, string group)
     {
         var value = observed.GetProperty(group);
-        Fields(value, ["humanVersion"]);
+        Fields(value, ["humanVersion"], ["fieldVersion"]);
         return Decimal(value.GetProperty("humanVersion"));
     }
 

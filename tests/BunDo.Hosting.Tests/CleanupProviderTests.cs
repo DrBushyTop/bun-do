@@ -35,6 +35,21 @@ public sealed class CleanupProviderTests
         Assert.Equal(time, result.Due.LocalTime);
     }
 
+    [Theory]
+    [InlineData("Pese astiat", "fi")][InlineData("Wash dishes", "en")][InlineData("Pese dinner dishes", "mixed")]
+    public void Split_output_is_a_validated_list_not_a_task_mutation(string title, string language)
+    {
+        var proposal = FoundryCleanupProvider.ParseSplitResponse(Response(new { type = "output_text",
+            text = JsonSerializer.Serialize(new { items = new[] { title }, language }) }));
+        Assert.Equal(new[] { title }, proposal.Items); Assert.True(proposal.NeedsReview);
+    }
+    [Theory]
+    [InlineData("[]")][InlineData("[\"Wash\",\"wash\"]")][InlineData("[\" padded \"]")]
+    [InlineData("[null]")][InlineData("[\"line\\nbreak\"]")]
+    public void Invalid_split_lists_are_rejected(string items) =>
+        Assert.Equal("INVALID_OUTPUT", Assert.Throws<CleanupProviderException>(() => FoundryCleanupProvider.ParseSplitResponse(
+            Response(new { type = "output_text", text = "{\"items\":" + items + ",\"language\":\"en\"}" }))).Code);
+
     [Fact]
     public void Refusal_and_incomplete_responses_do_not_become_task_text()
     {

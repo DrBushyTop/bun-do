@@ -39,6 +39,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -94,6 +95,7 @@ fun InboxApp(
     taskControls: (@Composable (String, (String) -> Unit) -> Unit)? = null,
     canEditTask: (String) -> Boolean = { true },
     snackbarHost: @Composable () -> Unit = {},
+    onSplit: (() -> Unit)? = null,
 ) {
     var settings by rememberSaveable { mutableStateOf(false) }
     var showVoice by rememberSaveable { mutableStateOf(false) }
@@ -161,7 +163,7 @@ fun InboxApp(
         ) { insets ->
             Box(Modifier.fillMaxSize().padding(insets).imePadding()) {
                 when {
-                    editor != null -> Editor(state, model, Modifier.align(Alignment.TopCenter).widthIn(max = 640.dp).fillMaxWidth())
+                    editor != null -> Editor(state, model, onSplit, Modifier.align(Alignment.TopCenter).widthIn(max = 640.dp).fillMaxWidth())
                     settings -> Settings(appearance, onAppearance, Modifier.align(Alignment.TopCenter).widthIn(max = 640.dp).fillMaxWidth(), queueTitle == null)
                     selected != null && !wide -> TaskDetail(
                         selected, { model.openEditor(selected.id) }, state, model::retry, Modifier.fillMaxSize(), queueTitle == null,
@@ -326,7 +328,7 @@ private fun Queue(
 }
 
 @Composable
-private fun Editor(state: InboxUiState, model: InboxViewModel, modifier: Modifier) {
+private fun Editor(state: InboxUiState, model: InboxViewModel, onSplit: (() -> Unit)?, modifier: Modifier) {
     val draft = state.editor ?: return
     val focus = remember { FocusRequester() }
     LaunchedEffect(draft.key) { focus.requestFocus() }
@@ -357,6 +359,8 @@ private fun Editor(state: InboxUiState, model: InboxViewModel, modifier: Modifie
         )
         draft.details?.let { TaskDateFields(it, draft.key == fi.bundo.data.InboxRepository.NEW_DRAFT, !state.working, model::changeDetails) }
         if (draft.title.isBlank()) Text(stringResource(R.string.title_required), style = MaterialTheme.typography.bodyMedium)
+        if (onSplit != null) OutlinedButton(onClick = onSplit, enabled = !state.working && InboxLimits.valid(draft.title, draft.description),
+            modifier = Modifier.testTag("editor-split")) { Text(stringResource(R.string.split_save_first)) }
         Text(
             stringResource(if (state.draftSaved) R.string.draft_saved else R.string.saving),
             style = MaterialTheme.typography.bodyMedium,

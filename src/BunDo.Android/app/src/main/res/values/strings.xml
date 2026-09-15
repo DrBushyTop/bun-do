@@ -98,7 +98,6 @@
     <string name="checklist_derived">Tehtävä valmistuu, kun sen vaiheet ovat valmiina.</string>
     <string name="checklist_parent">Avaa vaiheiden tehtävä</string>
     <string name="checklist_editor_help">Kirjoita yksi vaihe riville. Enimmäismäärä: %1$d. Muokkaa tai poista rivejä ennen tallennusta.</string>
-    <string name="checklist_invalid">Vaiheiden määrä: 1–%1$d. Kuhunkin vaiheeseen mahtuu 160 merkkiä.</string>
     <string name="checklist_save_failed">Vaiheita ei voitu tallentaa. Tekstisi on yhä tässä. Yritä uudelleen.</string>
     <string name="checklist_toggle">Muuta valmistumista: %1$s</string>
     <string name="task_snooze">Lykkää</string>

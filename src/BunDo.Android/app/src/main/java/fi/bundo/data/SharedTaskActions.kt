@@ -6,19 +6,19 @@ import org.json.JSONObject
 /** Durable action observations and local projection. No command is rebased on a remote conflict. */
 internal object SharedTaskActions {
     const val ORDER_ID = "root-order"
-    val cleanupKinds = setOf("RequestCleanup", "CancelCleanup", "ApplyCleanup")
+    val cleanupKinds = setOf("RequestCleanup", "RequestSplit", "CancelCleanup", "ApplyCleanup")
     val kinds = cleanupKinds + setOf("ClaimTask", "UnclaimTask", "CompleteTask", "ReopenTask", "CancelTask", "MoveTask", "DeleteTask", "RestoreTask",
         "SplitTask", "AddChildren", "SetSnooze", "ClearSnooze")
     val groups = listOf("lifecycle", "claim", "hierarchy", "deletion", "orderIntent", "subtree", "snooze", "urgent")
     fun version(task: JSONObject, group: String): String =
         if (group == "urgent") task.optString("urgencyVersion", "0") else if (task.has("${group}Version")) task.decimal("${group}Version").toString() else "0"
-    fun observedGroups(kind: String) = if (kind in cleanupKinds) listOf("title", "description", "due", "lifecycle", "hierarchy", "deletion")
+    fun observedGroups(kind: String) = if (kind in cleanupKinds) listOf("title", "description", "lifecycle", "hierarchy", "deletion") + if (kind == "RequestSplit") emptyList() else listOf("due")
         else if (kind == "MoveTask") listOf("orderIntent", "deletion")
         else listOf("lifecycle", "claim", "hierarchy", "deletion", "subtree", "snooze") +
             if (kind in SharedChecklistActions.splitKinds) listOf("title", "description") else emptyList()
     fun writes(kind: String) = when (kind) {
         "CreateTask" -> groups + listOf("title", "description", "due")
-        "RequestCleanup", "CancelCleanup" -> listOf("cleanup")
+        "RequestCleanup", "RequestSplit", "CancelCleanup" -> listOf("cleanup")
         "ApplyCleanup" -> listOf("cleanup", "title", "description", "due")
         "ClaimTask", "UnclaimTask" -> listOf("claim")
         "CompleteTask", "ReopenTask", "CancelTask" -> listOf("lifecycle", "claim", "subtree", "snooze")
@@ -67,6 +67,7 @@ internal object SharedTaskActions {
                 checkNotNull(receipts[after.getString(group)]), intent.taskId)), group, intent.kind)
                 else action.getJSONObject("versions").optString(group, "0")
             observed.put(group, JSONObject().put(if (group in listOf("title", "description", "due") && intent.kind !in cleanupKinds) "humanVersion" else "fieldVersion", value))
+            action.optJSONObject("exactText")?.nullableString(group)?.let { observed.getJSONObject(group).put("fieldVersion", it) }
         }
     }
 
@@ -114,8 +115,8 @@ internal object SharedTaskActions {
             for (key in listOf("lifecycle", "claimantId", "lifecycleActorId", "lifecycleAt", "firstCompletion", "deletion", "snoozedUntil"))
                 if (receipt.has(key)) task.put(key, receipt.get(key))
         } else when (intent.kind) {
-            "RequestCleanup" -> task.put("cleanup", JSONObject().put("status", "PENDING")
-                .put("id", "pending:${intent.sequence}"))
+            "RequestCleanup", "RequestSplit" -> task.put("cleanup", JSONObject().put("status", "PENDING")
+                .put("id", "pending:${intent.sequence}").put("mode", if (intent.kind == "RequestSplit") "SPLIT" else "CLEANUP"))
             "CancelCleanup" -> task.optJSONObject("cleanup")?.put("status", "SUPERSEDED")
             "ApplyCleanup" -> task.optJSONObject("cleanup")?.optJSONObject("proposal")?.let {
                 task.put("title", it.getString("title")).put("description", it.opt("description") ?: JSONObject.NULL)
@@ -134,7 +135,7 @@ internal object SharedTaskActions {
                 .put("lifecycleAt", JSONObject.NULL) // Completion credit and acceptance time belong to the server.
         }
         SharedChecklistActions.apply(before, task, intent, tasks)
-        if (intent.receipt == null && intent.kind !in listOf("RequestCleanup", "CancelCleanup"))
+        if (intent.receipt == null && intent.kind !in listOf("RequestCleanup", "RequestSplit", "CancelCleanup"))
             SharedTaskDetails.markPending(task, intent)
         return null
     }

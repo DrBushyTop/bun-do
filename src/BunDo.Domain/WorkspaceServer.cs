@@ -195,7 +195,7 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
                         DueVersion = new(revision, revision), UrgencyVersion = revision,
                     });
                 }
-                else if (operation.Command is not (RequestCleanup or CancelCleanup) && effect with { Cleanup = before.Cleanup } != before)
+                else if (operation.Command is not (RequestCleanup or RequestSplit or CancelCleanup) && effect with { Cleanup = before.Cleanup } != before)
                     effects = effects.SetItem(effect.Id, effect with { LastChange = new(authenticatedMemberId, acceptedAt, "HUMAN") });
             }
             if (task is not null && effects.TryGetValue(task.Id, out var finalTask)) task = finalTask;

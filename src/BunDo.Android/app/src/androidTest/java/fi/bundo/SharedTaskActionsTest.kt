@@ -170,6 +170,102 @@ class SharedTaskActionsTest {
         } finally { context.deleteDatabase(name) }
     }
 
+    private fun splitReady(task: JSONObject) = JSONObject(task.toString()).put("cleanup", JSONObject()
+        .put("id", "split-request").put("mode", "SPLIT").put("status", "READY")
+        .put("splitSource", JSONObject().put("state", JSONObject().put("lifecycle", "1").put("claim", "1")
+            .put("hierarchy", "1").put("deletion", "1").put("subtree", "0").put("snooze", "0"))
+            .put("title", task.getJSONObject("titleVersion")).put("description", task.getJSONObject("descriptionVersion"))
+            .put("sourceTitle", task.getString("title")).put("sourceDescription", task.opt("description") ?: JSONObject.NULL))
+        .put("proposal", JSONObject().put("items", JSONArray().put("Wash dishes").put("Wipe counter")).put("language", "en")))
+
+    @Test fun aiSplitPreviewIsEditableSelectableAndDurableBeforeAnyChildExists() = runBlocking {
+        fixture { db, state, repository ->
+            val task = task("Kitchen"); val id = task.getString("id")
+            val poll = repository.prepare(1000, 1)!!
+            repository.apply(poll, reply(poll, listOf(task, order(id))))
+            val draft = repository.checklistDraft(id).copy(details = JSONObject().put("instructions", "Start with dishes").toString())
+            repository.requestSplit(draft)
+            assertEquals(1, repository.taskStates.first().size)
+            assertEquals("SPLIT", repository.taskStates.first().single().getJSONObject("cleanup").getString("mode"))
+            val request = repository.prepare(1001, 1)!!
+            val wire = JSONObject(request.envelope!!)
+            assertEquals("RequestSplit", wire.getString("command"))
+            assertEquals("Start with dishes", wire.getJSONObject("payload").getString("instructions"))
+            val ready = splitReady(task)
+            repository.apply(request, reply(request, listOf(ready), receipt(request, ready)))
+            val preview = repository.adoptSplit(id)
+            val rows = JSONObject(preview.details!!).getJSONArray("rows")
+            rows.getJSONObject(0).put("text", "Wash gently")
+            rows.getJSONObject(1).put("selected", false)
+            repository.saveChecklistDraft(preview.copy(details = JSONObject(preview.details).put("rows", rows).toString()))
+            val restart = SharedRepository(db, DataLease(), state.scope, state.registration)
+            assertEquals(listOf("Wash gently"), SharedSplitPreview.items(restart.checklistDraft(id)))
+            assertEquals(1, restart.taskStates.first().size)
+            restart.commitChecklist(id)
+            val split = JSONObject(restart.prepare(1002, 1)!!.envelope!!)
+            assertEquals("SplitTask", split.getString("command"))
+            assertEquals("1", split.getJSONObject("observedVersions").getJSONObject("title").getString("fieldVersion"))
+            assertEquals(listOf("Wash gently"), restart.taskStates.first().filter { it.nullableString("parentId") == id }.map { it.getString("title") })
+        }
+    }
+
+    @Test fun staleAiPreviewRetainsEditedItemsWithoutPartialLocalChildren() = runBlocking {
+        fixture { _, _, repository ->
+            val original = task("Kitchen"); val id = original.getString("id")
+            val changed = splitReady(original).put("title", "Only the sink")
+                .put("titleVersion", JSONObject().put("fieldVersion", "2").put("humanVersion", "1"))
+            val poll = repository.prepare(1000, 1)!!
+            repository.apply(poll, reply(poll, listOf(original, order(id))))
+            repository.checklistDraft(id)
+            val update = repository.prepare(1001, 1)!!
+            repository.apply(update, reply(update, listOf(changed)))
+            val preview = repository.adoptSplit(id)
+            repository.commitChecklist(id)
+            assertEquals(1, repository.taskStates.first().size)
+            assertEquals("FIELD_CONFLICT", repository.problems.first().single().problem)
+            assertEquals("Wash dishes\nWipe counter", repository.problems.first().single().description)
+            assertEquals("Kitchen", preview.title)
+        }
+    }
+
+    @Test fun migrationKeepsRecoverableAudioAndDoesNotInventASplitDestination() {
+        val name = "split-migration-${UUID.randomUUID()}.db"
+        try {
+            migrations.createDatabase(name, 8).use { db ->
+                db.execSQL("INSERT INTO voice_recordings (id,createdAt,expiresAt,state,reason) VALUES ('audio',1,2,'FAILED','INTERRUPTED')")
+            }
+            migrations.runMigrationsAndValidate(name, 9, true, InboxDatabase.MIGRATION_8_9).use { db ->
+                db.query("SELECT state,reason,checklistScope,checklistTaskId FROM voice_recordings").use {
+                    assertTrue(it.moveToFirst()); assertEquals("FAILED", it.getString(0)); assertEquals("INTERRUPTED", it.getString(1))
+                    assertTrue(it.isNull(2)); assertTrue(it.isNull(3))
+                }
+            }
+        } finally { context.deleteDatabase(name) }
+    }
+
+    @Test fun dictatedSplitInstructionsSurviveRecordingRestartWithoutCreatingInboxTask() = runBlocking {
+        fixture { db, state, repository ->
+            val task = task("Kitchen"); val id = task.getString("id")
+            val poll = repository.prepare(1000, 1)!!
+            repository.apply(poll, reply(poll, listOf(task, order(id))))
+            repository.checklistDraft(id)
+            val directory = java.io.File(context.cacheDir, "split-audio-${UUID.randomUUID()}")
+            try {
+                val store = RecordingStore(db, directory)
+                val recording = store.begin(target = VoiceTarget(state.scope, id))
+                store.output(recording.id).use { it.write(byteArrayOf(1, 2)) }
+                val restart = RecordingStore(db, directory)
+                restart.recover()
+                assertEquals(id, db.recordings().get(recording.id)!!.checklistTaskId)
+                restart.commit(recording.id, "Start with dishes")
+                assertEquals("Start with dishes", JSONObject(repository.checklistDraft(id).details!!).getString("instructions"))
+                assertTrue(db.inbox().allTasks().isEmpty())
+                assertTrue(db.recordings().all().isEmpty())
+                assertEquals(1, repository.taskStates.first().size)
+            } finally { directory.deleteRecursively() }
+        }
+    }
+
     @Test fun cleanupIntentSurvivesRestartAndHumanEditWinsOverAutomaticText() = runBlocking {
         fixture { db, state, repository ->
             val task = task("osta maitoa")
@@ -605,6 +701,31 @@ class SharedTaskActionsTest {
             val wire = JSONObject(deletion.envelope!!)
             assertEquals("DeleteTask", wire.getString("command"))
             assertEquals("2", wire.getJSONObject("observedVersions").getJSONObject("subtree").getString("fieldVersion"))
+        }
+    }
+
+    @Test fun removalDropsGeneratedPreviewButRetainsEditedStepsAndInstructions() = runBlocking {
+        fixture { db, state, repository ->
+            val root = task("Private parent")
+            val id = root.getString("id")
+            val poll = repository.prepare(1000, 1)!!
+            repository.apply(poll, reply(poll, listOf(splitReady(root), order(id))))
+            repository.checklistDraft(id)
+            repository.adoptSplit(id)
+            val draft = repository.checklistDraft(id)
+            val details = JSONObject(draft.details!!)
+            details.put("instructions", "My instructions")
+            details.getJSONArray("rows").getJSONObject(0).put("text", "My edited step")
+            repository.saveChecklistDraft(draft.copy(details = details.toString()))
+            val request = repository.prepare(1001, 1)!!
+            repository.block(request, "FORBIDDEN")
+            val retained = db.shared().draft(state.scope, "checklist:$id")!!
+            assertEquals("", retained.title)
+            assertNull(retained.basis)
+            assertEquals("My edited step", retained.description)
+            assertEquals(setOf("instructions"), JSONObject(retained.details!!).keys().asSequence().toSet())
+            assertEquals("My instructions", JSONObject(retained.details).getString("instructions"))
+            assertTrue(db.shared().base(state.scope).isEmpty())
         }
     }
 

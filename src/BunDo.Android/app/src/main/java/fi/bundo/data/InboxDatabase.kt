@@ -89,7 +89,7 @@ interface InboxDao {
     entities = [InboxTask::class, InboxIntent::class, EditorDraft::class, VoiceRecording::class,
         SharedWorkspace::class, SharedBase::class, SharedProjection::class, SharedIntent::class, SharedDraft::class,
         SharedRecovery::class],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 abstract class InboxDatabase : RoomDatabase() {
@@ -162,9 +162,16 @@ abstract class InboxDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE voice_recordings ADD COLUMN checklistScope TEXT")
+                db.execSQL("ALTER TABLE voice_recordings ADD COLUMN checklistTaskId TEXT")
+            }
+        }
+
         fun open(context: Context, name: String = FILE_NAME, passphrase: ByteArray? = null): InboxDatabase {
             val builder = Room.databaseBuilder(context, InboxDatabase::class.java, name)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                 // AccountStore owns the connection used by both UI and workers.
                 // Workers cannot independently open a signed-out account.
             if (passphrase != null) {

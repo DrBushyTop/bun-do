@@ -20,6 +20,7 @@ internal data class SharedTaskAction(val kind: String, val displayed: String,
 
 internal fun taskActionLabel(kind: String) = when (kind) {
     "RequestCleanup" -> R.string.cleanup_request
+    "RequestSplit" -> R.string.split_generate
     "CancelCleanup" -> R.string.cleanup_cancel
     "ApplyCleanup" -> R.string.cleanup_apply
     "ClaimTask" -> R.string.task_claim

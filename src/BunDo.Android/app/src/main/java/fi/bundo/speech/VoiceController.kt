@@ -111,12 +111,12 @@ class VoiceController(
         mutable.update { it.copy(modelReady = true, message = "INSTALLED") }
     }
 
-    fun record() {
+    fun record(target: fi.bundo.data.VoiceTarget? = null) {
         if (!state.value.modelReady || state.value.busy) return
         stopReason = ""
         stopRequested = false
         start("RECORDING") {
-            val row = withContext(Dispatchers.IO) { store.begin() }
+            val row = withContext(Dispatchers.IO) { store.begin(target = target) }
             val input = LocalRecorder()
             recorder = input
             if (stopRequested) input.stop()
@@ -197,7 +197,7 @@ class VoiceController(
         } catch (error: Throwable) {
             // JNI decode cannot be interrupted. Only its result is canceled; retain audio.
             withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
-                try { store.failed(id, if (error is CancellationException) "CANCELED" else "TRANSCRIPTION_FAILED") }
+                try { store.failed(id, if (error is CancellationException) "CANCELED" else if (error is fi.bundo.data.TranscriptTooLong) "TOO_LONG" else "TRANSCRIPTION_FAILED") }
                 catch (_: CancellationException) { /* Revoked accounts retain interrupted audio for recovery. */ }
             }
             throw error
@@ -211,6 +211,7 @@ class VoiceController(
             try { operation() }
             catch (_: CancellationException) { mutable.update { it.copy(message = "CANCELED") } }
             catch (_: SpeechStorageFull) { mutable.update { it.copy(message = "MODEL_SPACE") } }
+            catch (_: fi.bundo.data.TranscriptTooLong) { mutable.update { it.copy(message = "TOO_LONG") } }
             catch (_: RecordingStorageFull) { mutable.update { it.copy(message = "AUDIO_SPACE") } }
             catch (_: Exception) { mutable.update { it.copy(message = "FAILED") } }
             catch (_: LinkageError) { mutable.update { it.copy(message = "FAILED") } }

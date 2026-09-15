@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="../../contracts/ai/extraction.schema.json" LogicalName="BunDo.CleanupSchema" />
+    <EmbeddedResource Include="../../contracts/ai/split.schema.json" LogicalName="BunDo.SplitSchema" />
     <ProjectReference Include="../BunDo.Domain/BunDo.Domain.csproj" />
     <PackageReference Include="Microsoft.Azure.Cosmos" Version="3.63.0" />
     <!-- Cosmos system documents still require this even with our System.Text.Json serializer. -->

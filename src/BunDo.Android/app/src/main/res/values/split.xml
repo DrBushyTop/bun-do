@@ -1,0 +1,17 @@
+<resources>
+    <string name="split_generate">Ehdota vaiheita tekoälyllä</string>
+    <string name="split_retry">Yritä vaiheiden ehdottamista uudelleen</string>
+    <string name="split_instructions">Miten tehtävä jaetaan vaiheisiin?</string>
+    <string name="split_dictate">Sanele ohjeet</string>
+    <string name="split_pending">Vaiheita valmistellaan. Voit jatkaa omien vaiheiden kirjoittamista.</string>
+    <string name="split_failed">Vaiheita ei voitu ehdottaa. Tehtävä ja luonnos on tallennettu. Yritä uudelleen tai kirjoita vaiheet itse.</string>
+    <string name="split_review">Tarkista ehdotetut vaiheet</string>
+    <string name="split_preview_title">Valitse tehtävän vaiheet</string>
+    <string name="split_review_help">Muokkaa vaiheita ja valitse lisättävät. Mikään ei muutu ennen tallennusta.</string>
+    <string name="split_select">Lisää %1$s</string>
+    <string name="split_step">Vaihe %1$d</string>
+    <string name="split_manual">Kirjoitan vaiheet itse</string>
+    <string name="split_invalid">Valitse 1–16 erilaista vaihetta. Jokainen tarvitsee lyhyen otsikon.</string>
+    <string name="split_save_first">Tallenna ja valitse vaiheet</string>
+    <string name="split_cancel">Peru ehdotukset</string>
+</resources>

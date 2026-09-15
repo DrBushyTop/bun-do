@@ -125,6 +125,85 @@ class SharedTaskUiTest {
         screenshot("details-fi-snoozed")
     }
 
+    @Test fun englishSplitInstructionsCanBeQueuedAndCancelledWithoutChangingParent() {
+        val (data, state) = fixture("en", "light")
+        compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
+        compose.onNodeWithTag("checklist-add").performScrollTo().performClick()
+        compose.onNodeWithTag("split-instructions").performScrollTo().performTextInput("Separate paper and cardboard")
+        compose.onNodeWithTag("split-generate").performScrollTo().performClick()
+        compose.onNodeWithTag("split-cancel").performScrollTo().assertIsEnabled()
+        screenshot("split-en-pending")
+        compose.onNodeWithTag("split-cancel").performClick()
+        compose.waitUntil(5_000) { runBlocking { data.database.shared().intents(state.scope).any { it.kind == "CancelCleanup" } } }
+        assertEquals(2, runBlocking { data.database.shared().projectionRows(state.scope, state.projectionGeneration).count { it.id != "root-order" } })
+    }
+
+    @Test fun finnishLargeSplitPreviewCanBeEditedAndSelectedBeforeAcceptance() {
+        val (data, state) = fixture("fi", "light", fontScale = 2f)
+        runBlocking {
+            val dao = data.database.shared()
+            val base = dao.base(state.scope).first { JSONObject(it.snapshot).optString("title") == "Vie paperit kierrätykseen" }
+            val task = JSONObject(base.snapshot)
+            val source = JSONObject().put("sourceTitle", task.getString("title")).put("sourceDescription", JSONObject.NULL)
+                .put("title", task.getJSONObject("titleVersion")).put("description", task.getJSONObject("descriptionVersion"))
+                .put("state", JSONObject().put("lifecycle", "1").put("claim", "1").put("hierarchy", "1").put("deletion", "1").put("subtree", "0").put("snooze", "0"))
+            task.put("cleanup", JSONObject().put("id", "split-fi").put("mode", "SPLIT").put("status", "READY")
+                .put("splitSource", source).put("proposal", JSONObject().put("items", JSONArray().put("Kerää paperit").put("Vie pahvit"))))
+            dao.saveBase(base.copy(snapshot = task.toString()))
+            dao.saveProjection(SharedProjection(state.scope, task.getString("id"), task.toString()))
+        }
+        compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
+        compose.onNodeWithTag("checklist-add").performScrollTo().performClick()
+        compose.onNodeWithTag("split-review").performScrollTo().performClick()
+        compose.onNodeWithTag("split-item-0").performScrollTo().performTextReplacement("Kerää paperit keittiöstä")
+        compose.onNodeWithTag("split-select-1").performScrollTo().performClick()
+        screenshot("split-fi-preview-large")
+        compose.onNodeWithTag("checklist-save").performClick()
+        compose.waitUntil(5_000) { runBlocking { data.database.shared().intents(state.scope).any { it.kind == "SplitTask" } } }
+        val split = runBlocking { data.database.shared().intents(state.scope).single { it.kind == "SplitTask" } }
+        assertEquals("Kerää paperit keittiöstä", split.description)
+        assertEquals("Vie paperit kierrätykseen", split.title)
+    }
+
+    @Test fun accessRemovalDismissesOpenSplitPreview() = removedSplit(false)
+    @Test fun accessRemovalDismissesSplitDictation() = removedSplit(true)
+
+    private fun removedSplit(dictating: Boolean) {
+        val (data, state) = fixture("en", "light")
+        val repository = SharedRepository(data.database, data.lease, state.scope, state.registration)
+        val id = runBlocking { repository.taskStates.first().first { it.getString("title") == "Vie paperit kierrätykseen" }.getString("id") }
+        runBlocking {
+            val draft = repository.checklistDraft(id)
+            repository.saveChecklistDraft(draft.copy(details = JSONObject().put("sourceDescription", "Private parent description")
+                .put("rows", JSONArray().put(JSONObject().put("text", "Private generated step").put("originalText", "Private generated step").put("selected", true))).toString()))
+        }
+        compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
+        compose.onNodeWithTag("checklist-add").performScrollTo().performClick()
+        compose.onNodeWithTag("split-item-0").assertExists()
+        if (dictating) {
+            compose.onNodeWithTag("split-dictate").performScrollTo().performClick()
+            compose.waitUntil(10_000) { compose.onAllNodesWithTag("split-item-0").fetchSemanticsNodes().isEmpty() }
+            compose.onNodeWithText("Dictate instructions").assertExists()
+        }
+        runBlocking { repository.block(repository.prepare(1000, 1)!!, "FORBIDDEN") }
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("checklist-save").fetchSemanticsNodes().isEmpty() &&
+            compose.onAllNodesWithText("Dictate instructions").fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithText("Private parent description").assertDoesNotExist()
+        compose.onNodeWithText("Private generated step").assertDoesNotExist()
+        compose.onNodeWithText("Vie paperit kierrätykseen").assertDoesNotExist()
+    }
+
+    @Test fun newTaskOffersSplitAfterLocalSave() {
+        val (data, state) = fixture("en", "light")
+        compose.onNodeWithTag("capture").performClick()
+        compose.onNodeWithTag("title").performTextInput("Prepare kitchen")
+        compose.onNodeWithTag("editor-split").performScrollTo().performClick()
+        compose.onNodeWithTag("split-instructions").performScrollTo().assertExists()
+        val intents = runBlocking { data.database.shared().intents(state.scope) }
+        assertEquals(1, intents.size); assertEquals("CreateTask", intents.single().kind)
+        assertNotNull(runBlocking { data.database.shared().draft(state.scope, "checklist:${intents.single().taskId}") })
+    }
+
     @Test fun cleanupPendingAndCancelStayUsableAtLargeFinnishText() {
         fixture("fi", "light", fontScale = 2f)
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
@@ -189,9 +268,10 @@ class SharedTaskUiTest {
         val (data, state) = fixture("fi", "light")
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
         compose.onNodeWithTag("task-claim").performScrollTo().performClick()
-        compose.onNodeWithText("Sinulla työn alla").assertIsDisplayed()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Sinulla työn alla").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Sinulla työn alla").performScrollTo().assertIsDisplayed()
         screenshot("tasks-fi-light.png")
-        compose.onNodeWithTag("task-complete").performClick()
+        compose.onNodeWithTag("task-complete").performScrollTo().performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithTag("task-reopen").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("task-reopen").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("back").performClick()
@@ -207,7 +287,7 @@ class SharedTaskUiTest {
     @Test fun englishConfirmationRejectsAChangedClaimAndMoveButtonsNeedNoDragging() {
         val (data, state) = fixture("en", "dark", claimed = true)
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
-        compose.onNodeWithTag("task-complete").performClick()
+        compose.onNodeWithTag("task-complete").performScrollTo().performClick()
         compose.onNodeWithText("Bob is working on this task. Mark it complete anyway?").assertIsDisplayed()
         screenshot("tasks-en-dark-confirm.png")
         runBlocking {

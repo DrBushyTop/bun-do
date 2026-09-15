@@ -304,9 +304,8 @@ class AccountStore(private val context: Context, private val name: String = "acc
                     runCatching { java.time.Instant.parse(JSONObject(it.captureContext).getString("capturedInstant")).toEpochMilli() }.getOrDefault(0),
                     workspaceLabel = data.database.shared().workspace(it.scope)?.name,
                     reason = it.problem, captureContext = it.captureContext)
-            } + data.database.shared().allDrafts().filter { it.title.isNotBlank() || it.description.isNotBlank() }.map {
-                RecoveryText("shared-draft:${it.scope}:${it.key}", it.title, it.description, it.savedAt,
-                    workspaceLabel = data.database.shared().workspace(it.scope)?.name)
+            } + data.database.shared().allDrafts().flatMap {
+                SharedSplitPreview.recovery(it, data.database.shared().workspace(it.scope)?.name)
             }
         }
     }

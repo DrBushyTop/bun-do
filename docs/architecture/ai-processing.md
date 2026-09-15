@@ -32,7 +32,9 @@ When a result is stale or ambiguous, keep the useful proposal available for expl
 
 ## Split
 
-Split produces an editable preview for direct checklist items and no immediate task mutation. Acceptance carries the final child list and relevant parent text/lifecycle/hierarchy/deletion versions. The normal manual split command validates the bounded list and atomically converts the root and creates children. A stale acceptance makes no partial change and preserves the draft for a fresh action. Model output cannot authorize a split itself.
+Cleanup and split generation share one active AI request per task. An explicit new request supersedes the previous one; it never blocks manual editing. Dictated split instructions stay in the checklist draft through interruption and retry.
+
+Split produces an editable preview for direct checklist items and no immediate task mutation. Acceptance carries the final child list and relevant parent text/lifecycle/hierarchy/deletion versions. AI preview acceptance checks the exact source text versions, including AI-only changes. The normal manual split command validates the bounded list and atomically converts the root and creates children. A stale acceptance makes no partial change and preserves the draft for a fresh action. Model output cannot authorize a split itself.
 
 ## Usage policy
 

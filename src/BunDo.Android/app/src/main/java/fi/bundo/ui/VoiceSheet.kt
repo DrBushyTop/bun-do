@@ -49,7 +49,7 @@ import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun VoiceSheet(controller: VoiceController, onDismiss: () -> Unit, onType: () -> Unit, onSaved: (String) -> Unit) {
+fun VoiceSheet(controller: VoiceController, onDismiss: () -> Unit, onType: () -> Unit, onSaved: (String) -> Unit, target: fi.bundo.data.VoiceTarget? = null) {
     val state by controller.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current
@@ -59,7 +59,7 @@ fun VoiceSheet(controller: VoiceController, onDismiss: () -> Unit, onType: () ->
     var exportId by rememberSaveable { mutableStateOf<String?>(null) }
     var notices by rememberSaveable { mutableStateOf(false) }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        if (it) controller.record() else controller.permissionDenied()
+        if (it) controller.record(target) else controller.permissionDenied()
     }
     val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("audio/wav")) { uri ->
         val id = exportId
@@ -85,7 +85,7 @@ fun VoiceSheet(controller: VoiceController, onDismiss: () -> Unit, onType: () ->
                 .verticalScroll(rememberScrollState()).padding(horizontal = 24.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(stringResource(R.string.voice_capture), style = MaterialTheme.typography.headlineSmall,
+            Text(stringResource(if (target == null) R.string.voice_capture else R.string.split_dictate), style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.semantics { heading() })
             Text(stringResource(R.string.voice_private), style = MaterialTheme.typography.bodyMedium)
             if (state.message.isNotEmpty()) {
@@ -125,7 +125,7 @@ fun VoiceSheet(controller: VoiceController, onDismiss: () -> Unit, onType: () ->
                     } else {
                         Button(onClick = {
                             if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
-                                controller.record()
+                                controller.record(target)
                             else permission.launch(Manifest.permission.RECORD_AUDIO)
                         }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("record")) {
                             Text(stringResource(R.string.voice_record))

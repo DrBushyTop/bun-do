@@ -112,6 +112,41 @@ class AccountIsolationTest {
         } finally { store.close(); clean(name) }
     }
 
+    @Test fun splitInstructionsAndEditedStepsReachRecoveryExportAfterRemoval() = runBlocking {
+        val name = "account-test-${UUID.randomUUID()}"
+        val store = AccountStore(context, name)
+        try {
+            store.unlock(alice, registration())
+            val data = store.active.value!!
+            data.selectHousehold(UUID.randomUUID().toString(), UUID.randomUUID().toString(), "Home")
+            val state = data.database.shared().workspaces(data.registrationId!!).single()
+            val details = org.json.JSONObject().put("instructions", "My dictated instructions")
+                .put("sourceDescription", "Private source")
+                .put("rows", org.json.JSONArray()
+                    .put(org.json.JSONObject().put("text", "My edited step").put("originalText", "Generated original"))
+                    .put(org.json.JSONObject().put("text", "Untouched suggestion").put("originalText", "Untouched suggestion")))
+            data.database.shared().saveDraft(fi.bundo.data.SharedDraft(state.scope, "checklist:one", "Private parent", "", 1000,
+                details = details.toString()))
+            data.database.shared().saveDraft(fi.bundo.data.SharedDraft(state.scope, "checklist:two", "Other parent", "", 1000,
+                details = org.json.JSONObject().put("instructions", "Only instructions").toString()))
+            fun exported(records: List<fi.bundo.data.RecoveryText>, plain: Boolean): String {
+                val output = ByteArrayOutputStream()
+                RecoveryExport.write(output, records, "Home", plain, data.lease)
+                return output.toString("UTF-8")
+            }
+            val before = exported(store.recovery(data), true)
+            assertTrue(before.contains("My edited step")); assertTrue(before.contains("My dictated instructions"))
+            val repository = fi.bundo.data.SharedRepository(data.database, data.lease, state.scope, state.registration)
+            repository.block(repository.prepare(1000, 1)!!, "FORBIDDEN")
+            val records = store.recovery(data)
+            for (plain in listOf(true, false)) {
+                val output = exported(records, plain)
+                for (authored in listOf("My edited step", "My dictated instructions", "Only instructions")) assertTrue(output.contains(authored))
+                for (remote in listOf("Private parent", "Other parent", "Private source", "Generated original", "Untouched suggestion")) assertFalse(output.contains(remote))
+            }
+        } finally { store.close(); clean(name) }
+    }
+
     @Test fun versionedRecoveryExportKeepsLabelsAndDatesAndImportsOnlyTextWithNewIds() = runBlocking {
         val name = "account-test-${UUID.randomUUID()}"
         val store = AccountStore(context, name)

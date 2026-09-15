@@ -97,7 +97,6 @@
     <string name="checklist_derived">This task finishes when its steps are complete.</string>
     <string name="checklist_parent">Open checklist</string>
     <string name="checklist_editor_help">Write one step per line. Maximum: %1$d. Edit or remove lines before saving.</string>
-    <string name="checklist_invalid">Number of steps: 1 to %1$d. Each step can have up to 160 characters.</string>
     <string name="checklist_save_failed">Could not save the steps. Your text is still here. Try again.</string>
     <string name="checklist_toggle">Change completion: %1$s</string>
     <string name="task_snooze">Snooze</string>

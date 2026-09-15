@@ -25,7 +25,11 @@ public sealed record RestoreTask(string TaskId, TaskStateVersions Expected) : Ta
 public sealed record SetSnooze(string TaskId, TaskStateVersions Expected, DateTimeOffset Until) : TaskTransition(TaskId, Expected);
 public sealed record ClearSnooze(string TaskId, TaskStateVersions Expected) : TaskTransition(TaskId, Expected);
 public abstract record ChecklistCommand(string TaskId, TaskStateVersions Expected,
-    string[] Items, ulong ExpectedTitleHumanVersion, ulong ExpectedDescriptionHumanVersion) : TaskTransition(TaskId, Expected);
+    string[] Items, ulong ExpectedTitleHumanVersion, ulong ExpectedDescriptionHumanVersion) : TaskTransition(TaskId, Expected)
+{
+    public ulong? ExpectedTitleFieldVersion { get; init; }
+    public ulong? ExpectedDescriptionFieldVersion { get; init; }
+}
 public sealed record SplitTask(string TaskId, TaskStateVersions Expected, string[] Items,
     ulong ExpectedTitleHumanVersion, ulong ExpectedDescriptionHumanVersion)
     : ChecklistCommand(TaskId, Expected, Items, ExpectedTitleHumanVersion, ExpectedDescriptionHumanVersion);
@@ -41,6 +45,9 @@ public abstract record CleanupCommand(string TaskId, ulong TitleVersion, ulong D
 }
 public sealed record RequestCleanup(string TaskId, ulong TitleVersion, ulong DescriptionVersion,
     ulong LifecycleVersion, ulong HierarchyVersion, ulong DeletionVersion, string? RequestId)
+    : CleanupCommand(TaskId, TitleVersion, DescriptionVersion, LifecycleVersion, HierarchyVersion, DeletionVersion, RequestId);
+public sealed record RequestSplit(string TaskId, ulong TitleVersion, ulong DescriptionVersion,
+    ulong LifecycleVersion, ulong HierarchyVersion, ulong DeletionVersion, string? RequestId, string? Instructions)
     : CleanupCommand(TaskId, TitleVersion, DescriptionVersion, LifecycleVersion, HierarchyVersion, DeletionVersion, RequestId);
 public sealed record CancelCleanup(string TaskId, ulong TitleVersion, ulong DescriptionVersion,
     ulong LifecycleVersion, ulong HierarchyVersion, ulong DeletionVersion, string? RequestId)
@@ -86,6 +93,7 @@ public sealed class FrozenOperation
         var kind = command switch
         {
             RequestCleanup => "RequestCleanup",
+            RequestSplit => "RequestSplit",
             CancelCleanup => "CancelCleanup",
             ApplyCleanup => "ApplyCleanup",
             CreateTask => "CreateTask",

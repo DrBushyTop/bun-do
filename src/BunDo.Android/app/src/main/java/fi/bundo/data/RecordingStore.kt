@@ -18,7 +18,11 @@ data class VoiceRecording(
     val expiresAt: Long,
     val state: String,
     val reason: String = "",
+    val checklistScope: String? = null,
+    val checklistTaskId: String? = null,
 )
+
+data class VoiceTarget(val scope: String, val taskId: String)
 
 @Dao
 interface RecordingDao {
@@ -59,13 +63,13 @@ class RecordingStore(
     fun checkActive() = lease.check()
 
     @SuppressLint("UsableSpace") // Conservative preflight; do not count or evict reclaimable caches.
-    suspend fun begin(now: Long = System.currentTimeMillis()): VoiceRecording = lease.access {
+    suspend fun begin(now: Long = System.currentTimeMillis(), target: VoiceTarget? = null): VoiceRecording = lease.access {
         pruneUnsafe(now)
         val existing = dao.all()
         if (existing.size >= MAX_RECORDINGS ||
             directory.listFiles().orEmpty().sumOf { it.length() } + MAX_AUDIO_BYTES > MAX_RETAINED_BYTES ||
             directory.usableSpace < MAX_AUDIO_BYTES + 8 * 1024 * 1024) throw RecordingStorageFull()
-        val record = VoiceRecording(UUID.randomUUID().toString(), now, now + RETAIN_MILLIS, "RECORDING")
+        val record = VoiceRecording(UUID.randomUUID().toString(), now, now + RETAIN_MILLIS, "RECORDING", checklistScope = target?.scope, checklistTaskId = target?.taskId)
         dao.insert(record) // Persist intent before opening the microphone or creating audio.
         record
     }
@@ -144,12 +148,26 @@ class RecordingStore(
     suspend fun commit(id: String, transcript: String): String = lease.access {
         val text = transcript.trim()
         require(text.isNotEmpty() && InboxLimits.length(text) <= InboxLimits.DESCRIPTION)
-        val taskId = "voice-$id"
+        var taskId = "voice-$id"
         database.withTransaction {
             lease.check()
             val record = checkNotNull(dao.get(id))
             check(record.expiresAt > System.currentTimeMillis())
-            if (record.state != "COMMITTED" && database.inbox().task(taskId) == null) {
+            if (record.checklistScope != null && record.checklistTaskId != null) {
+                val shared = database.shared()
+                val workspace = checkNotNull(shared.workspace(record.checklistScope))
+                check(workspace.blocked == null)
+                val draft = checkNotNull(shared.draft(record.checklistScope, "checklist:${record.checklistTaskId}"))
+                taskId = "checklist:${record.checklistScope}:${record.checklistTaskId}"
+                if (record.state != "COMMITTED") {
+                    val details = draft.details?.let { org.json.JSONObject(it) } ?: org.json.JSONObject()
+                    val previous = details.optString("instructions")
+                    val combined = if (previous.isBlank()) text else "$previous\n$text"
+                    if (InboxLimits.length(combined) > 2000) throw TranscriptTooLong()
+                    details.put("instructions", combined)
+                    shared.saveDraft(draft.copy(details = details.toString(), savedAt = System.currentTimeMillis()))
+                }
+            } else if (record.state != "COMMITTED" && database.inbox().task(taskId) == null) {
                 val title = text.substring(0, text.offsetByCodePoints(0, minOf(InboxLimits.length(text), InboxLimits.TITLE)))
                 val description = if (title == text) "" else text
                 database.inbox().insertTask(InboxTask(
@@ -185,3 +203,5 @@ class RecordingStore(
 }
 
 class RecordingStorageFull : java.io.IOException()
+
+class TranscriptTooLong : IllegalArgumentException()

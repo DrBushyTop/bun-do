@@ -18,6 +18,8 @@ import org.json.JSONObject
 internal fun SharedCleanupControls(task: JSONObject, enabled: Boolean, onAction: (SharedTaskAction) -> Unit) {
     val cleanup = task.optJSONObject("cleanup")
     val status = cleanup?.optString("status")
+    val splitting = cleanup?.optString("mode") == "SPLIT"
+    if (splitting && cleanup?.optString("status") !in listOf("APPLIED", "SUPERSEDED")) return
     val pending = status in listOf("PENDING", "RUNNING")
     var compare by remember(task.getString("id"), cleanup?.optString("id")) { mutableStateOf(false) }
     val open = task.optString("lifecycle", "OPEN") == "OPEN"
