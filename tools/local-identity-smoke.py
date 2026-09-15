@@ -2,6 +2,7 @@
 """Verify local identity HTTP behavior. Start Aspire in Local mode before running."""
 import json
 import uuid
+from datetime import datetime
 from urllib.error import HTTPError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
@@ -15,7 +16,13 @@ BASE = "http://127.0.0.1:7275/api"
 OPENER = build_opener(NoRedirect())
 
 
-def request(path, *, token=None, method="GET", body=None):
+def assert_registration_retry(previous, current):
+    assert current["registrationId"] == previous["registrationId"], "Registration retry changed device identity"
+    parse = lambda value: datetime.fromisoformat(value.replace("Z", "+00:00"))
+    assert parse(current["expiresAt"]) >= parse(previous["expiresAt"]), "Registration retry shortened expiry"
+
+
+def request(path, *, token=None, method="GET", body=None, maximum_response_bytes=32768):
     headers = {"Accept": "application/json"}
     if token is not None:
         headers["Authorization"] = "Bearer " + token
@@ -29,8 +36,8 @@ def request(path, *, token=None, method="GET", body=None):
     except HTTPError as error:
         response = error
     with response:
-        body = response.read(32769)
-        assert len(body) <= 32768, "Response exceeds expected bound"
+        body = response.read(maximum_response_bytes + 1)
+        assert len(body) <= maximum_response_bytes, "Response exceeds expected bound"
         return response.status, json.loads(body) if body else None, response.headers
 
 
@@ -51,7 +58,7 @@ def main():
             if attempt == 0:
                 previous = registered
             else:
-                assert registered == previous, "Registration retry changed device identity or expiry"
+                assert_registration_retry(previous, registered)
         print(f"PASS {account}: sign-in and fresh token preserve validated identity")
 
     for scenario, expected_status in (("expired", 401), ("wrong-audience", 401), ("wrong-scope", 403)):

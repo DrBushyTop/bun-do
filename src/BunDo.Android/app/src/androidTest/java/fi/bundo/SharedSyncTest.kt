@@ -61,6 +61,31 @@ class SharedSyncTest {
         assertNull(client.prepare().envelope)
     }
 
+    @Test fun retainedSharedBuildsUpgradeWithoutRewritingPendingBytesOrRecordingDeadlines() = runBlocking {
+        // First shared-data build and the last schema before workspace recording recovery.
+        for (version in listOf(5, 11)) {
+            val name = "retained-upgrade-${UUID.randomUUID()}.db"
+            names += name
+            val frozen = " {\"pending\":\"exact original bytes\"} "
+            migrations.createDatabase(name, version).use { db ->
+                db.execSQL("INSERT INTO shared_intents (scope, sequence, taskId, kind, title, description, titleChanged, descriptionChanged, observedTitle, observedDescription, observedDeletion, captureContext, frozen, status) VALUES ('scope', '7', 'task', 'CreateTask', 'Kesken', 'Keep me', 1, 1, '0', '0', '0', '{}', ?, 'SUBMITTED')",
+                    arrayOf(frozen))
+                db.execSQL("INSERT INTO shared_drafts (scope, `key`, title, description, savedAt, basis) VALUES ('scope', 'new', 'Unfinished', 'Original draft', 123, '{}')")
+                db.execSQL("INSERT INTO voice_recordings (id, createdAt, expiresAt, state, reason) VALUES ('recording', 100, 200, 'FAILED', 'INTERRUPTED')")
+            }
+            val db = InboxDatabase.open(context, name).also { databases += it }
+            val intent = db.shared().intents("scope").single()
+            assertEquals(frozen, intent.frozen)
+            assertEquals("SUBMITTED", intent.status)
+            assertEquals("7", intent.sequence)
+            assertEquals("Kesken", intent.title)
+            assertEquals("Keep me", intent.description)
+            assertEquals("Unfinished", db.shared().allDrafts().single().title)
+            assertEquals(200L, db.recordings().all().single().expiresAt)
+            assertEquals(12, db.openHelper.readableDatabase.version)
+        }
+    }
+
     @Test fun editDuringInflightCreateStaysVisibleAndUsesAcceptedOutputVersions() = runBlocking {
         val server = Server()
         val client = client(server)

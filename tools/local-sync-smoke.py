@@ -44,7 +44,9 @@ def main():
             "observedVersions": observed or {}, "occurredAtContext": context}, separators=(",", ":")).encode()
 
     def send(operation=None, cursor=None, acknowledged=0):
-        status, response, headers = identity.request("/sync", token=token, method="POST", body={
+        # Sync pages include complete change groups, up to the server's 4 MiB bound.
+        status, response, headers = identity.request("/sync", token=token, method="POST",
+            maximum_response_bytes=4 * 1024 * 1024, body={
             "workspaceId": workspace, "stateEpoch": epoch, "registrationId": device, "cursor": cursor,
             "acknowledgedThrough": str(acknowledged),
             "envelopes": [base64.b64encode(operation).decode()] if operation else []})
@@ -63,6 +65,16 @@ def main():
 
     try:
         create = envelope(1, "CreateTask", {"taskId": task_id(1), "title": "Synthetic coffee", "description": None})
+        for field, code in (("protocolVersion", "UNSUPPORTED_PROTOCOL"),
+                            ("commandVersion", "UNSUPPORTED_COMMAND_VERSION")):
+            unsupported = json.loads(create)
+            unsupported[field] = 2
+            status, rejected, _ = identity.request("/sync", token=token, method="POST", body={
+                "workspaceId": workspace, "stateEpoch": epoch, "registrationId": device,
+                "cursor": None, "acknowledgedThrough": "0",
+                "envelopes": [base64.b64encode(json.dumps(unsupported).encode()).decode()]})
+            assert status == 400 and rejected["code"] == code, (status, rejected)
+            assert send()["throughRevision"] == "0"
         first = send(create)
         assert first["code"] == "ACCEPTED"
         assert send(create)["receipts"] == first["receipts"]
