@@ -20,12 +20,22 @@ android {
         applicationId = "fi.bundo"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1"
+        versionCode = providers.gradleProperty("bundoVersionCode").orElse("2").get().toInt().also { require(it > 0) }
+        versionName = providers.gradleProperty("bundoVersionName").orElse("0.1.0-rc.1").get().also {
+            require(it.matches(Regex("[0-9]+\\.[0-9]+\\.[0-9]+(?:-rc\\.[0-9]+)?")))
+        }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += "arm64-v8a" }
     }
     buildFeatures { compose = true; buildConfig = true }
+    signingConfigs {
+        create("release") {
+            providers.environmentVariable("BUNDO_KEYSTORE_PATH").orNull?.let { storeFile = file(it) }
+            storePassword = providers.environmentVariable("BUNDO_STORE_PASSWORD").orNull
+            keyAlias = providers.environmentVariable("BUNDO_KEY_ALIAS").orNull
+            keyPassword = providers.environmentVariable("BUNDO_KEY_PASSWORD").orNull
+        }
+    }
     buildTypes {
         create("local") {
             initWith(getByName("debug"))
@@ -43,6 +53,7 @@ android {
             buildConfigField("String", "IDENTITY_API_BASE", "\"http://10.0.2.2:7275/api\"")
         }
         getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
             buildConfigField("String", "IDENTITY_API_BASE",
                 "\"https://func-bun-do-dev-qrquvcgmhocc6.azurewebsites.net/api\"")
         }
@@ -52,9 +63,9 @@ android {
         sourceSets[variant].res.srcDir("src/authCheck/res")
     }
     sourceSets["release"].java.srcDir("src/authCheck/java")
+    sourceSets["debug"].res.srcDir("src/microsoft/res")
     for (variant in listOf("debug", "release")) {
         sourceSets[variant].java.srcDir("src/microsoft/java")
-        sourceSets[variant].res.srcDir("src/microsoft/res")
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -70,6 +81,16 @@ android {
         disable += "ChromeOsAbiSupport"
     }
 }
+
+val checkReleaseSigning by tasks.registering {
+    doLast {
+        val names = listOf("BUNDO_KEYSTORE_PATH", "BUNDO_STORE_PASSWORD", "BUNDO_KEY_ALIAS", "BUNDO_KEY_PASSWORD")
+        check(names.all { !providers.environmentVariable(it).orNull.isNullOrBlank() }) {
+            "Release signing requires all BUNDO signing environment variables. See docs/android-release.md."
+        }
+    }
+}
+tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(checkReleaseSigning) }
 
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 
@@ -114,6 +135,45 @@ val prepareSherpa by tasks.registering {
     }
 }
 val sherpaRuntime = files(sherpaArchive).builtBy(prepareSherpa)
+
+tasks.register("releaseInventory") {
+    dependsOn(prepareSherpa)
+    val output = layout.buildDirectory.dir("release-inventory")
+    outputs.dir(output)
+    outputs.upToDateWhen { false }
+    doLast {
+        val directory = output.get().asFile.apply { mkdirs() }
+        val artifacts = configurations.getByName("releaseRuntimeClasspath").resolvedConfiguration.resolvedArtifacts
+        directory.resolve("dependencies.tsv").writeText("component\tartifact\tsha256\n" +
+            artifacts.sortedBy { it.moduleVersion.id.toString() }.joinToString("\n") {
+                "${it.moduleVersion.id}\t${it.file.name}\t${sha256(it.file)}"
+            } + "\nk2-fsa:sherpa-onnx:1.13.7\t${sherpaArchive.get().asFile.name}\t$sherpaSha256\n")
+        val components = artifacts.map { it.id.componentIdentifier }.distinct()
+        val poms = dependencies.createArtifactResolutionQuery().forComponents(components)
+            .withArtifacts(org.gradle.maven.MavenModule::class.java, org.gradle.maven.MavenPomArtifact::class.java)
+            .execute()
+        check(poms.components.size == poms.resolvedComponents.size) { "Dependency POM resolution failed" }
+        val pomDirectory = directory.resolve("poms").apply { mkdirs() }
+        val parser = javax.xml.parsers.DocumentBuilderFactory.newInstance().apply {
+            setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+        }.newDocumentBuilder()
+        val licenses = mutableListOf("component\tpublisher-declared-license")
+        for (component in poms.resolvedComponents) {
+            for (artifact in component.getArtifacts(org.gradle.maven.MavenPomArtifact::class.java)) {
+                check(artifact is org.gradle.api.artifacts.result.ResolvedArtifactResult) { "Dependency POM unavailable" }
+                artifact.file.copyTo(pomDirectory.resolve(
+                    component.id.displayName.replace(Regex("[^a-zA-Z0-9._-]"), "_") + ".pom"), overwrite = true)
+                val nodes = parser.parse(artifact.file).getElementsByTagName("license")
+                val names = (0 until nodes.length).map { index ->
+                    val license = nodes.item(index) as org.w3c.dom.Element
+                    license.getElementsByTagName("name").item(0)?.textContent?.trim().orEmpty()
+                }.filter { it.isNotBlank() }
+                licenses += "${component.id.displayName}\t${names.joinToString("; ").ifEmpty { "See parent POM / upstream notice in LICENSES.md" }}"
+            }
+        }
+        directory.resolve("licenses.tsv").writeText(licenses.joinToString("\n") + "\n")
+    }
+}
 
 dependencies {
     debugImplementation("com.microsoft.identity.client:msal:8.4.2")

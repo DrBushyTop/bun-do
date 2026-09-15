@@ -24,7 +24,9 @@ jobs:
         run: bash tools/android-setup.sh </dev/null
       - name: Build, unit test, lint, and compile instrumentation tests
         working-directory: src/BunDo.Android
-        run: ./gradlew --no-daemon assembleDebug assembleLocal testDebugUnitTest testLocalUnitTest lintDebug lintLocal assembleDebugAndroidTest
+        run: |
+          ./gradlew --no-daemon assembleDebug assembleLocal testDebugUnitTest testLocalUnitTest lintDebug lintLocal assembleDebugAndroidTest
+          ./gradlew --no-daemon -PbundoTestBuildType=local assembleLocalAndroidTest
       - name: Upload failure reports
         if: ${{ failure() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

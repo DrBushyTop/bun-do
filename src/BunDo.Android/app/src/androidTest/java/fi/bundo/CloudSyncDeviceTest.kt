@@ -132,6 +132,41 @@ class CloudSyncDeviceTest {
                     assertEquals("öö osta maitoa huomenna", cleaned.getJSONObject("capture").getString("title"))
                 }
             }
+            if (InstrumentationRegistry.getArguments().getString("v1CloudSmoke") == "true") {
+                // Each language gets one explicit paid speech request and one split request.
+                // Never retry an ambiguous provider call merely to make verification green.
+                for ((language, locale, title) in listOf(
+                    Triple("fi", "fi-FI", "Siivoa keittiö"),
+                    Triple("en", "en-US", "Clean the kitchen"),
+                )) {
+                    val pcm = InstrumentationRegistry.getInstrumentation().context.assets
+                        .open("speech/$language.pcm").use { it.readBytes() }
+                    val text = try {
+                        fi.bundo.speech.OnlineSpeech().transcribe(token, ownerRegistration, pcm, locale)
+                    } finally { pcm.fill(0) }
+                    assertTrue("Speech returned no text for $language", text.isNotBlank())
+                    val id = repositories[0].commit(EditorDraft("new", title, ""))
+                    sync(repositories[0])
+                    repositories[0].requestSplit(repositories[0].checklistDraft(id))
+                    sync(repositories[0])
+                    val ready = repositories[0].taskStates.first().single { it.getString("id") == id }
+                    assertEquals("READY", ready.getJSONObject("cleanup").getString("status"))
+                    val draft = repositories[0].adoptSplit(id)
+                    val details = JSONObject(checkNotNull(draft.details))
+                    val rows = details.getJSONArray("rows")
+                    assertTrue(rows.length() > 0)
+                    rows.getJSONObject(0).put("text", if (language == "fi") "Tarkista ensimmäinen vaihe" else "Review the first step")
+                    repositories[0].saveChecklistDraft(draft.copy(details = details.toString()))
+                    repositories[0].commitChecklist(id)
+                    sync(repositories[0])
+                    sync(repositories[1])
+                    for (repository in repositories) {
+                        val children = repository.taskStates.first().filter { it.nullableString("parentId") == id }
+                        assertEquals(rows.length(), children.size)
+                        assertTrue(children.any { it.getString("title") == rows.getJSONObject(0).getString("text") })
+                    }
+                }
+            }
             repositories[0].commit(EditorDraft("new", "Synthetic unsent recovery", ""))
             val current = home("get").getJSONObject("household")
             home("delete", JSONObject().put("stateEpoch", epoch).put("expectedVersion", current.getString("membershipVersion")))

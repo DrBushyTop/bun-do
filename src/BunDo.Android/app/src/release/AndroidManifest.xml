@@ -5,7 +5,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="msauth" android:host="fi.bundo" android:path="/JMd5dw0RAj/KIKcQy1gU4vBukKc=" />
+                <data android:scheme="msauth" android:host="fi.bundo" android:path="/gpdLpURjCTV85EC9Wsyv9T+A+78=" />
             </intent-filter>
         </activity>
     </application>

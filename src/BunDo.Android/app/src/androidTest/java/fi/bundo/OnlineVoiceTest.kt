@@ -5,9 +5,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import fi.bundo.data.*
 import fi.bundo.speech.*
 import fi.bundo.identity.*
-import com.microsoft.identity.client.exception.MsalClientException
-import com.microsoft.identity.client.exception.MsalServiceException
-import com.microsoft.identity.client.exception.MsalUiRequiredException
 import kotlinx.coroutines.*
 import org.junit.Assert.*
 import org.junit.Test
@@ -103,10 +100,10 @@ class OnlineVoiceTest {
                         refreshes++
                         throw when (fault) {
                             "missing-refresh" -> TokenFailure("no_current_account")
-                            "interaction" -> microsoftTokenFailure(MsalUiRequiredException(MsalUiRequiredException.INVALID_GRANT))
-                            "denied" -> microsoftTokenFailure(MsalServiceException(MsalServiceException.ACCESS_DENIED, "private", 403, null))
-                            "network" -> microsoftTokenFailure(MsalClientException(MsalClientException.DEVICE_NETWORK_NOT_AVAILABLE))
-                            else -> microsoftTokenFailure(MsalServiceException(MsalServiceException.SERVICE_NOT_AVAILABLE, "private", 503, null))
+                            "interaction" -> TokenFailure("invalid_grant")
+                            "denied" -> TokenFailure("access_denied")
+                            "network" -> TokenFailure("device_network_not_available", retryable = true)
+                            else -> TokenFailure("service_not_available", retryable = true)
                         }
                     }
                     override suspend fun signIn(activity: android.app.Activity, choice: String?): String = error("Unexpected interactive sign-in")

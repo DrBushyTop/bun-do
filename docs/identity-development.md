@@ -96,9 +96,9 @@ association. Set `androidSigningCertificates` in the Bicep parameters to the
 colon-separated SHA-256 fingerprint reported by `keytool -list -v`. Separate
 multiple accepted certificates with semicolons. Publish the backend and verify
 that its `/.well-known/assetlinks.json` endpoint serves the intended app and
-certificate, without a redirect. The development parameters trust the local
-development certificate only. Release signing must replace or explicitly extend
-that trust alongside the MSAL redirect setup.
+certificate, without a redirect. The development parameters explicitly trust
+the development and release certificates. A signing-key change must update
+that trust alongside the MSAL redirect setup. See [Android releases](android-release.md).
 
 Install the corresponding APK, then run `adb -s SERIAL shell pm verify-app-links
 --re-verify fi.bundo`. After verification completes, inspect `pm get-app-links
