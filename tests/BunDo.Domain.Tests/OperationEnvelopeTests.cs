@@ -19,6 +19,23 @@ public sealed class OperationEnvelopeTests
     private static FrozenOperation Parse(JsonNode node) => OperationEnvelope.Parse(Encoding.UTF8.GetBytes(node.ToJsonString()));
 
     [Theory]
+    [InlineData("ConfigureRepeat")][InlineData("StopRepeat")]
+    public void Repeat_commands_pin_schedule_and_task_observations(string kind)
+    {
+        var node = Envelope(); node["command"] = kind;
+        var payload = new JsonObject { ["taskId"] = TaskIdentity.ForCreate(Device, 1) };
+        if (kind == "ConfigureRepeat")
+        { payload["frequency"] = "WEEKLY"; payload["weekday"] = 1; payload["zoneId"] = "Europe/Helsinki"; payload["title"] = "Next"; payload["description"] = null; }
+        node["payload"] = payload;
+        var observed = new JsonObject();
+        foreach (var group in new[] { "recurrence", "lifecycle", "hierarchy", "deletion" }) observed[group] = new JsonObject { ["fieldVersion"] = "1" };
+        node["observedVersions"] = observed;
+        Assert.IsAssignableFrom<RepeatCommand>(Parse(node).Command);
+        observed.Remove("recurrence");
+        Assert.Throws<EnvelopeException>(() => Parse(node));
+    }
+
+    [Theory]
     [InlineData("2099-01-01", false)]
     [InlineData("2099-01-01T12:00:00", false)]
     [InlineData("2099-01-01T12:00:00Z", true)]

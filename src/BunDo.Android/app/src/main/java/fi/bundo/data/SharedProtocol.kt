@@ -175,6 +175,17 @@ internal object SharedProtocol {
             require(UUID.fromString(it.getString("memberId")).toString() == it.getString("memberId"))
             Instant.parse(it.getString("acceptedAt"))
         }
+        task.optJSONObject("repeat")?.let {
+            require(task.isNull("parentId"))
+            require(UUID.fromString(it.getString("id")).toString() == it.getString("id"))
+            require(it.decimal("version") in 1uL..revision)
+            it.getBoolean("active")
+            require(InboxLimits.valid(it.getString("title"), it.nullableString("description").orEmpty()))
+            val rule = it.getJSONObject("rule")
+            ZoneId.of(rule.getString("zoneId"))
+            require(if (rule.getString("frequency") == "DAILY") rule.isNull("weekday")
+                else rule.getString("frequency") == "WEEKLY" && rule.getInt("weekday") in 1..7)
+        }
     }
 
     fun containsEffect(current: JSONObject?, effect: JSONObject): Boolean {
@@ -192,6 +203,7 @@ internal object SharedProtocol {
             val actual = SharedTaskActions.version(current, group).toULong()
             val expected = SharedTaskActions.version(effect, group).toULong()
             val fields = when (group) {
+                "recurrence" -> listOf("repeat")
                 "urgent" -> listOf("urgent")
                 "lifecycle" -> listOf("lifecycle", "lifecycleActorId", "lifecycleAt", "cancellationGroupId")
                 "claim" -> listOf("claimantId")

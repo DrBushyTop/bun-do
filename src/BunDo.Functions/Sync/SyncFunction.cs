@@ -79,6 +79,7 @@ public sealed class SyncFunction(AccessTokens tokens, IServiceProvider services)
                 if (result.Receipt is { } receipt) receipts.Add(receipt);
                 else break;
             }
+            await new BunDo.Functions.Repeats.RepeatWorker(documents).RunAsync(member, workspace, epoch, ct);
             var provider = services.GetService<BunDo.Functions.AI.ICleanupProvider>() ?? new BunDo.Functions.AI.UnavailableCleanupProvider();
             await new BunDo.Functions.AI.CleanupWorker(documents, provider).RunAsync(member, workspace, epoch, ct);
             var reply = await sync.PullAsync(member, workspace, epoch, cursor, receipts, code, ct);

@@ -104,4 +104,19 @@
     <string name="task_snoozed">Snoozed. Clear the snooze before claiming or completing a step.</string>
     <string name="task_unsnooze">Clear snooze</string>
     <string name="task_snoozed_view">Snoozed</string>
+    <string name="repeat_active">Repeating task</string>
+    <string name="repeat_stopped">Repeat stopped</string>
+    <string name="repeat_on_weekday">Every %1$s</string>
+    <string name="repeat_daily">Daily</string>
+    <string name="repeat_weekly">Weekly</string>
+    <string name="repeat_start">Set repeat</string>
+    <string name="repeat_edit">Edit repeat</string>
+    <string name="repeat_explanation">Repeats need a connection. The next task appears after sync. Time zone: %1$s.</string>
+    <string name="repeat_title">Title for future tasks</string>
+    <string name="repeat_description">Description for future tasks</string>
+    <string name="repeat_edit_explanation">Changes apply to future tasks. Stopping keeps this task. Deleting stops the repeat, and Undo does not restart it.</string>
+    <string name="repeat_save">Save repeat online</string>
+    <string name="repeat_stop">Stop repeat online</string>
+    <string name="repeat_conflict">The repeat or current task changed. Open the latest task and compare before trying again.</string>
+    <string name="repeat_pending">Repeat change is waiting for server confirmation. Sync before changing it again.</string>
 </resources>

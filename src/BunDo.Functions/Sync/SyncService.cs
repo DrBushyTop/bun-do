@@ -83,7 +83,7 @@ public sealed class SyncService(IHouseholdDocuments documents)
                 if (receipt is not null) receipts = receipts.Add(id, receipt);
             }
             var taskId = operation.Command switch {
-                CleanupCommand c => c.TaskId, CreateTask c => c.TaskId, EditTask e => e.TaskId, TaskTransition t => t.TaskId, MoveTask m => m.TaskId, _ => null,
+                RepeatCommand r => r.TaskId, CleanupCommand c => c.TaskId, CreateTask c => c.TaskId, EditTask e => e.TaskId, TaskTransition t => t.TaskId, MoveTask m => m.TaskId, _ => null,
             };
             var tasks = ImmutableDictionary<string, TaskSnapshot>.Empty;
             if (metadata.RootOrder is null && (metadata.TaskCount > 0 || metadata.Tasks.Count > 0))
@@ -117,8 +117,14 @@ public sealed class SyncService(IHouseholdDocuments documents)
                     if (child is not null) tasks = tasks.SetItem(childId, child);
                 }
             }
+            var repeats = ImmutableDictionary<string, RepeatSchedule>.Empty;
+            foreach (var repeatId in tasks.Values.Select(t => t.Repeat?.Id).OfType<string>().Distinct())
+            {
+                var repeat = (await documents.ReadAsync<RepeatSchedule>(partition, $"repeat:{repeatId}", ct))?.Value;
+                if (repeat is not null) repeats = repeats.SetItem(repeatId, repeat);
+            }
             var staged = new StagedStore(metadata with { Devices = ImmutableDictionary<Guid, DeviceRegistration>.Empty.Add(device.DeviceId, device),
-                Tasks = tasks, Receipts = receipts, Changes = [] });
+                Tasks = tasks, Receipts = receipts, Changes = [], Repeats = repeats });
             var result = new WorkspaceServer(staged).Handle(member, operation);
             if (staged.Next is null) return result;
             try

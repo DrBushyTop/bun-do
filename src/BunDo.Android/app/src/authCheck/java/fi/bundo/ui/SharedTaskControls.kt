@@ -19,6 +19,8 @@ internal data class SharedTaskAction(val kind: String, val displayed: String,
     val confirmedClaimant: String? = null, val after: String? = null, val before: String? = null, val until: String? = null)
 
 internal fun taskActionLabel(kind: String) = when (kind) {
+    "ConfigureRepeat" -> R.string.repeat_save
+    "StopRepeat" -> R.string.repeat_stop
     "RequestCleanup" -> R.string.cleanup_request
     "RequestSplit" -> R.string.split_generate
     "CancelCleanup" -> R.string.cleanup_cancel

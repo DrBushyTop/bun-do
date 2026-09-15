@@ -7,17 +7,21 @@ import org.json.JSONObject
 internal object SharedTaskActions {
     const val ORDER_ID = "root-order"
     val cleanupKinds = setOf("RequestCleanup", "RequestSplit", "CancelCleanup", "ApplyCleanup")
-    val kinds = cleanupKinds + setOf("ClaimTask", "UnclaimTask", "CompleteTask", "ReopenTask", "CancelTask", "MoveTask", "DeleteTask", "RestoreTask",
+    val repeatKinds = setOf("ConfigureRepeat", "StopRepeat")
+    val kinds = cleanupKinds + repeatKinds + setOf("ClaimTask", "UnclaimTask", "CompleteTask", "ReopenTask", "CancelTask", "MoveTask", "DeleteTask", "RestoreTask",
         "SplitTask", "AddChildren", "SetSnooze", "ClearSnooze")
-    val groups = listOf("lifecycle", "claim", "hierarchy", "deletion", "orderIntent", "subtree", "snooze", "urgent")
+    val groups = listOf("lifecycle", "claim", "hierarchy", "deletion", "orderIntent", "subtree", "snooze", "urgent", "recurrence")
     fun version(task: JSONObject, group: String): String =
-        if (group == "urgent") task.optString("urgencyVersion", "0") else if (task.has("${group}Version")) task.decimal("${group}Version").toString() else "0"
-    fun observedGroups(kind: String) = if (kind in cleanupKinds) listOf("title", "description", "lifecycle", "hierarchy", "deletion") + if (kind == "RequestSplit") emptyList() else listOf("due")
+        if (group == "recurrence") task.optJSONObject("repeat")?.decimal("version")?.toString() ?: "0"
+        else if (group == "urgent") task.optString("urgencyVersion", "0") else if (task.has("${group}Version")) task.decimal("${group}Version").toString() else "0"
+    fun observedGroups(kind: String) = if (kind in repeatKinds) listOf("recurrence", "lifecycle", "hierarchy", "deletion")
+        else if (kind in cleanupKinds) listOf("title", "description", "lifecycle", "hierarchy", "deletion") + if (kind == "RequestSplit") emptyList() else listOf("due")
         else if (kind == "MoveTask") listOf("orderIntent", "deletion")
         else listOf("lifecycle", "claim", "hierarchy", "deletion", "subtree", "snooze") +
             if (kind in SharedChecklistActions.splitKinds) listOf("title", "description") else emptyList()
     fun writes(kind: String) = when (kind) {
         "CreateTask" -> groups + listOf("title", "description", "due")
+        "ConfigureRepeat", "StopRepeat" -> listOf("recurrence")
         "RequestCleanup", "RequestSplit", "CancelCleanup" -> listOf("cleanup")
         "ApplyCleanup" -> listOf("cleanup", "title", "description", "due")
         "ClaimTask", "UnclaimTask" -> listOf("claim")
@@ -111,10 +115,11 @@ internal object SharedTaskActions {
         val receipt = intent.receipt?.let(::JSONObject)?.optJSONObject("task")
         if (receipt != null) {
             // A receipt can reveal concurrent state changes as well as this action's own effect.
-            for (group in groups) task.put(if (group == "urgent") "urgencyVersion" else "${group}Version", version(receipt, group))
-            for (key in listOf("lifecycle", "claimantId", "lifecycleActorId", "lifecycleAt", "firstCompletion", "deletion", "snoozedUntil"))
+            for (group in groups - "recurrence") task.put(if (group == "urgent") "urgencyVersion" else "${group}Version", version(receipt, group))
+            for (key in listOf("lifecycle", "claimantId", "lifecycleActorId", "lifecycleAt", "firstCompletion", "deletion", "snoozedUntil", "repeat"))
                 if (receipt.has(key)) task.put(key, receipt.get(key))
         } else when (intent.kind) {
+            "ConfigureRepeat", "StopRepeat" -> task.put("repeatPending", true)
             "RequestCleanup", "RequestSplit" -> task.put("cleanup", JSONObject().put("status", "PENDING")
                 .put("id", "pending:${intent.sequence}").put("mode", if (intent.kind == "RequestSplit") "SPLIT" else "CLEANUP"))
             "CancelCleanup" -> task.optJSONObject("cleanup")?.put("status", "SUPERSEDED")
@@ -135,7 +140,7 @@ internal object SharedTaskActions {
                 .put("lifecycleAt", JSONObject.NULL) // Completion credit and acceptance time belong to the server.
         }
         SharedChecklistActions.apply(before, task, intent, tasks)
-        if (intent.receipt == null && intent.kind !in listOf("RequestCleanup", "RequestSplit", "CancelCleanup"))
+        if (intent.receipt == null && intent.kind !in listOf("RequestCleanup", "RequestSplit", "CancelCleanup") && intent.kind !in repeatKinds)
             SharedTaskDetails.markPending(task, intent)
         return null
     }

@@ -63,6 +63,20 @@ public static class OperationEnvelope
                         groups.Contains("due") ? new(Due(payload.GetProperty("due")), Version(observed, "due")) : null,
                         groups.Contains("urgent") ? new(payload.GetProperty("urgent").GetBoolean(), ExactVersion(observed, "urgent")) : null);
                     break;
+                case "ConfigureRepeat":
+                case "StopRepeat":
+                    var configuring = root.GetProperty("command").GetString() == "ConfigureRepeat";
+                    Fields(payload, configuring ? ["taskId", "frequency", "weekday", "zoneId", "title", "description"] : ["taskId"]);
+                    Fields(observed, ["recurrence", "lifecycle", "hierarchy", "deletion"]);
+                    var repeatTask = Uuid(payload.GetProperty("taskId")).ToString("D");
+                    var repeatVersion = ExactVersion(observed, "recurrence");
+                    var repeatExpected = new TaskStateVersions(ExactVersion(observed, "lifecycle"), 0,
+                        ExactVersion(observed, "hierarchy"), ExactVersion(observed, "deletion"));
+                    command = configuring ? new ConfigureRepeat(repeatTask, repeatVersion, repeatExpected,
+                        new RepeatRule(Text(payload.GetProperty("frequency")), payload.GetProperty("weekday").ValueKind == JsonValueKind.Null ? null : payload.GetProperty("weekday").GetInt32(),
+                            Text(payload.GetProperty("zoneId"))), Text(payload.GetProperty("title")), NullableText(payload.GetProperty("description")))
+                        : new StopRepeat(repeatTask, repeatVersion, repeatExpected);
+                    break;
                 case "RequestSplit":
                 case "RequestCleanup":
                 case "CancelCleanup":

@@ -32,8 +32,21 @@ class SharedRepository(
 
     /** The displayed snapshot binds confirmation and dependencies to what the user actually saw. */
     suspend fun act(kind: String, displayed: String, confirmedClaimant: String? = null,
-        after: String? = null, before: String? = null, until: String? = null, instructions: String? = null) = lease.access {
-        require(kind in SharedTaskActions.kinds && kind !in SharedChecklistActions.splitKinds)
+        after: String? = null, before: String? = null, until: String? = null, instructions: String? = null) =
+        recordAction(kind, displayed, confirmedClaimant, after, before, until, instructions)
+
+    /** A successful server round trip is required before admitting a schedule change.
+     * Once admitted, its immutable outbox entry survives an ambiguous delivery like other commands. */
+    suspend fun changeRepeat(displayed: String, blueprint: String?, checkConnection: suspend () -> Unit): String {
+        checkConnection()
+        return recordAction(if (blueprint == null) "StopRepeat" else "ConfigureRepeat", displayed, repeat = blueprint, schedule = true)
+    }
+
+    private suspend fun recordAction(kind: String, displayed: String, confirmedClaimant: String? = null,
+        after: String? = null, before: String? = null, until: String? = null, instructions: String? = null,
+        repeat: String? = null, schedule: Boolean = false) = lease.access {
+        require(kind in SharedTaskActions.kinds && kind !in SharedChecklistActions.splitKinds &&
+            (kind !in SharedTaskActions.repeatKinds || schedule))
         database.withTransaction {
             val state = current()
             check(state.blocked == null && dao.recoveryState(scope) == null)
@@ -49,6 +62,15 @@ class SharedRepository(
             val prior = dao.intents(scope).filter { SharedTaskActions.pending(it, state.revision) &&
                 SharedChecklistActions.writes(it, task, tasks).isNotEmpty() }
             val payload = JSONObject().put("taskId", id)
+            if (kind in SharedTaskActions.repeatKinds) {
+                check(task.isNull("parentId"))
+                check(prior.isEmpty()) { "Sync this task first" }
+                repeat?.let { value ->
+                    val blueprint = JSONObject(value)
+                    require(InboxLimits.valid(blueprint.getString("title"), blueprint.nullableString("description").orEmpty()))
+                    for (key in listOf("frequency", "weekday", "zoneId", "title", "description")) payload.put(key, blueprint.get(key))
+                }
+            }
             if (kind in SharedTaskActions.cleanupKinds) payload.put("requestId", task.optJSONObject("cleanup")?.opt("id") ?: JSONObject.NULL)
             if (kind == "RequestSplit") payload.put("instructions", instructions ?: JSONObject.NULL)
             if (kind == "CompleteTask") payload.put("confirmedClaimantId", confirmedClaimant ?: JSONObject.NULL)

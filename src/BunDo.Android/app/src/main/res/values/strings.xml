@@ -105,4 +105,19 @@
     <string name="task_snoozed">Lykätty. Poista lykkäys ennen varaamista tai valmiiksi merkitsemistä.</string>
     <string name="task_unsnooze">Poista lykkäys</string>
     <string name="task_snoozed_view">Lykätyt</string>
+    <string name="repeat_active">Toistuva tehtävä</string>
+    <string name="repeat_stopped">Toisto pysäytetty</string>
+    <string name="repeat_on_weekday">Viikoittain: %1$s</string>
+    <string name="repeat_daily">Päivittäin</string>
+    <string name="repeat_weekly">Viikoittain</string>
+    <string name="repeat_start">Aseta toisto</string>
+    <string name="repeat_edit">Muokkaa toistoa</string>
+    <string name="repeat_explanation">Toisto vaatii verkkoyhteyden. Seuraava tehtävä ilmestyy synkronoinnin jälkeen. Aikavyöhyke: %1$s.</string>
+    <string name="repeat_title">Seuraavien tehtävien otsikko</string>
+    <string name="repeat_description">Seuraavien tehtävien kuvaus</string>
+    <string name="repeat_edit_explanation">Muutokset koskevat seuraavia tehtäviä. Pysäyttäminen säilyttää nykyisen tehtävän. Poistaminen pysäyttää toiston, eikä Kumoa käynnistä sitä uudelleen.</string>
+    <string name="repeat_save">Tallenna toisto verkossa</string>
+    <string name="repeat_stop">Pysäytä toisto verkossa</string>
+    <string name="repeat_conflict">Toisto tai nykyinen tehtävä muuttui. Avaa uusin tehtävä ja vertaa ennen uutta yritystä.</string>
+    <string name="repeat_pending">Toiston muutos odottaa palvelimen vahvistusta. Synkronoi ennen uutta muutosta.</string>
 </resources>

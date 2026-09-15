@@ -147,6 +147,16 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
             SharedChecklist(task, byId, membership, !busy && current?.blocked == null && recovery == null,
                 onOpen, { checklistId = id }, ::act)
             SharedTaskControls(task, taskStates, membership, !busy && current?.blocked == null && recovery == null, failed, ::act)
+            SharedRepeatControls(task, membership, !busy && current?.blocked == null && recovery == null) { displayed, blueprint ->
+                run {
+                    repository.changeRepeat(displayed, blueprint) {
+                        (context.applicationContext as BunDoApplication).withAccountToken(data) { token ->
+                            SharedRepeatSetup.checkConnection(context, repository, token)
+                        }
+                    }
+                    SharedSyncWorker.request(context, data)
+                }
+            }
         } },
         queueHeader = {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
@@ -250,6 +260,7 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
                 Text(intent.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp))
                 if (intent.taskAction != null) Text(stringResource(taskActionLabel(intent.kind)))
                 Text(stringResource(when (intent.problem) {
+                    "REPEAT_CONFLICT", "REPEAT_MOVED", "REPEAT_OPEN_CONFLICT", "REPEAT_UNAVAILABLE" -> R.string.repeat_conflict
                     "CLAIM_CONFLICT", "ALREADY_CLAIMED", "CLAIM_CONFIRMATION_REQUIRED", "CLAIM_NOT_YOURS" -> R.string.task_claim_conflict
                     "LIFECYCLE_CONFLICT", "HIERARCHY_CONFLICT", "ORDER_CONFLICT", "SUBTREE_CONFLICT", "SNOOZE_CONFLICT", "TASK_SNOOZED", "PARENT_UNAVAILABLE", "CHECKLIST_ROOT", "CHECKLIST_DERIVED", "TASK_NOT_OPEN", "TASK_NOT_DELETED" -> R.string.task_state_conflict
                     "TASK_DELETED", "TASK_PURGING" -> R.string.task_deleted_conflict

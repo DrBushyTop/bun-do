@@ -92,6 +92,8 @@ public sealed class FrozenOperation
         Dependencies = dependencies.ToArray();
         var kind = command switch
         {
+            ConfigureRepeat => "ConfigureRepeat",
+            StopRepeat => "StopRepeat",
             RequestCleanup => "RequestCleanup",
             RequestSplit => "RequestSplit",
             CancelCleanup => "CancelCleanup",

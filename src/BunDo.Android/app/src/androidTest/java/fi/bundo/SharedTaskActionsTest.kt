@@ -762,6 +762,35 @@ class SharedTaskActionsTest {
         }
     }
 
+    @Test fun repeatSetupRequiresConnectionAndKeepsRetryBytesWithoutPredictingTasks() = runBlocking {
+        fixture { db, state, repository ->
+            val original = task("Milk")
+            val poll = repository.prepare(1000, 1)!!
+            repository.apply(poll, reply(poll, listOf(original, order(original.getString("id")))))
+            val blueprint = JSONObject().put("frequency", "WEEKLY").put("weekday", 1).put("zoneId", "Europe/Helsinki")
+                .put("title", "Next milk").put("description", JSONObject.NULL).toString()
+            assertTrue(runCatching { repository.changeRepeat(original.toString(), blueprint) { error("Offline") } }.isFailure)
+            assertTrue(db.shared().intents(state.scope).isEmpty())
+            repository.changeRepeat(original.toString(), blueprint) { }
+            assertEquals("Milk", repository.tasks.first().single().title)
+            assertTrue(repository.taskStates.first().single().isNull("repeat"))
+            val request = repository.prepare(1001, 1)!!
+            val wire = JSONObject(request.envelope!!)
+            assertEquals("ConfigureRepeat", wire.getString("command"))
+            assertEquals("0", wire.getJSONObject("observedVersions").getJSONObject("recurrence").getString("fieldVersion"))
+            val restarted = SharedRepository(db, DataLease(), state.scope, state.registration)
+            val retry = restarted.prepare(200_000, 2)!!
+            assertEquals(request.envelope, retry.envelope)
+            val linked = JSONObject(original.toString()).put("repeat", JSONObject().put("id", UUID.randomUUID().toString())
+                .put("version", "2").put("active", true).put("title", "Next milk").put("description", JSONObject.NULL).put("rule", JSONObject().put("frequency", "WEEKLY").put("weekday", 1).put("zoneId", "Europe/Helsinki")))
+            assertFalse(SharedProtocol.containsEffect(original, linked))
+            restarted.apply(retry, reply(retry, listOf(linked), receipt(retry, linked)))
+            restarted.act("CompleteTask", restarted.taskStates.first().single().toString())
+            assertEquals(1, restarted.taskStates.first().size)
+            assertTrue(restarted.taskStates.first().single().isNull("firstCompletion"))
+        }
+    }
+
     private fun deletion(group: String) = JSONObject().put("groupId", group)
         .put("deletedAt", "2026-09-13T12:00:00Z").put("purging", false)
 

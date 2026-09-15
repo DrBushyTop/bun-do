@@ -198,6 +198,7 @@ class SharedTaskUiTest {
         compose.onNodeWithTag("capture").performClick()
         compose.onNodeWithTag("title").performTextInput("Prepare kitchen")
         compose.onNodeWithTag("editor-split").performScrollTo().performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("split-instructions").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("split-instructions").performScrollTo().assertExists()
         val intents = runBlocking { data.database.shared().intents(state.scope) }
         assertEquals(1, intents.size); assertEquals("CreateTask", intents.single().kind)

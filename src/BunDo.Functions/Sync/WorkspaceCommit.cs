@@ -28,6 +28,7 @@ public sealed record WorkspaceCommit(WorkspaceState Metadata, IReadOnlyList<Work
             throw new ArgumentException("Invalid maintenance deletion set.");
         var writes = new List<WorkspaceWrite> { new(GroupId(next.Revision), group, true) };
         foreach (var task in group.Tasks) writes.Add(new(TaskId(task.Id), task, false));
+        foreach (var repeat in group.Repeats ?? []) writes.Add(new($"repeat:{repeat.Id}", repeat, false));
         // Completion credit outlives task content and remains available to household statistics.
         foreach (var completion in group.RetainedCompletions ?? [])
             writes.Add(new($"completion:{completion.RootId}", completion, true));
@@ -38,7 +39,7 @@ public sealed record WorkspaceCommit(WorkspaceState Metadata, IReadOnlyList<Work
                 writes.Add(new(DeviceId(device.DeviceId), device, false));
         // Existing pre-sync records remain readable. New history and entities never accumulate in metadata.
         var metadata = next with { Changes = current.Changes, Tasks = current.Tasks,
-            Devices = current.Devices, Receipts = current.Receipts };
+            Devices = current.Devices, Receipts = current.Receipts, Repeats = current.Repeats };
         var bytes = JsonSerializer.SerializeToUtf8Bytes(metadata).Length +
             writes.Sum(x => JsonSerializer.SerializeToUtf8Bytes(x.Value, x.Value.GetType()).Length + 512) + 512;
         bytes += deletes.Sum(x => System.Text.Encoding.UTF8.GetByteCount(x) + 512);

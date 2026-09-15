@@ -58,6 +58,7 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
             var revision = state.Revision + 1;
             var acceptedAt = clock.GetUtcNow();
             var code = "ACCEPTED";
+            var repeats = state.Repeats ?? ImmutableDictionary<string, RepeatSchedule>.Empty;
             var originalOrder = RootOrdering.Current(state);
             var order = originalOrder;
             TaskSnapshot? task;
@@ -106,6 +107,17 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
                        state.Receipts.TryGetValue(dependencyId, out var dependency) && !dependency.Accepted
                     ? "BLOCKED_DEPENDENCY"
                     : "INVALID_DEPENDENCY";
+            }
+            else if (operation.Command is RepeatCommand)
+            {
+                var result = TaskRepeats.Configure(state, operation, authenticatedMemberId, revision, acceptedAt);
+                code = result.Code;
+                task = result.Task;
+                if (result.Schedule is { } schedule)
+                {
+                    changed = task;
+                    repeats = repeats.SetItem(schedule.Id, schedule);
+                }
             }
             else if (operation.Command is CleanupCommand cleanup)
             {
@@ -186,6 +198,19 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
             }
             if (changed is not null) effects = effects.SetItem(changed.Id, changed);
             effects = ChecklistTasks.Reconcile(state, effects, authenticatedMemberId, revision, acceptedAt);
+            if (code == "ACCEPTED")
+            {
+                var repeated = TaskRepeats.Reconcile(state, effects, repeats, revision, acceptedAt);
+                code = repeated.Code;
+                if (code == "ACCEPTED") { effects = repeated.Effects; repeats = repeated.Schedules; }
+                else
+                {
+                    effects = ImmutableDictionary<string, TaskSnapshot>.Empty;
+                    repeats = state.Repeats ?? ImmutableDictionary<string, RepeatSchedule>.Empty;
+                    order = originalOrder;
+                    if (task is not null) task = state.Tasks.GetValueOrDefault(task.Id);
+                }
+            }
             foreach (var effect in effects.Values.ToArray())
             {
                 if (!state.Tasks.TryGetValue(effect.Id, out var before))
@@ -212,11 +237,13 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
                 RootOrder = order,
                 TaskCount = state.TaskCount + effects.Keys.Count(id => !state.Tasks.ContainsKey(id)),
                 Tasks = state.Tasks.SetItems(effects),
+                Repeats = repeats,
                 Receipts = state.Receipts.Add(operation.OperationId, receipt),
                 Devices = state.Devices.SetItem(operation.DeviceId,
                     state.Devices[operation.DeviceId] with { LastTerminalSequence = operation.Sequence }),
                 Changes = state.Changes.Add(new(revision, effects.Values.OrderBy(value => value.Id).ToImmutableArray(), acceptedAt, operation.OperationId,
-                    state.RootOrder is null || !order.SequenceEqual(originalOrder) ? order : null))
+                    state.RootOrder is null || !order.SequenceEqual(originalOrder) ? order : null,
+                    Repeats: repeats.Values.Where(value => value != state.Repeats?.GetValueOrDefault(value.Id)).ToImmutableArray()))
             };
             if (store.TryCommit(state.Revision, next)) return new(code, receipt);
         }

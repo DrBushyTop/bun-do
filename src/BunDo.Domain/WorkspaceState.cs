@@ -17,7 +17,7 @@ public sealed record TaskSnapshot(
     ulong SubtreeVersion = 0, ulong SnoozeVersion = 0, string? CancellationGroupId = null,
     bool EmptyChecklist = false, CleanupRequest? Cleanup = null, string? ContentLanguage = null, TaskDue? Due = null, FieldVersion? DueVersion = null,
     bool Urgent = false, ulong UrgencyVersion = 0, TaskCreation? Creation = null, TaskChange? LastChange = null,
-    string? InitialPlacement = null);
+    string? InitialPlacement = null, RepeatInfo? Repeat = null);
 public sealed record DeviceRegistration(Guid DeviceId, Guid MemberId, ulong LastTerminalSequence = 0,
     ulong AcknowledgedThrough = 0, string? RegistryPartition = null);
 public sealed record OperationReceipt(
@@ -29,7 +29,7 @@ public sealed record OperationReceipt(
 public sealed record SubmissionResult(string Code, OperationReceipt? Receipt = null);
 public sealed record ChangeGroup(ulong Revision, ImmutableArray<TaskSnapshot> Tasks,
     DateTimeOffset? RecordedAt = null, string? OperationId = null, ImmutableArray<string>? RootOrder = null,
-    ImmutableArray<string>? PurgedTaskIds = null, ImmutableArray<FirstCompletion>? RetainedCompletions = null);
+    ImmutableArray<string>? PurgedTaskIds = null, ImmutableArray<FirstCompletion>? RetainedCompletions = null, ImmutableArray<RepeatSchedule>? Repeats = null);
 public sealed record SnapshotPin(Guid Id, Guid MemberId, Guid DeviceId, Guid ArtifactId, ulong Revision,
     DateTimeOffset ExpiresAt, DateTimeOffset BuildUntil, string? ManifestHash = null);
 public sealed record ChangePage(
@@ -48,7 +48,7 @@ public sealed record WorkspaceState(
     string? CursorSecret = null,
     int TaskCount = 0,
     ulong PrunedThrough = 0,
-    ImmutableDictionary<Guid, SnapshotPin>? SnapshotPins = null, ImmutableArray<string>? RootOrder = null, string TimeZoneId = "Europe/Helsinki");
+    ImmutableDictionary<Guid, SnapshotPin>? SnapshotPins = null, ImmutableArray<string>? RootOrder = null, string TimeZoneId = "Europe/Helsinki", ImmutableDictionary<string, RepeatSchedule>? Repeats = null);
 
 /// <summary>The transaction seam; a failed compare-and-swap must have no effects.</summary>
 public interface IWorkspaceStore
