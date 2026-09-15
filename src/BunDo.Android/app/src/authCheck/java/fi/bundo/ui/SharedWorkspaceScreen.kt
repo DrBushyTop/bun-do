@@ -59,6 +59,7 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
     val taskStates by repository.taskStates.collectAsStateWithLifecycle(emptyList())
     val byId = taskStates.associateBy { it.getString("id") }
     val membership = current?.membership?.let(::JSONObject)
+    var destination by rememberSaveable(selected.scope) { mutableStateOf("queue") }
     var history by rememberSaveable(selected.scope) { mutableStateOf(false) }
     var deleted by rememberSaveable(selected.scope) { mutableStateOf(false) }
     var snoozed by rememberSaveable(selected.scope) { mutableStateOf(false) }
@@ -136,6 +137,12 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
         onDispose { owner.lifecycle.removeObserver(observer); if (!data.lease.active) model.hide() }
     }
     InboxApp(state, model, appearance, onAppearance, onAccount = onAccount, queueTitle = selected.name,
+        queueNavigation = { SharedHouseholdNavigation(destination) { destination = it } },
+        queueContent = if (destination != "queue") ({ onOpen ->
+            SharedProgressScreen(current?.progress?.takeIf { current?.blocked == null && recovery == null },
+                destination == "activity", byId, membership,
+                { SharedSyncWorker.request(context, data) }, onOpen)
+        }) else null,
         canEdit = current?.blocked == null, queueTasks = queueRows,
         onSplit = if (state.editor?.let { it.key == InboxRepository.NEW_DRAFT || byId[it.key]?.let { task ->
             task.isNull("parentId") && !task.optBoolean("isChecklist") && task.optString("lifecycle", "OPEN") == "OPEN"

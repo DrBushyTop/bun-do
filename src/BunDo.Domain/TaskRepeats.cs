@@ -129,6 +129,7 @@ public static class TaskRepeats
         var order = RootOrdering.Current(state).Add(task.Id);
         return state with { Revision = revision, TaskCount = state.TaskCount + 1, RootOrder = order,
             Tasks = state.Tasks.Add(task.Id, task), Repeats = state.Repeats!.SetItem(repeat.Id, repeat),
+            RecentActivity = HouseholdProgress.Record(state.RecentActivity, revision, task.Id, null, "GenerateRepeat", now),
             Changes = state.Changes.Add(new(revision, [task], now, RootOrder: order, Repeats: [repeat])) };
     }
 

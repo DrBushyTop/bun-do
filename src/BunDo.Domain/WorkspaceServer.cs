@@ -238,6 +238,9 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
                 TaskCount = state.TaskCount + effects.Keys.Count(id => !state.Tasks.ContainsKey(id)),
                 Tasks = state.Tasks.SetItems(effects),
                 Repeats = repeats,
+                RecentActivity = code == "ACCEPTED" && task is not null && effects.Count > 0
+                    ? HouseholdProgress.Record(state.RecentActivity, revision, task.Id, authenticatedMemberId,
+                        operation.Command.GetType().Name, acceptedAt) : state.RecentActivity,
                 Receipts = state.Receipts.Add(operation.OperationId, receipt),
                 Devices = state.Devices.SetItem(operation.DeviceId,
                     state.Devices[operation.DeviceId] with { LastTerminalSequence = operation.Sequence }),

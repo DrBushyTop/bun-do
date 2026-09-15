@@ -96,6 +96,8 @@ fun InboxApp(
     canEditTask: (String) -> Boolean = { true },
     snackbarHost: @Composable () -> Unit = {},
     onSplit: (() -> Unit)? = null,
+    queueNavigation: (@Composable () -> Unit)? = null,
+    queueContent: (@Composable ((String) -> Unit) -> Unit)? = null,
 ) {
     var settings by rememberSaveable { mutableStateOf(false) }
     var showVoice by rememberSaveable { mutableStateOf(false) }
@@ -117,6 +119,7 @@ fun InboxApp(
         val gutter = if (maxWidth < 600.dp) 16.dp else 24.dp
         Scaffold(
             snackbarHost = snackbarHost,
+            bottomBar = { if (editor == null && !settings && selected == null) queueNavigation?.invoke() },
             topBar = {
                 TopAppBar(
                     title = {
@@ -165,10 +168,11 @@ fun InboxApp(
                 when {
                     editor != null -> Editor(state, model, onSplit, Modifier.align(Alignment.TopCenter).widthIn(max = 640.dp).fillMaxWidth())
                     settings -> Settings(appearance, onAppearance, Modifier.align(Alignment.TopCenter).widthIn(max = 640.dp).fillMaxWidth(), queueTitle == null)
-                    selected != null && !wide -> TaskDetail(
+                    selected != null && (!wide || queueContent != null) -> TaskDetail(
                         selected, { model.openEditor(selected.id) }, state, model::retry, Modifier.fillMaxSize(), queueTitle == null,
                         taskControls, canEdit && canEditTask(selected.id), { selectedId = it },
                     )
+                    queueContent != null -> queueContent { selectedId = it }
                     else -> Row(Modifier.fillMaxSize()) {
                         Queue(
                             state = if (queueTasks == null) state else state.copy(tasks = queueTasks),

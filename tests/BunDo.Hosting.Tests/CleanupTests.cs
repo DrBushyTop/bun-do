@@ -78,6 +78,7 @@ public sealed class CleanupTests : IDisposable
         var reply = Assert.IsType<ContentResult>(await Poll("alice"));
         Assert.Equal(200, reply.StatusCode);
         Assert.Contains("APPLIED", reply.Content);
+        Assert.Contains("\"statistics\"", reply.Content);
         Assert.Equal("APPLIED", (await Read(task.Id)).Cleanup!.Status);
         await Poll("alice");
         Assert.Equal(1, provider.Calls);

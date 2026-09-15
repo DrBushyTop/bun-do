@@ -85,6 +85,26 @@ class SharedTaskUiTest {
         return data to state
     }
 
+    @Test fun householdDestinationsOpenActivityTasksAndKeepTogetherAccessibleAtLargeText() {
+        val (data, state) = fixture("en", "light", fontScale = 2f)
+        val id = runBlocking {
+            val task = data.database.shared().base(state.scope).map { JSONObject(it.snapshot) }.first { it.optString("title") == "Vie paperit kierrätykseen" }
+            data.database.shared().saveWorkspace(state.copy(progress = progressFixture(task.getString("id"), alice).toString()))
+            task.getString("id")
+        }
+        compose.onNodeWithTag("household-activity").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("activity-task-$id").fetchSemanticsNodes().isNotEmpty() }
+        screenshot("progress-native-activity-large")
+        compose.onNodeWithTag("activity-task-$id").performScrollTo().performClick()
+        compose.onNodeWithTag("task-complete").performScrollTo().assertExists()
+        compose.onNodeWithTag("back").performClick()
+        compose.onNodeWithTag("household-together").performClick()
+        screenshot("progress-native-together-large")
+        compose.onNodeWithTag("progress-streak").performScrollTo().assertExists()
+        compose.onNodeWithTag("household-queue").performClick()
+        compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().assertExists()
+    }
+
     @Test fun tomorrowCaptureExplainsPlacementAndPersistsUrgencyInEnglish() {
         val (data, state) = fixture("en", "light")
         compose.onNodeWithTag("capture").performClick()

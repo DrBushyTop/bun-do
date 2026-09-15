@@ -120,4 +120,49 @@
     <string name="repeat_stop">Pysäytä toisto verkossa</string>
     <string name="repeat_conflict">Toisto tai nykyinen tehtävä muuttui. Avaa uusin tehtävä ja vertaa ennen uutta yritystä.</string>
     <string name="repeat_pending">Toiston muutos odottaa palvelimen vahvistusta. Synkronoi ennen uutta muutosta.</string>
+    <string name="progress_activity">Tapahtumat</string>
+    <string name="progress_together">Yhdessä</string>
+    <string name="progress_unavailable">Synkronoi nähdäksesi yhteiset tapahtumat ja valmistumiset.</string>
+    <string name="progress_as_of">Tiedot päivitetty %1$s</string>
+    <string name="progress_activity_empty">Yhteiset tapahtumat ilmestyvät tähän, kun tehtäviä muutetaan.</string>
+    <string name="progress_task_unavailable">Tehtävä ei ole enää saatavilla tällä laitteella.</string>
+    <string name="progress_week">Viikko</string>
+    <string name="progress_month">Kuukausi</string>
+    <plurals name="progress_completed">
+        <item quantity="one">%1$d tehtävä hoidettu</item>
+        <item quantity="other">%1$d tehtävää hoidettu</item>
+    </plurals>
+    <string name="progress_period">%1$s – %2$s</string>
+    <string name="progress_bucket">%1$s, hoidettu: %2$d</string>
+    <plurals name="progress_streak">
+        <item quantity="one">%1$d viikon putki</item>
+        <item quantity="other">%1$d viikon putki</item>
+    </plurals>
+    <string name="progress_streak_explanation">Vähintään yksi uusi valmistuminen joka viikko. Keskeneräinen viikko ei katkaise edellisen viikon putkea.</string>
+    <plurals name="progress_lifetime">
+        <item quantity="one">%1$d asia hoidettu yhdessä</item>
+        <item quantity="other">%1$d asiaa hoidettu yhdessä</item>
+    </plurals>
+    <string name="progress_milestone">Etappi saavutettu: %1$d.</string>
+    <string name="progress_next_milestone">Seuraava etappi: %1$d.</string>
+    <string name="progress_counting_explanation">Jokainen päätehtävä lasketaan kerran. Ilman verkkoyhteyttä tehdyt valmistumiset lasketaan, kun palvelin hyväksyy ne synkronoinnissa. Viikko alkaa maanantaina. Tilastojen aikavyöhyke: %1$s.</string>
+    <string name="activity_created">%1$s lisäsi tehtävän</string>
+    <string name="activity_completed">%1$s merkitsi valmiiksi</string>
+    <string name="activity_cancelled">%1$s perui tehtävän</string>
+    <string name="activity_reopened">%1$s avasi uudelleen</string>
+    <string name="activity_deleted">%1$s poisti tehtävän</string>
+    <string name="activity_restored">%1$s palautti tehtävän</string>
+    <string name="activity_claimed">%1$s otti tehtävän</string>
+    <string name="activity_unclaimed">%1$s vapautti tehtävän</string>
+    <string name="activity_moved">%1$s siirsi tehtävää</string>
+    <string name="activity_repeat_saved">%1$s tallensi toiston</string>
+    <string name="activity_repeat_stopped">%1$s pysäytti toiston</string>
+    <string name="activity_repeat_created">%1$s loi seuraavan toistuvan tehtävän</string>
+    <string name="activity_ai_requested">%1$s pyysi tekoälyn ehdotusta</string>
+    <string name="activity_ai_cancelled">%1$s perui tekoälypyynnön</string>
+    <string name="activity_ai_applied">%1$s hyväksyi tekoälyn ehdotuksen</string>
+    <string name="activity_checklist">%1$s lisäsi vaiheita</string>
+    <string name="activity_snoozed">%1$s siirsi tehtävän myöhemmäksi</string>
+    <string name="activity_unsnoozed">%1$s palautti tehtävän jonoon</string>
+    <string name="activity_edited">%1$s muokkasi tehtävää</string>
 </resources>

@@ -119,4 +119,49 @@
     <string name="repeat_stop">Stop repeat online</string>
     <string name="repeat_conflict">The repeat or current task changed. Open the latest task and compare before trying again.</string>
     <string name="repeat_pending">Repeat change is waiting for server confirmation. Sync before changing it again.</string>
+    <string name="progress_activity">Activity</string>
+    <string name="progress_together">Together</string>
+    <string name="progress_unavailable">Sync to see shared activity and completions.</string>
+    <string name="progress_as_of">Updated %1$s</string>
+    <string name="progress_activity_empty">Shared activity appears here when tasks change.</string>
+    <string name="progress_task_unavailable">This task is no longer available on this device.</string>
+    <string name="progress_week">Week</string>
+    <string name="progress_month">Month</string>
+    <plurals name="progress_completed">
+        <item quantity="one">%1$d task completed</item>
+        <item quantity="other">%1$d tasks completed</item>
+    </plurals>
+    <string name="progress_period">%1$s to %2$s</string>
+    <string name="progress_bucket">%1$s, completed: %2$d</string>
+    <plurals name="progress_streak">
+        <item quantity="one">%1$d week streak</item>
+        <item quantity="other">%1$d week streak</item>
+    </plurals>
+    <string name="progress_streak_explanation">At least one new completion each week. An unfinished week keeps the run that ended last week.</string>
+    <plurals name="progress_lifetime">
+        <item quantity="one">%1$d thing done together</item>
+        <item quantity="other">%1$d things done together</item>
+    </plurals>
+    <string name="progress_milestone">Milestone reached: %1$d.</string>
+    <string name="progress_next_milestone">Next milestone: %1$d.</string>
+    <string name="progress_counting_explanation">Each root task counts once. Offline completions count when the server accepts them during sync. Weeks start on Monday. Statistics time zone: %1$s.</string>
+    <string name="activity_created">%1$s added a task</string>
+    <string name="activity_completed">%1$s marked complete</string>
+    <string name="activity_cancelled">%1$s cancelled a task</string>
+    <string name="activity_reopened">%1$s reopened a task</string>
+    <string name="activity_deleted">%1$s deleted a task</string>
+    <string name="activity_restored">%1$s restored a task</string>
+    <string name="activity_claimed">%1$s took a task</string>
+    <string name="activity_unclaimed">%1$s released a task</string>
+    <string name="activity_moved">%1$s moved a task</string>
+    <string name="activity_repeat_saved">%1$s saved a repeat</string>
+    <string name="activity_repeat_stopped">%1$s stopped a repeat</string>
+    <string name="activity_repeat_created">%1$s created the next repeating task</string>
+    <string name="activity_ai_requested">%1$s requested an AI suggestion</string>
+    <string name="activity_ai_cancelled">%1$s cancelled an AI request</string>
+    <string name="activity_ai_applied">%1$s accepted an AI suggestion</string>
+    <string name="activity_checklist">%1$s added checklist steps</string>
+    <string name="activity_snoozed">%1$s snoozed a task</string>
+    <string name="activity_unsnoozed">%1$s returned a task to the queue</string>
+    <string name="activity_edited">%1$s edited a task</string>
 </resources>

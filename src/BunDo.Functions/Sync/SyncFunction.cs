@@ -83,11 +83,17 @@ public sealed class SyncFunction(AccessTokens tokens, IServiceProvider services)
             var provider = services.GetService<BunDo.Functions.AI.ICleanupProvider>() ?? new BunDo.Functions.AI.UnavailableCleanupProvider();
             await new BunDo.Functions.AI.CleanupWorker(documents, provider).RunAsync(member, workspace, epoch, ct);
             var reply = await sync.PullAsync(member, workspace, epoch, cursor, receipts, code, ct);
+            if (!reply.HasMore)
+            {
+                try { reply = reply with { Progress = await new BunDo.Functions.Progress.ProgressService(documents).ReadAsync(member, workspace, epoch, ct) }; }
+                // Busy statistics must not prevent delivery of already-accepted task receipts.
+                catch (SyncException error) when (error.Code == "BUSY") { }
+            }
             Activity.Current?.SetTag("sync.result", code);
             Activity.Current?.SetTag("sync.receipts", receipts.Count);
             Activity.Current?.SetTag("sync.groups", reply.Groups.Count);
             return new ContentResult { ContentType = "application/json", StatusCode = 200,
-                Content = JsonSerializer.Serialize(reply, SyncJson.Options) };
+                Content = SyncJson.SerializeReply(reply) };
         }
         catch (EnvelopeException error) { return Failure(error.Code, 400); }
         catch (SyncException error) { return Failure(error.Code, error.Code == "FORBIDDEN" ? 403 :

@@ -791,6 +791,38 @@ class SharedTaskActionsTest {
         }
     }
 
+    @Test fun serverProgressIsCachedWithoutOptimisticCreditAndClearedOnAccessRemoval() = runBlocking {
+        fixture { db, state, repository ->
+            val task = task("Milk")
+            val poll = repository.prepare(1000, 1)!!
+            val progress = progressFixture(task.getString("id"), me)
+            repository.apply(poll, reply(poll, listOf(task, order(task.getString("id")))).put("progress", progress))
+            val before = repository.workspace.first()!!.progress
+            assertEquals(25, JSONObject(before!!).getJSONObject("statistics").getInt("lifetimeCount"))
+            repository.act("CompleteTask", repository.taskStates.first().single().toString())
+            assertEquals(before, repository.workspace.first()!!.progress)
+            val restarted = SharedRepository(db, DataLease(), state.scope, state.registration)
+            assertEquals(before, restarted.workspace.first()!!.progress)
+            assertEquals(before, SharedProgress.accept(before, progressFixture(task.getString("id"), me, "0").put("activity", JSONArray())))
+            restarted.block(restarted.prepare(1001, 1)!!, "FORBIDDEN")
+            assertNull(restarted.workspace.first()!!.progress)
+        }
+    }
+
+    @Test fun progressMigrationKeepsSavedTasks() {
+        val name = "progress-migration-${UUID.randomUUID()}.db"
+        migrations.createDatabase(name, 10).apply {
+            execSQL("INSERT INTO inbox_tasks VALUES ('kept','Milk','','Milk','',1,1)")
+            close()
+        }
+        migrations.runMigrationsAndValidate(name, 11, true, InboxDatabase.MIGRATION_10_11).apply {
+            query("SELECT title FROM inbox_tasks WHERE id='kept'").use { assertTrue(it.moveToFirst()); assertEquals("Milk", it.getString(0)) }
+            query("SELECT progress FROM shared_workspaces").close()
+            close()
+        }
+        context.deleteDatabase(name)
+    }
+
     private fun deletion(group: String) = JSONObject().put("groupId", group)
         .put("deletedAt", "2026-09-13T12:00:00Z").put("purging", false)
 

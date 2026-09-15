@@ -367,7 +367,7 @@ class SharedRepository(
         database.withTransaction {
             val state = current()
             if (state.worker != request.worker) return@withTransaction
-            dao.saveWorkspace(state.copy(blocked = reason, worker = null))
+            dao.saveWorkspace(state.copy(blocked = reason, worker = null, progress = null))
             for (intent in dao.intents(scope)) {
                 val quarantine = intent.status in listOf("PENDING", "SUBMITTED") ||
                     intent.status == "ACCEPTED" && intent.receipt?.let { JSONObject(it).decimal("effectRevision") > state.revision.toULong() } == true
@@ -481,7 +481,8 @@ class SharedRepository(
             }
             val next = state.copy(revision = through.toString(), cursor = response.getString("cursor"),
                 acknowledged = acknowledged.toString(), worker = null, workerUntil = 0,
-                membership = response.optJSONObject("membership")?.toString() ?: state.membership)
+                membership = response.optJSONObject("membership")?.toString() ?: state.membership,
+                progress = SharedProgress.accept(state.progress, response.optJSONObject("progress")))
             dao.saveWorkspace(next)
             rebuild(next)
             lease.check()

@@ -171,7 +171,7 @@ public sealed class SyncService(IHouseholdDocuments documents)
             var group = SyncGroup.Encode(change);
             var size = JsonSerializer.SerializeToUtf8Bytes(group, SyncJson.Options).Length + 1;
             if (size > 2 * 1024 * 1024) throw new SyncException("CHANGE_UNAVAILABLE");
-            if (responseBytes + size > 4 * 1024 * 1024 - 1024) break;
+            if (responseBytes + size > SyncJson.MaximumResponseBytes - 1024) break;
             groups.Add(group);
             through = revision;
             responseBytes += size;
@@ -202,7 +202,8 @@ public sealed class SyncService(IHouseholdDocuments documents)
 
 public sealed record SyncReply(string Code, Guid WorkspaceId, Guid StateEpoch, ulong AfterRevision,
     ulong ThroughRevision, ulong HeadRevision, ulong TargetRevision, string Cursor, bool HasMore,
-    IReadOnlyList<OperationReceipt> Receipts, IReadOnlyList<SyncGroup> Groups, SyncMembership? Membership = null);
+    IReadOnlyList<OperationReceipt> Receipts, IReadOnlyList<SyncGroup> Groups, SyncMembership? Membership = null,
+    BunDo.Functions.Progress.ProgressSnapshot? Progress = null);
 public sealed record SyncMembership(Guid Me, Guid OwnerId, IReadOnlyList<HouseholdMember> Members, string TimeZoneId = "Europe/Helsinki");
 public sealed record SyncPart(int PartIndex, string[] EntityIds, string Payload);
 public sealed record SyncGroup(ulong Revision, int PartCount, SyncPart[] Parts, string Digest)
@@ -229,7 +230,19 @@ public sealed record SyncGroup(ulong Revision, int PartCount, SyncPart[] Parts, 
 
 public static class SyncJson
 {
+    public const int MaximumResponseBytes = 4 * 1024 * 1024;
     public static readonly JsonSerializerOptions Options = Create();
+
+    public static string SerializeReply(SyncReply reply)
+    {
+        var json = JsonSerializer.Serialize(reply, Options);
+        // Task pagination has already budgeted receipts and groups. Optional progress must not
+        // make that page unreadable; a later idle/ack poll can deliver the statistics snapshot.
+        if (reply.Progress is not null && Encoding.UTF8.GetByteCount(json) > MaximumResponseBytes)
+            json = JsonSerializer.Serialize(reply with { Progress = null }, Options);
+        return json;
+    }
+
     private static JsonSerializerOptions Create()
     {
         var result = new JsonSerializerOptions(JsonSerializerDefaults.Web);

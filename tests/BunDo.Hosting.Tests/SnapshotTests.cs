@@ -278,6 +278,9 @@ public sealed class SnapshotTests : IDisposable
         Assert.Null(await storage.ReadAsync<TaskSnapshot>(workspace.ToString(), WorkspaceCommit.TaskId(created.Id), default));
         var credit = (await storage.ReadAsync<FirstCompletion>(workspace.ToString(), $"completion:{created.Id}", default))!.Value;
         Assert.Equal(completed.FirstCompletion, credit);
+        var progress = await new BunDo.Functions.Progress.ProgressService(storage, clock).ReadAsync(member, workspace, epoch, default);
+        Assert.Equal(1, progress.Statistics.LifetimeCount);
+        Assert.DoesNotContain("Original private text", JsonSerializer.Serialize(progress));
     }
 
     [Theory]

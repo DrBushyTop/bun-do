@@ -30,6 +30,7 @@ data class SharedWorkspace(
     @ColumnInfo(defaultValue = "'0'") val snapshotRevision: String = "0",
     @ColumnInfo(defaultValue = "0") val journalVersion: Long = 0,
     val membership: String? = null,
+    val progress: String? = null,
 )
 
 @Entity(tableName = "shared_base", primaryKeys = ["scope", "generation", "id"])
