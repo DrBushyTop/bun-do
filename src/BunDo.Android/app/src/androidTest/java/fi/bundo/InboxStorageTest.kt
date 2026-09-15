@@ -59,6 +59,21 @@ class InboxStorageTest {
         assertTrue(reopened.inbox().draft("new")!!.savedAt > 0)
     }
 
+    @Test fun remindersMigrationPreservesExistingDrafts() {
+        val name = "test-${UUID.randomUUID()}.db"
+        names += name
+        migrations.createDatabase(name, 9).apply {
+            execSQL("INSERT INTO editor_drafts (`key`, title, description, savedAt) VALUES ('new', 'Keep me', '', 123)")
+            close()
+        }
+        migrations.runMigrationsAndValidate(name, 10, true, InboxDatabase.MIGRATION_9_10).apply {
+            query("SELECT title FROM editor_drafts WHERE `key` = 'new'").use {
+                assertTrue(it.moveToFirst()); assertEquals("Keep me", it.getString(0))
+            }
+            close()
+        }
+    }
+
     @Test fun failedIntentInsertRollsBackProjectionAndPreservesDraft() = runBlocking {
         val db = open()
         val repository = InboxRepository(db)

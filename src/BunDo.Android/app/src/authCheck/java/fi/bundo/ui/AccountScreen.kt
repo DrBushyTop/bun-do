@@ -104,7 +104,7 @@ fun AccountScreen(accounts: AccountStore, model: SignInModel, onHouseholds: () -
         TopAppBar(title = { Text(stringResource(R.string.account_title)) },
             navigationIcon = { TextButton(onClick = onClose) { Text(stringResource(R.string.back)) } })
     }) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())
+        Column(Modifier.padding(padding).fillMaxSize().imePadding().verticalScroll(rememberScrollState())
             .padding(24.dp).semantics { testTagsAsResourceId = true },
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
             val current = data
@@ -120,6 +120,7 @@ fun AccountScreen(accounts: AccountStore, model: SignInModel, onHouseholds: () -
                 Text(stringResource(R.string.households_title))
             }
             if (current != null) key(current.lease.generation) {
+                if (signedIn) ReminderSettingsSection(current)
                 LegacyRecordingsSection(accounts, current, onClose)
             }
             Text(stringResource(R.string.account_local_notice))

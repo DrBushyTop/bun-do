@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="reminders_title">Muistutukset</string>
+    <string name="reminders_approximate">Muistutusten ajankohta on suuntaa antava. Android voi viivästyttää niitä. Jokainen käytössä oleva laite voi muistuttaa.</string>
+    <string name="reminders_off">Pois käytöstä</string>
+    <string name="reminders_mine">Omat varaukset ja vapaat tehtävät</string>
+    <string name="reminders_all">Kaikki kodin tehtävät</string>
+    <string name="reminders_denied">Ilmoitukset on estetty. Erääntyneet tehtävät näkyvät silti kodin Erääntyneet-listassa.</string>
+    <string name="reminders_system_settings">Avaa ilmoitusasetukset</string>
+    <string name="reminders_time">Päivämäärätehtävien muistutusaika</string>
+    <string name="reminders_time_short">Kellonaika</string>
+    <string name="reminders_time_invalid">Anna kellonaika väliltä 00:00–23:59.</string>
+    <string name="reminders_time_hint">Käytä muotoa HH:mm, esimerkiksi 09:00. Aika tulkitaan määräpäivään tallennetulla aikavyöhykkeellä.</string>
+    <string name="reminders_save_time">Tallenna muistutusaika</string>
+    <string name="reminders_offline">Ilman verkkoyhteyttä laite voi muistuttaa tehtävästä, jonka toinen on jo tehnyt. Tilanne tarkistetaan synkronoinnin jälkeen.</string>
+    <string name="reminders_failed">Muistutuksia ei voitu tallentaa. Yritä uudelleen.</string>
+    <string name="reminders_waiting">Kodin tehtäviä on erääntynyt</string>
+    <plurals name="reminders_more">
+        <item quantity="one">Ja %1$d muu</item>
+        <item quantity="other">Ja %1$d muuta</item>
+    </plurals>
+    <string name="reminders_due">Erääntyneet</string>
+    <string name="reminders_due_empty">Ei erääntyneitä tehtäviä juuri nyt. Siirretyt tehtävät palaavat lykkäyksen päättyessä.</string>
+</resources>

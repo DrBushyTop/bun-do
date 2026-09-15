@@ -62,6 +62,8 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
     var history by rememberSaveable(selected.scope) { mutableStateOf(false) }
     var deleted by rememberSaveable(selected.scope) { mutableStateOf(false) }
     var snoozed by rememberSaveable(selected.scope) { mutableStateOf(false) }
+    var dueOnly by rememberSaveable(selected.scope) { mutableStateOf(false) }
+    val reminderSettings by remember(data) { data.database.reminders().observeSettings() }.collectAsState(null)
     var now by remember { mutableStateOf(java.time.Instant.now()) }
     LaunchedEffect(selected.scope) { while (true) { kotlinx.coroutines.delay(30_000); now = java.time.Instant.now() } }
     var checklistId by rememberSaveable(selected.scope) { mutableStateOf<String?>(null) }
@@ -70,7 +72,11 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
     val snackbar = remember(selected.scope) { SnackbarHostState() }
     val deletedMessage = stringResource(R.string.task_deleted)
     val undoLabel = stringResource(R.string.task_undo)
-    val queueRows = taskStates.filter { if (deleted) !it.isNull("deletion") &&
+    val dueIds = fi.bundo.reminders.ReminderPolicy.candidates(taskStates.map {
+        ReminderCoordinator.fromProjection(selected.scope, it, reminderSettings?.dateOnlyTime ?: "09:00", emptySet())
+    }, "", true, 0).filter { it.at <= now }.map { it.task.id }.toSet()
+    val queueRows = taskStates.filter { if (dueOnly) it.getString("id") in dueIds
+        else if (deleted) !it.isNull("deletion") &&
         (it.isNull("parentId") || byId[it.getString("parentId")]?.isNull("deletion") == true)
         else it.isNull("parentId") && it.isNull("deletion") && (it.optString("lifecycle", "OPEN") != "OPEN") == history &&
             (history || SharedChecklistActions.snoozed(it, byId, now) == snoozed) }
@@ -144,14 +150,17 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
         } },
         queueHeader = {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-            FilterChip(selected = !history && !deleted && !snoozed, onClick = { history = false; deleted = false; snoozed = false }, modifier = Modifier.testTag("task-active-view"),
+            FilterChip(selected = !history && !deleted && !snoozed && !dueOnly, onClick = { history = false; deleted = false; snoozed = false; dueOnly = false }, modifier = Modifier.testTag("task-active-view"),
                 label = { Text(stringResource(R.string.task_active_view)) })
-            FilterChip(selected = history && !deleted, onClick = { history = true; deleted = false; snoozed = false }, modifier = Modifier.testTag("task-history-view"),
+            FilterChip(selected = history && !deleted && !dueOnly, onClick = { history = true; deleted = false; snoozed = false; dueOnly = false }, modifier = Modifier.testTag("task-history-view"),
                 label = { Text(stringResource(R.string.task_history_view)) })
-            FilterChip(selected = deleted, onClick = { deleted = true }, modifier = Modifier.testTag("task-deleted-view"),
+            FilterChip(selected = deleted && !dueOnly, onClick = { deleted = true; dueOnly = false }, modifier = Modifier.testTag("task-deleted-view"),
                 label = { Text(stringResource(R.string.task_deleted_view)) })
-            FilterChip(selected = snoozed && !deleted && !history, onClick = { snoozed = true; deleted = false; history = false },
+            FilterChip(selected = snoozed && !deleted && !history && !dueOnly, onClick = { snoozed = true; deleted = false; history = false; dueOnly = false },
                 modifier = Modifier.testTag("task-snoozed-view"), label = { Text(stringResource(R.string.task_snoozed_view)) })
+            FilterChip(selected = dueOnly, onClick = { dueOnly = true; deleted = false; history = false; snoozed = false },
+                modifier = Modifier.testTag("task-due-view"), label = { Text(stringResource(R.string.reminders_due)) })
+            if (dueOnly && queueRows.isEmpty()) Text(stringResource(R.string.reminders_due_empty))
             if (deleted) Text(stringResource(if (queueRows.isEmpty()) R.string.task_deleted_empty else R.string.task_deleted_retention))
             recovery?.let { recovering ->
                 Text(stringResource(if (recovering.problem == "STORAGE_REQUIRED") R.string.shared_storage_required

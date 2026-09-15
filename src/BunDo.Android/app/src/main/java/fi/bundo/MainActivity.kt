@@ -35,6 +35,13 @@ import fi.bundo.ui.SharedWorkspaceScreen
 class MainActivity : AppCompatActivity() {
     private var invitation by mutableStateOf<String?>(null)
 
+    override fun onStart() {
+        super.onStart()
+        (application as BunDoApplication).accounts.active.value?.let {
+            fi.bundo.reminders.ReminderWorker.request(this, it)
+        }
+    }
+
     private fun acceptInvitation(intent: Intent?) {
         val value = intent?.dataString ?: return
         if (InvitationLink.parse(value) != null) invitation = value

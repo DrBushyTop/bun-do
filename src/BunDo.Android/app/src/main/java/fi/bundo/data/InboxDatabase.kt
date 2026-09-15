@@ -88,14 +88,15 @@ interface InboxDao {
 @Database(
     entities = [InboxTask::class, InboxIntent::class, EditorDraft::class, VoiceRecording::class,
         SharedWorkspace::class, SharedBase::class, SharedProjection::class, SharedIntent::class, SharedDraft::class,
-        SharedRecovery::class],
-    version = 9,
+        SharedRecovery::class, ReminderSettings::class, ReminderDelivery::class],
+    version = 10,
     exportSchema = true,
 )
 abstract class InboxDatabase : RoomDatabase() {
     abstract fun inbox(): InboxDao
     abstract fun recordings(): RecordingDao
     abstract fun shared(): SharedDao
+    abstract fun reminders(): ReminderDao
 
     companion object {
         // Deliberately not derived from a future active account or workspace selection.
@@ -169,9 +170,16 @@ abstract class InboxDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE reminder_settings (id INTEGER NOT NULL PRIMARY KEY, enabled INTEGER NOT NULL, allTasks INTEGER NOT NULL, dateOnlyTime TEXT NOT NULL, revision INTEGER NOT NULL, permissionAsked INTEGER NOT NULL)")
+                db.execSQL("CREATE TABLE reminder_deliveries (`key` TEXT NOT NULL PRIMARY KEY, deliveredAt INTEGER NOT NULL)")
+            }
+        }
+
         fun open(context: Context, name: String = FILE_NAME, passphrase: ByteArray? = null): InboxDatabase {
             val builder = Room.databaseBuilder(context, InboxDatabase::class.java, name)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
                 // AccountStore owns the connection used by both UI and workers.
                 // Workers cannot independently open a signed-out account.
             if (passphrase != null) {

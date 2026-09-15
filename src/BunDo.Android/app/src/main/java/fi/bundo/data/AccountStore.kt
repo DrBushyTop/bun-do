@@ -41,6 +41,18 @@ class AccountData internal constructor(
 ) {
     val inbox = InboxRepository(database, lease)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    internal fun startReminders() {
+        if (identity == null) return
+        fi.bundo.reminders.ReminderWorker.start(context, this)
+        scope.launch {
+            database.invalidationTracker.createFlow("shared_workspaces", "shared_projection", "reminder_settings").collect {
+                try {
+                    ReminderCoordinator(this@AccountData, fi.bundo.reminders.AndroidReminders(context, this@AccountData)).reconcile()
+                } catch (error: kotlinx.coroutines.CancellationException) { throw error }
+                catch (_: Exception) { fi.bundo.reminders.ReminderWorker.request(context, this@AccountData) }
+            }
+        }
+    }
     private val selectedHouseholdValue = MutableStateFlow<String?>(null)
     val selectedHousehold = selectedHouseholdValue.asStateFlow()
     private val selectedWorkspaceValue = MutableStateFlow<SharedWorkspace?>(null)
@@ -78,6 +90,7 @@ class AccountData internal constructor(
     val voice: VoiceController get() = controller ?: VoiceController(context, recordings).also { controller = it }
     internal fun revoke() {
         lease.revoke()
+        fi.bundo.reminders.AndroidReminders.stop(context, this)
         scope.cancel()
         controller?.close()
     }
@@ -238,7 +251,11 @@ class AccountStore(private val context: Context, private val name: String = "acc
         root.mkdirs()
         check(signOutMarker.exists() || signOutMarker.createNewFile())
         activeKey.destroy()
-        mutable.value?.let { it.revoke(); retiring = it }
+        mutable.value?.let {
+            it.revoke()
+            WorkManager.getInstance(context).cancelAllWorkByTag("account:${it.lease.owner}")
+            retiring = it
+        }
         mutable.value = null
         context.getSystemService(NotificationManager::class.java).cancelAll()
     }
@@ -270,6 +287,7 @@ class AccountStore(private val context: Context, private val name: String = "acc
     }
 
     private fun schedule(data: AccountData) {
+        data.startReminders()
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             "audio-expiry:${data.lease.owner}", ExistingPeriodicWorkPolicy.UPDATE,
             PeriodicWorkRequestBuilder<AudioExpiryWorker>(6, TimeUnit.HOURS)

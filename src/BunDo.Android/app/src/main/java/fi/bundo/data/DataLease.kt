@@ -8,6 +8,7 @@ import java.util.UUID
 /** Revocation is immediate. Closing waits for already-started local transactions. */
 class DataLease(val owner: String = "anonymous", val generation: String = UUID.randomUUID().toString()) {
     private val mutex = Mutex()
+    private val callbackGate = Any()
     @Volatile var active = true
         private set
 
@@ -20,6 +21,8 @@ class DataLease(val owner: String = "anonymous", val generation: String = UUID.r
         operation()
     }
 
-    fun revoke() { active = false }
+    /** Serialize short external effects with revocation, not just their preceding check. */
+    fun <T> whileActive(operation: () -> T): T = synchronized(callbackGate) { check(); operation() }
+    fun revoke() = synchronized(callbackGate) { active = false }
     suspend fun drain() { mutex.withLock { } }
 }
