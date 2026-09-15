@@ -77,6 +77,9 @@ android {
         warningsAsErrors = true
         // Toolchain/dependency upgrades are deliberate, not time-dependent lint failures.
         disable += setOf("GradleDependency", "NewerVersionAvailable", "AndroidGradlePluginVersion")
+        // V1 is tested against API 36. A runner's newer SDK catalog must not
+        // silently require an unverified target-SDK behavior change.
+        disable += "OldTargetApi"
         // v1 targets ARM64 phones and ARM64 emulator profiles, not ChromeOS.
         disable += "ChromeOsAbiSupport"
     }
