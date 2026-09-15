@@ -64,6 +64,14 @@ if (builder.Configuration["AI:Enabled"] == "true")
             new ManagedIdentityCredential(ManagedIdentityId.FromUserAssignedClientId(builder.Configuration["AZURE_CLIENT_ID"]!)),
             new Uri(builder.Configuration["AI:Endpoint"]!), builder.Configuration["AI:LunaDeployment"]!));
 }
+if (builder.Configuration["Speech:Enabled"] == "true")
+{
+    builder.Services.AddSingleton<BunDo.Functions.Speech.ISpeechProvider>(_ =>
+        new BunDo.Functions.Speech.MaiSpeechProvider(
+            new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(100) },
+            new ManagedIdentityCredential(ManagedIdentityId.FromUserAssignedClientId(builder.Configuration["AZURE_CLIENT_ID"]!)),
+            new Uri(builder.Configuration["Speech:Endpoint"]!)));
+}
 builder.Services.AddSingleton<BackendTelemetry>();
 // Wrap the HTTP proxy too, including IActionResult execution/serialization.
 builder.UseMiddleware<FunctionTelemetryMiddleware>();

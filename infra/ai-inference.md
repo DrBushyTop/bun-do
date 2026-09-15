@@ -1,7 +1,7 @@
 # AI inference deployment
 
-`modules/ai-inference.bicep` owns Bun Do's dedicated Azure OpenAI account and
-model deployments. `backend-hosting.bicep` grants its own user-assigned identity
+`modules/ai-inference.bicep` owns Bun Do's dedicated Azure OpenAI account,
+model deployments and the separate Speech account. `backend-hosting.bicep` grants its own user-assigned identity
 the account-scoped Cognitive Services OpenAI User role. That role includes
 Responses inference, not model deployment or key management.
 
@@ -23,6 +23,14 @@ The backend receives the v1 base URL and deployment names, never an account key.
 sync process one durable request from the authenticated requester at a time. An
 expired inference lease offers Retry without automatically repeating the paid call.
 Product quotas and token budgets are not enablement gates; their review waits until after V2.
+
+The backend uses the Speech account for MAI transcription through managed
+identity and an account-scoped Speech User grant. The existing account keeps
+its resource identity despite its historical `speech-test` name. The experiment
+template no longer owns its configuration. Disabling `Speech__Enabled` stops
+new online transcription calls; Android retains failed input and can use an
+installed local model. Audio stays in backend request memory, not Blob or Cosmos.
+This does not assert that Azure's own processing has no retention obligations.
 
 ## Verification
 

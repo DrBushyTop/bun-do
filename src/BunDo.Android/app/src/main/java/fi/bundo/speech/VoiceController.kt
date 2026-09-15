@@ -32,6 +32,8 @@ import kotlin.coroutines.coroutineContext
 data class VoiceState(
     val loaded: Boolean = false,
     val modelReady: Boolean = false,
+    val onlineConfigured: Boolean = false,
+    val usingOnline: Boolean = false,
     val phase: String = "CHECKING",
     val progress: Float = 0f,
     val seconds: Int = 0,
@@ -48,16 +50,21 @@ class VoiceController(
     private val context: Context,
     private val store: RecordingStore,
     private val installer: ModelInstaller = ModelInstaller(File(context.noBackupFilesDir, "speech-models"), loadSpeechManifest(context)),
+    private val online: (suspend (ByteArray) -> String)? = null,
+    private val connected: () -> Boolean = { speechNetworkAvailable(context) },
+    private val recorderFactory: () -> RecordingInput = ::LocalRecorder,
     private val transcribe: (File, ByteArray) -> String = LocalSpeech()::transcribe,
 ) : AutoCloseable {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val mutable = MutableStateFlow(VoiceState())
+    private val mutable = MutableStateFlow(VoiceState(onlineConfigured = online != null))
     val state = mutable.asStateFlow()
     private var work: Job? = null
-    private var recorder: LocalRecorder? = null
+    private var pendingFallback: Job? = null
+    private var recorder: RecordingInput? = null
     private var stopReason = ""
     private var stopRequested = false
     private var verifiedModel: File? = null
+    private var activeRecording: String? = null
 
     init {
         scope.launch {
@@ -112,12 +119,12 @@ class VoiceController(
     }
 
     fun record(target: fi.bundo.data.VoiceTarget? = null) {
-        if (!state.value.modelReady || state.value.busy) return
+        if ((!state.value.modelReady && online == null) || state.value.busy) return
         stopReason = ""
         stopRequested = false
         start("RECORDING") {
             val row = withContext(Dispatchers.IO) { store.begin(target = target) }
-            val input = LocalRecorder()
+            val input = recorderFactory()
             recorder = input
             if (stopRequested) input.stop()
             try {
@@ -151,6 +158,7 @@ class VoiceController(
     }
 
     fun cancel() {
+        pendingFallback?.cancel()
         if (state.value.phase == "RECORDING") {
             stopReason = "CANCELED"
             stop()
@@ -158,6 +166,18 @@ class VoiceController(
     }
 
     fun retry(id: String) = start("TRANSCRIBING") { recognize(id) }
+    fun retryOffline(id: String) = start("TRANSCRIBING") { recognize(id, offlineOnly = true) }
+    fun useOffline() {
+        if (!state.value.usingOnline || !state.value.modelReady) return
+        val id = activeRecording ?: return
+        val previous = work ?: return
+        previous.cancel()
+        pendingFallback?.cancel()
+        pendingFallback = scope.launch {
+            previous.join()
+            retryOffline(id)
+        }
+    }
     fun delete(id: String) = start("CLEANING") { withContext(Dispatchers.IO) { store.delete(id) } }
 
     fun export(id: String, destination: Uri) = start("EXPORTING") {
@@ -171,14 +191,31 @@ class VoiceController(
         mutable.update { it.copy(message = "EXPORTED") }
     }
 
-    private suspend fun recognize(id: String) {
+    private suspend fun recognize(id: String, offlineOnly: Boolean = false) {
+        activeRecording = id
         mutable.update { it.copy(phase = "TRANSCRIBING", level = 0f) }
         try {
             withContext(Dispatchers.IO) {
                 check(store.available(id))
                 store.transcribing(id)
-                val model = checkNotNull(verifiedModel)
-                val text = transcribe(model, store.readAudio(id))
+                val audio = store.readAudio(id)
+                val text = try {
+                    if (!offlineOnly && online != null && connected()) {
+                        mutable.update { it.copy(usingOnline = true) }
+                        try { online.invoke(audio) }
+                        catch (error: Exception) {
+                            coroutineContext.ensureActive()
+                            // Auth failure remains explicit; local retry is still available.
+                            if (error is SpeechFailure && error.code in setOf("SIGN_IN_REQUIRED", "TOO_LONG")) throw error
+                            val model = verifiedModel ?: throw SpeechFailure("ONLINE_FAILED")
+                            mutable.update { it.copy(usingOnline = false) }
+                            transcribe(model, audio)
+                        }
+                    } else {
+                        val model = verifiedModel ?: throw SpeechFailure("OFFLINE_MODEL_REQUIRED")
+                        transcribe(model, audio)
+                    }
+                } finally { audio.fill(0) }
                 coroutineContext.ensureActive() // A late JNI result cannot commit after cancel.
                 when {
                     text.isBlank() -> store.failed(id, "SILENCE")
@@ -197,10 +234,18 @@ class VoiceController(
         } catch (error: Throwable) {
             // JNI decode cannot be interrupted. Only its result is canceled; retain audio.
             withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
-                try { store.failed(id, if (error is CancellationException) "CANCELED" else if (error is fi.bundo.data.TranscriptTooLong) "TOO_LONG" else "TRANSCRIPTION_FAILED") }
+                try { store.failed(id, when (error) {
+                    is CancellationException -> "CANCELED"
+                    is SpeechFailure -> error.code
+                    is fi.bundo.data.TranscriptTooLong -> "TOO_LONG"
+                    else -> "TRANSCRIPTION_FAILED"
+                }) }
                 catch (_: CancellationException) { /* Revoked accounts retain interrupted audio for recovery. */ }
             }
             throw error
+        } finally {
+            activeRecording = null
+            mutable.update { it.copy(usingOnline = false) }
         }
     }
 
@@ -213,6 +258,7 @@ class VoiceController(
             catch (_: SpeechStorageFull) { mutable.update { it.copy(message = "MODEL_SPACE") } }
             catch (_: fi.bundo.data.TranscriptTooLong) { mutable.update { it.copy(message = "TOO_LONG") } }
             catch (_: RecordingStorageFull) { mutable.update { it.copy(message = "AUDIO_SPACE") } }
+            catch (error: SpeechFailure) { mutable.update { it.copy(message = error.code) } }
             catch (_: Exception) { mutable.update { it.copy(message = "FAILED") } }
             catch (_: LinkageError) { mutable.update { it.copy(message = "FAILED") } }
             finally { mutable.update { it.copy(phase = "IDLE", level = 0f) } }

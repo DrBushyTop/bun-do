@@ -10,8 +10,9 @@ runners are the source for exact request shapes.
 Bun Do records first and transcribes after stop. The owner approved a comparison
 of hosted transcription with local Android recognition, then selected
 MAI-Transcribe-2 as the primary online path with Parakeet retained for offline
-fallback. Cloud transcription is not implemented by that decision. It needs its
-own authenticated upload, retention, cancellation, and recovery work.
+fallback. The decision alone did not implement cloud transcription. The
+[speech decision and runtime contract](../adr/0002-cloud-first-speech-with-offline-fallback.md)
+now owns its authenticated upload, retention, cancellation and recovery behavior.
 
 Test completed-file transcription before adding streaming. Streaming is worthwhile
 only if measured partial results justify its transport and lifecycle complexity.

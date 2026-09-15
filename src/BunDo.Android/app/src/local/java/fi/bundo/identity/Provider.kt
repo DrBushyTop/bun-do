@@ -38,7 +38,8 @@ private class LocalTokens(private val application: Application) : TokenProvider 
             connection.instanceFollowRedirects = false
             connection.connectTimeout = 15_000
             connection.readTimeout = 15_000
-            if (connection.responseCode != 200) throw TokenFailure("local_token_unavailable")
+            if (connection.responseCode != 200) throw TokenFailure("local_token_unavailable",
+                retryable = connection.responseCode !in setOf(401, 403))
             val bytes = ByteArray(16 * 1024 + 1)
             var count = 0
             connection.inputStream.use { input ->

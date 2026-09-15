@@ -35,18 +35,9 @@ resource liveTranscription 'Microsoft.CognitiveServices/accounts/deployments@202
   }
 }
 
-resource speech 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
+// The normal foundation owns this account. Experiments may only grant test access.
+resource speech 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
   name: speechAccountName
-  location: 'northeurope'
-  kind: 'AIServices'
-  sku: { name: 'S0' }
-  tags: { application: 'bun-do', environment: 'dev', purpose: 'speech-comparison' }
-  properties: {
-    customSubDomainName: speechAccountName
-    disableLocalAuth: true
-    publicNetworkAccess: 'Enabled'
-    networkAcls: { defaultAction: 'Allow' }
-  }
 }
 
 var openAiUserRole = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'

@@ -23,6 +23,8 @@ param aiAccountName string
 param aiEndpoint string
 param lunaDeployment string
 param terraDeployment string
+param speechAccountName string
+param speechEndpoint string
 
 resource identity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
   name: '${appName}-identity'
@@ -136,6 +138,20 @@ resource inferenceAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = 
   }
 }
 
+resource speech 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
+  name: speechAccountName
+}
+
+resource speechAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(speech.id, identity.id, 'speech-user')
+  scope: speech
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'f2dc8367-1007-4938-bd23-fe263f013447')
+    principalId: identity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 resource plan 'Microsoft.Web/serverfarms@2024-04-01' = {
   name: '${appName}-plan'
   location: location
@@ -212,10 +228,12 @@ resource app 'Microsoft.Web/sites@2024-04-01' = {
         { name: 'AI__Endpoint', value: aiEndpoint }
         { name: 'AI__LunaDeployment', value: lunaDeployment }
         { name: 'AI__TerraDeployment', value: terraDeployment }
+        { name: 'Speech__Enabled', value: 'true' }
+        { name: 'Speech__Endpoint', value: speechEndpoint }
       ]
     }
   }
-  dependsOn: [runtimeAccess, snapshotAccess, workspaceAccess, telemetryAccess, inferenceAccess]
+  dependsOn: [runtimeAccess, snapshotAccess, workspaceAccess, telemetryAccess, inferenceAccess, speechAccess]
 }
 
 resource scmAuthentication 'Microsoft.Web/sites/basicPublishingCredentialsPolicies@2024-04-01' = {

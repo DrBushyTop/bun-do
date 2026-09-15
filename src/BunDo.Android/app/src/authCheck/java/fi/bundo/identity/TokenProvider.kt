@@ -12,4 +12,9 @@ internal interface TokenProvider {
     suspend fun signOut()
 }
 internal class SignInCancelled : Exception()
-internal class TokenFailure(val code: String) : Exception()
+internal class TokenFailure(val code: String, val retryable: Boolean = false) : Exception()
+
+internal suspend fun TokenProvider.requestToken(): String {
+    if (!restore()) throw TokenFailure("no_current_account")
+    return refresh()
+}

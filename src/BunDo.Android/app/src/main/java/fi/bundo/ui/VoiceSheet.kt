@@ -87,7 +87,8 @@ fun VoiceSheet(controller: VoiceController, onDismiss: () -> Unit, onType: () ->
         ) {
             Text(stringResource(if (target == null) R.string.voice_capture else R.string.split_dictate), style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.semantics { heading() })
-            Text(stringResource(R.string.voice_private), style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(if (state.onlineConfigured) R.string.voice_online_private else R.string.voice_private),
+                style = MaterialTheme.typography.bodyMedium)
             if (state.message.isNotEmpty()) {
                 Text(stringResource(messageResource(state.message)), modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
             }
@@ -112,17 +113,17 @@ fun VoiceSheet(controller: VoiceController, onDismiss: () -> Unit, onType: () ->
                     TextButton(onClick = controller::cancel, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.voice_cancel)) }
                 }
                 "TRANSCRIBING" -> {
-                    Text(stringResource(R.string.voice_transcribing))
+                    Text(stringResource(if (state.usingOnline) R.string.voice_online_transcribing else R.string.voice_transcribing))
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                     TextButton(onClick = controller::cancel, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.voice_cancel)) }
+                    if (state.usingOnline && state.modelReady) {
+                        TextButton(onClick = controller::useOffline, modifier = Modifier.heightIn(min = 48.dp)) {
+                            Text(stringResource(R.string.voice_use_offline))
+                        }
+                    }
                 }
                 "IDLE" -> {
-                    if (!state.modelReady) {
-                        Text(stringResource(R.string.voice_install_explanation))
-                        Button(onClick = controller::install, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("install-model")) {
-                            Text(stringResource(R.string.voice_install))
-                        }
-                    } else {
+                    if (state.modelReady || state.onlineConfigured) {
                         Button(onClick = {
                             if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
                                 controller.record(target)
@@ -131,6 +132,12 @@ fun VoiceSheet(controller: VoiceController, onDismiss: () -> Unit, onType: () ->
                             Text(stringResource(R.string.voice_record))
                         }
                         Text(stringResource(R.string.voice_limit), style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (!state.modelReady) {
+                        Text(stringResource(R.string.voice_install_explanation))
+                        TextButton(onClick = controller::install, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("install-model")) {
+                            Text(stringResource(R.string.voice_install))
+                        }
                     }
                 }
                 else -> LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -152,9 +159,14 @@ fun VoiceSheet(controller: VoiceController, onDismiss: () -> Unit, onType: () ->
                     if (recording.state == "COMMITTED") Text(stringResource(R.string.voice_cleanup_pending))
                     TextButton(
                         onClick = { controller.retry(recording.id) },
-                        enabled = !state.busy && state.modelReady && recording.state != "COMMITTED",
+                        enabled = !state.busy && (state.modelReady || state.onlineConfigured) && recording.state != "COMMITTED",
                         modifier = Modifier.heightIn(min = 48.dp),
                     ) { Text(stringResource(R.string.retry)) }
+                    if (state.onlineConfigured && state.modelReady) {
+                        TextButton(onClick = { controller.retryOffline(recording.id) },
+                            enabled = !state.busy && recording.state != "COMMITTED",
+                            modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.voice_use_offline)) }
+                    }
                     Text(stringResource(R.string.voice_export_warning), style = MaterialTheme.typography.bodySmall)
                     TextButton(
                         onClick = { exportId = recording.id; export.launch("bun-do-recording.wav") },
@@ -188,5 +200,8 @@ private fun messageResource(code: String): Int = when (code) {
     "INSTALLED" -> R.string.voice_installed
     "SAVED" -> R.string.voice_saved
     "EXPORTED" -> R.string.voice_exported
+    "SIGN_IN_REQUIRED" -> R.string.voice_sign_in_required
+    "ONLINE_FAILED" -> R.string.voice_online_failed
+    "OFFLINE_MODEL_REQUIRED" -> R.string.voice_offline_required
     else -> R.string.voice_failed
 }

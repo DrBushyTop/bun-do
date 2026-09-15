@@ -4,6 +4,8 @@ import android.app.Activity
 import android.app.Application
 import com.microsoft.identity.client.*
 import com.microsoft.identity.client.exception.MsalException
+import com.microsoft.identity.client.exception.MsalClientException
+import com.microsoft.identity.client.exception.MsalServiceException
 import fi.bundo.R
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
@@ -24,7 +26,7 @@ private class MicrosoftTokens(private val application: Application) : TokenProvi
                         if (continuation.isActive) continuation.resume(app)
                     }
                     override fun onError(exception: MsalException) {
-                        if (continuation.isActive) continuation.resumeWithException(failure(exception))
+                        if (continuation.isActive) continuation.resumeWithException(microsoftTokenFailure(exception))
                     }
                 })
         }
@@ -35,7 +37,7 @@ private class MicrosoftTokens(private val application: Application) : TokenProvi
                 }
                 override fun onAccountChanged(priorAccount: IAccount?, currentAccount: IAccount?) = Unit
                 override fun onError(exception: MsalException) {
-                    if (continuation.isActive) continuation.resumeWithException(failure(exception))
+                    if (continuation.isActive) continuation.resumeWithException(microsoftTokenFailure(exception))
                 }
             })
         }
@@ -52,7 +54,7 @@ private class MicrosoftTokens(private val application: Application) : TokenProvi
                     }
                 }
                 override fun onError(exception: MsalException) {
-                    if (continuation.isActive) continuation.resumeWithException(failure(exception))
+                    if (continuation.isActive) continuation.resumeWithException(microsoftTokenFailure(exception))
                 }
                 override fun onCancel() {
                     if (continuation.isActive) continuation.resumeWithException(SignInCancelled())
@@ -73,7 +75,7 @@ private class MicrosoftTokens(private val application: Application) : TokenProvi
                     if (continuation.isActive) continuation.resume(result.accessToken)
                 }
                 override fun onError(exception: MsalException) {
-                    if (continuation.isActive) continuation.resumeWithException(failure(exception))
+                    if (continuation.isActive) continuation.resumeWithException(microsoftTokenFailure(exception))
                 }
             }).build())
     }
@@ -85,15 +87,23 @@ private class MicrosoftTokens(private val application: Application) : TokenProvi
                 if (continuation.isActive) continuation.resume(Unit)
             }
             override fun onError(exception: MsalException) {
-                if (continuation.isActive) continuation.resumeWithException(failure(exception))
+                if (continuation.isActive) continuation.resumeWithException(microsoftTokenFailure(exception))
             }
         })
     }
-
-    private fun failure(exception: MsalException) = TokenFailure(
-        exception.errorCode.orEmpty().filter { it.isLetterOrDigit() || it == '_' }.take(80))
 
     companion object {
         private val SCOPES = listOf("api://d33b7867-41ed-45c3-805a-b5e841323d20/access_as_user")
     }
 }
+
+internal fun microsoftTokenFailure(exception: MsalException) = TokenFailure(
+    exception.errorCode.orEmpty().filter { it.isLetterOrDigit() || it == '_' }.take(80),
+    retryable = when (exception) {
+        is MsalClientException -> exception.errorCode in setOf(
+            MsalClientException.DEVICE_NETWORK_NOT_AVAILABLE, MsalClientException.IO_ERROR)
+        is MsalServiceException -> exception.httpStatusCode == 429 || exception.httpStatusCode >= 500 ||
+            exception.errorCode in setOf(MsalServiceException.SERVICE_NOT_AVAILABLE, MsalServiceException.REQUEST_TIMEOUT)
+        else -> false
+    },
+)

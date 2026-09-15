@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_online_private">Verkossa ääni lähetetään Bun Don kautta Microsoft Azureen litteroitavaksi. Ilman yhteyttä asennettu Parakeet-malli toimii tällä laitteella. Tarkista tallennettu teksti, etenkin määrät ja päivämäärät. Tekoälyn tekstin siistiminen on erillinen toiminto.</string>
+    <string name="voice_online_transcribing">Muutetaan puhetta tekstiksi Azuressa…</string>
+    <string name="voice_use_offline">Käytä paikallista puhemallia</string>
+    <string name="voice_sign_in_required">Kirjaudu uudelleen verkkolitterointia varten. Äänitys on tallessa. Voit myös käyttää paikallista puhemallia, viedä äänen tiedostoksi tai poistaa sen.</string>
+    <string name="voice_online_failed">Verkkolitterointi ei valmistunut. Äänitys on tallessa. Uusi yritys voi lähettää sen Azureen uudelleen. Voit myös viedä äänen tiedostoksi tai poistaa sen.</string>
+    <string name="voice_offline_required">Ei verkkoyhteyttä eikä paikallista puhemallia. Äänitys on tallessa. Yhdistä verkkoon ja yritä uudelleen, lataa Parakeet tai vie ääni tiedostoksi.</string>
+</resources>

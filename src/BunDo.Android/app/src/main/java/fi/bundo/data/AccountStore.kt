@@ -87,7 +87,18 @@ class AccountData internal constructor(
         SharedSyncWorker.request(context, this@AccountData)
     }
     private var controller: VoiceController? = null
-    val voice: VoiceController get() = controller ?: VoiceController(context, recordings).also { controller = it }
+    val voice: VoiceController get() = controller ?: VoiceController(context, recordings,
+        online = if (identity == null) null else { audio ->
+            val app = context.applicationContext as fi.bundo.BunDoApplication
+            fi.bundo.speech.authenticatedSpeech {
+                kotlinx.coroutines.withTimeout(150_000) {
+                    app.withAccountToken(this@AccountData) { token ->
+                        fi.bundo.speech.OnlineSpeech().transcribe(token, checkNotNull(registrationId), audio,
+                            if (context.resources.configuration.locales[0].language == "fi") "fi-FI" else "en-US")
+                    }
+                }
+            }
+        }).also { controller = it }
     internal fun revoke() {
         lease.revoke()
         fi.bundo.reminders.AndroidReminders.stop(context, this)

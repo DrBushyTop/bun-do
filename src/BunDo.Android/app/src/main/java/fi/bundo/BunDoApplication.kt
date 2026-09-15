@@ -6,6 +6,7 @@ import fi.bundo.data.AccountData
 import fi.bundo.identity.SharedTokens
 import fi.bundo.identity.createTokenProvider
 import fi.bundo.identity.IdentityEndpoint
+import fi.bundo.identity.requestToken
 import kotlinx.coroutines.CancellationException
 
 class BunDoApplication : Application() {
@@ -19,8 +20,7 @@ class BunDoApplication : Application() {
                 request.expected != data.identity) throw CancellationException("Account session ended")
         }
         checkCurrent()
-        check(tokens.restore())
-        val token = tokens.refresh()
+        val token = tokens.requestToken()
         checkCurrent()
         check(IdentityEndpoint(tokens.issuer).verify(token) == data.identity)
         checkCurrent()

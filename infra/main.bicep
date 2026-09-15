@@ -71,6 +71,7 @@ module aiInference 'modules/ai-inference.bicep' = {
   scope: development
   params: {
     accountName: 'ai-bun-do-dev-${uniqueString(subscription().subscriptionId, resourceGroupName)}'
+    speechAccountName: 'ai-bun-do-speech-test-${uniqueString(subscription().subscriptionId, resourceGroupName)}'
     location: location
     lunaModel: lunaModel
     lunaVersion: lunaVersion
@@ -108,6 +109,8 @@ module backendHosting 'modules/backend-hosting.bicep' = {
     aiEndpoint: aiInference.outputs.endpoint
     lunaDeployment: aiInference.outputs.lunaDeployment
     terraDeployment: aiInference.outputs.terraDeployment
+    speechAccountName: aiInference.outputs.speechAccountName
+    speechEndpoint: aiInference.outputs.speechEndpoint
   }
 }
 

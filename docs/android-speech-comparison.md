@@ -109,8 +109,11 @@ Primary-source API and region research is in
 
 - Two pinned, capacity-10 Global Standard GPT speech test deployments to the
   existing development OpenAI account.
-- One key-disabled `AIServices` S0 account in North Europe for MAI-Transcribe-2.
 - Account-scoped inference roles for the test operator.
+
+The normal foundation now owns the existing North Europe Speech account and
+the backend's inference grant. The experiment references that account rather
+than provisioning or reconfiguring it.
 
 The owner approved European resource locations. Global Standard GPT deployments
 do not guarantee EU-only inference. Neither a Sweden account name nor these
@@ -202,6 +205,31 @@ repetitions do not establish a reliable p95. Report medians and observed ranges.
 Emulator CPU timings on this Mac are not measurements of a target phone.
 These runs also exclude UI rendering, microphone capture, authentication refresh,
 application backend hops, production queuing and any later LLM cleanup.
+
+## Backend and Android integration checks
+
+The opt-in `SpeechProofFunction` test fixture runs the production MAI adapter
+under the deployed backend identity. Copy it into a temporary verification
+build only, require its Function key, and remove it by publishing the normal
+build afterward. Verify that its route returns 404 after removal. The normal
+transcription route must reject an unauthenticated request before reading audio.
+Do not weaken the normal API's token validation to run a corpus.
+
+`OnlineSpeechDeviceTest` accepts a private `files/speech-proof` directory with
+the corpus cases, their PCM files, and a configuration naming that protected
+verification endpoint and its key. Its `onlineSpeechProof=true` instrumentation
+opt-in permits paid calls. Supply the key through app-private storage, never
+instrumentation arguments or logs. Remove the directory in the invoking
+runner's `finally` block, including on failure. Stop at a failed or uncertain
+request rather than automatically retrying it.
+
+The device fixture feeds prerecorded PCM into the recorder interface, then
+calls the real controller's Stop. It measures upload-to-final and
+stop-to-local-commit through encrypted audio recovery, the HTTP client, backend
+and provider. These measurements exclude live microphone acquisition and
+Microsoft sign-in/token refresh. Function-key verification is not evidence of
+an end-to-end Microsoft account login. Keep that distinction in issue evidence.
+Reports contain transcripts and belong with the ignored private corpus.
 
 ## Checks
 

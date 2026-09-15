@@ -2,6 +2,7 @@ targetScope = 'resourceGroup'
 
 // Dedicated inference account and deployments. The consuming backend owns RBAC.
 param accountName string
+param speechAccountName string
 @allowed(['swedencentral'])
 param location string = 'swedencentral'
 param lunaModel string
@@ -58,3 +59,21 @@ output accountName string = account.name
 output endpoint string = 'https://${account.properties.customSubDomainName}.openai.azure.com/openai/v1/'
 output lunaDeployment string = luna.name
 output terraDeployment string = terraEnabled ? terra!.name : ''
+
+// Retain the owner-approved North Europe Speech account and its resource identity.
+resource speech 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
+  name: speechAccountName
+  location: 'northeurope'
+  kind: 'AIServices'
+  sku: { name: 'S0' }
+  tags: { application: 'bun-do', environment: 'development' }
+  properties: {
+    customSubDomainName: speechAccountName
+    disableLocalAuth: true
+    publicNetworkAccess: 'Enabled'
+    networkAcls: { defaultAction: 'Allow' }
+  }
+}
+
+output speechAccountName string = speech.name
+output speechEndpoint string = 'https://${speech.properties.customSubDomainName}.cognitiveservices.azure.com'

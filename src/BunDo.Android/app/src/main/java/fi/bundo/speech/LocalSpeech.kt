@@ -69,12 +69,17 @@ class LocalSpeech {
 }
 
 /** Blocking recorder, called on IO. Persist raw PCM so process death needs no header repair. */
-class LocalRecorder {
+interface RecordingInput {
+    fun stop()
+    fun record(output: OutputStream, progress: (Int, Float) -> Unit)
+}
+
+class LocalRecorder : RecordingInput {
     @Volatile private var stopping = false
-    fun stop() { stopping = true }
+    override fun stop() { stopping = true }
 
     @SuppressLint("MissingPermission") // Caller requests permission; AudioRecord failure is still handled.
-    fun record(output: OutputStream, progress: (Int, Float) -> Unit) {
+    override fun record(output: OutputStream, progress: (Int, Float) -> Unit) {
         val rate = RecordingStore.SAMPLE_RATE
         val size = maxOf(AudioRecord.getMinBufferSize(rate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT), 8192)
         val recorder = AudioRecord(MediaRecorder.AudioSource.MIC, rate,

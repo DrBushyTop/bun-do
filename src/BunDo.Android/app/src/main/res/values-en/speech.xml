@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_online_private">Online, audio goes through Bun Do to Microsoft Azure for transcription. Offline, an installed Parakeet model works on this device. Review the saved text, especially quantities and dates. AI cleanup is a separate action.</string>
+    <string name="voice_online_transcribing">Transcribing with Azure…</string>
+    <string name="voice_use_offline">Use local speech</string>
+    <string name="voice_sign_in_required">Sign in again to transcribe online. Your recording is saved. You can also use local speech, export it or delete it.</string>
+    <string name="voice_online_failed">Online transcription did not finish. Your recording is saved. Retry may send it to Azure again. You can also export it or delete it.</string>
+    <string name="voice_offline_required">No connection and no local speech model. Your recording is saved. Connect and retry, download Parakeet, or export the recording.</string>
+</resources>

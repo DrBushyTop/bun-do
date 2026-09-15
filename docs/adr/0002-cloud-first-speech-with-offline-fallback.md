@@ -18,9 +18,18 @@ recovery until text commits, and fence late cloud results after cancellation,
 fallback or an account switch.
 
 Transcription converts speech to text. Later AI enrichment is separate and must
-not hide transcription failures or overwrite human corrections. Cloud-first
-capture ships only after its authentication and recovery integration passes.
-The completed offline slice and local comparison scripts do not constitute that
-integration.
+not hide transcription failures or overwrite human corrections.
+
+Signed-in capture uses the authenticated backend when connected. Without a
+connection, it uses an installed Parakeet model. An online failure can fall back
+to the installed model, but rejected authentication remains visible with an
+explicit local retry. Without a model, the recording stays available for retry,
+export or deletion. Anonymous capture stays local.
+
+There is no automatic upload retry or server audio job. Android commits text
+before removing local audio and fences results with the active account lease
+and cancellation. An uncertain upload may have incurred a provider charge;
+explicit retry can incur another. Cancelling an upload does not promise that
+Azure stopped processing it.
 
 On September 13, 2026, the owner moved product AI length and usage-policy review until after V2. Start without product quotas and observe household usage before deciding whether limits are needed. Authentication, provider constraints, technical payload/memory/output bounds, timeouts and recoverable input remain required. The [usage-policy issue](https://github.com/DrBushyTop/bun-do/issues/37) is outside both release parents; earlier numeric admission proposals are superseded.
