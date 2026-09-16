@@ -85,6 +85,11 @@ guided task creation and reusable generated artwork, without XP or autonomous
 agents. The prototype remains the interaction reference, not implementation
 evidence.
 
+The first implementation slice is
+[Persist the shared Bun journey from canonical first completions](https://github.com/DrBushyTop/bun-do/issues/57).
+Native world integration, AI adventures and private reusable artwork remain in
+the parent issue.
+
 ## AI usage policy after V2
 
 [Decide whether AI usage limits are needed after V2](https://github.com/DrBushyTop/bun-do/issues/37) is blocked by V2 completion and belongs to neither release parent. Start without product usage quotas, daily/monthly budgets or per-user fairness allowances. Observe actual usage before deciding whether limits are needed. Technical I/O, memory, output and timeout bounds, authentication and provider constraints remain. No token-limit implementation gates AI enablement.
