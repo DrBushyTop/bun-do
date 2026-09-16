@@ -69,6 +69,19 @@ public static class HouseholdAdventure
         return ("ACCEPTED", board with { Active = null });
     }
 
+    public static AdventureBoard? AssignArtwork(AdventureBoard board, Guid batch, Guid choice, string key, DateTimeOffset now)
+    {
+        if (board.Active is { } active) {
+            if (active.BatchId != batch || active.Id != choice) return null;
+            // Artwork is independent of the editable draft version. Once assigned it never rotates.
+            return active.Artwork == "dojo-garden" ? board with { Active = active with { Artwork = key } } : board;
+        }
+        if (board.Batch is not { Status: "READY" } proposals || proposals.Id != batch || proposals.ExpiresAt <= now ||
+            proposals.Proposals?.Any(p => p.Id == choice) != true) return null;
+        return board with { Batch = proposals with { Proposals = proposals.Proposals.Select(p =>
+            p.Id == choice && p.Artwork == "dojo-garden" ? p with { Artwork = key } : p).ToArray() } };
+    }
+
     public static AdventureProgress Progress(AdventureDraft draft, IReadOnlyDictionary<string, TaskSnapshot> tasks)
     {
         var roots = draft.Phases.Select(p => p.RootId).Distinct(StringComparer.Ordinal).Select(id => {

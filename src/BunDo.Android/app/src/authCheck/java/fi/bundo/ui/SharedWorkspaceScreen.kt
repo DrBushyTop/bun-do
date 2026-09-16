@@ -218,6 +218,10 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
         owner.lifecycle.addObserver(observer)
         onDispose { owner.lifecycle.removeObserver(observer); if (!data.lease.active) model.hide() }
     }
+    val artworkLoader: suspend (AdventureChoice, Boolean) -> ArtworkResult = remember(data.lease.generation, selected.scope) {
+        { choice, retry -> AdventureArtworkClient.load(context, repository, data, choice, retry) }
+    }
+    CompositionLocalProvider(LocalAdventureArtwork provides artworkLoader) {
     InboxApp(state, model, appearance, onAppearance, voice = data.voice, voiceTarget = VoiceTarget(selected.scope), onAccount = onAccount, onWelcome = onWelcome, queueTitle = selected.name,
         queueNavigation = { SharedHouseholdNavigation(if (destination in listOf("journey", "adventure", "creator")) "together" else destination) { destination = it } },
         queueContent = if (destination != "queue") ({ onOpen ->
@@ -446,4 +450,5 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
             } }) { Text(stringResource(R.string.shared_reapply)) } },
             dismissButton = { TextButton(enabled = !busy, onClick = { reapply = null }) { Text(stringResource(R.string.back)) } })
     }
+}
 }

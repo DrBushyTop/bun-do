@@ -100,6 +100,15 @@ public sealed partial class AdventureService(IHouseholdDocuments documents, IAdv
     public Task CloseAsync(Guid member, Guid workspace, Guid epoch, Guid id, ulong version, bool leave, bool confirmed, CancellationToken ct) =>
         Change(member, workspace, epoch, [], (view, board) => HouseholdAdventure.Close(board, id, version, leave, confirmed, view.Tasks), ct);
 
+    public Task AssignArtworkAsync(Guid member, Guid workspace, Guid epoch, Guid batch, Guid choice, string key, CancellationToken ct)
+    {
+        if (Artwork.ArtworkBrief.Find(key) is null) throw new SyncException("ARTWORK_UNAVAILABLE");
+        return Change(member, workspace, epoch, [], (_, board) => {
+            var next = HouseholdAdventure.AssignArtwork(board, batch, choice, key, clock.GetUtcNow());
+            return next is null ? ("ADVENTURE_CHANGED", board) : ("ACCEPTED", next);
+        }, ct);
+    }
+
     private async Task Change(Guid member, Guid workspace, Guid epoch, IEnumerable<string> extra,
         Func<View, AdventureBoard, (string Code, AdventureBoard Board)> change, CancellationToken ct)
     {

@@ -35,4 +35,5 @@
     <string name="adventure_leave_confirm">This ends the adventure for both of you. All tasks stay untouched.</string>
     <string name="adventure_dismiss">Back to suggestions</string>
     <string name="adventure_task_sync">Task controls will be available after sync.</string>
+    <string name="artwork_retry">Retry artwork</string>
 </resources>

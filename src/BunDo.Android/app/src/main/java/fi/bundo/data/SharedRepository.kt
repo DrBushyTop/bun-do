@@ -464,12 +464,23 @@ class SharedRepository(
         }
     }
 
-    internal suspend fun applyAdventure(request: SharedRequest, snapshot: JSONObject): Boolean = lease.access {
+    internal suspend fun applyAdventure(request: SharedRequest, snapshot: JSONObject): Boolean =
+        acceptAdventure(request.workspace, request.worker, snapshot)
+
+    /** Artwork never owns the task/command worker, even while a large image is in flight. */
+    internal suspend fun prepareArtwork(): SharedWorkspace? = lease.access {
+        current().takeIf { it.blocked == null && dao.recoveryState(scope) == null }
+    }
+
+    internal suspend fun applyArtwork(workspace: SharedWorkspace, snapshot: JSONObject): Boolean =
+        acceptAdventure(workspace, null, snapshot)
+
+    private suspend fun acceptAdventure(workspace: SharedWorkspace, worker: String?, snapshot: JSONObject): Boolean = lease.access {
         database.withTransaction {
             val state = current()
-            if (state.worker != request.worker || state.blocked != null || dao.recoveryState(scope) != null) return@withTransaction false
-            check(request.workspace.scope == state.scope && request.workspace.epoch == state.epoch &&
-                request.workspace.workspaceId == state.workspaceId && request.workspace.registration == state.registration)
+            if (worker != null && state.worker != worker || state.blocked != null || dao.recoveryState(scope) != null) return@withTransaction false
+            check(workspace.scope == state.scope && workspace.epoch == state.epoch &&
+                workspace.workspaceId == state.workspaceId && workspace.registration == state.registration)
             val parsed = AdventureSnapshot.read(snapshot)
             check(parsed.workspaceId == state.workspaceId && parsed.epoch == state.epoch)
             val prior = state.adventure?.let { AdventureSnapshot.read(JSONObject(it)) }
@@ -478,6 +489,13 @@ class SharedRepository(
             lease.check()
             true
         }
+    }
+
+    internal suspend fun artworkChoice(id: String): AdventureChoice? = lease.access {
+        val state = current()
+        if (state.blocked != null || dao.recoveryState(scope) != null) return@access null
+        val snapshot = state.adventure?.let { AdventureSnapshot.read(JSONObject(it)) } ?: return@access null
+        (listOfNotNull(snapshot.active) + snapshot.proposals).firstOrNull { it.id == id }
     }
 
     internal suspend fun guidedCreation(): GuidedCreation? = lease.access { current().adventureCreation?.let(GuidedCreation::read) }
@@ -577,10 +595,17 @@ class SharedRepository(
         }
     }
 
-    suspend fun block(request: SharedRequest, reason: String) = lease.access {
+    suspend fun block(request: SharedRequest, reason: String) = blockAccess(request, reason, false)
+
+    internal suspend fun blockArtwork(workspace: SharedWorkspace, reason: String) =
+        blockAccess(SharedRequest("", workspace, null), reason, true)
+
+    private suspend fun blockAccess(request: SharedRequest, reason: String, artwork: Boolean) = lease.access {
         database.withTransaction {
             val state = current()
-            if (state.worker != request.worker) return@withTransaction
+            if (!artwork && state.worker != request.worker) return@withTransaction
+            if (state.scope != request.workspace.scope || state.epoch != request.workspace.epoch ||
+                state.workspaceId != request.workspace.workspaceId || state.registration != request.workspace.registration) return@withTransaction
             dao.saveWorkspace(state.copy(blocked = reason, worker = null, progress = null, adventure = null, adventureBow = null, adventureSeal = null, adventureCreation = null))
             for (intent in dao.intents(scope)) {
                 val quarantine = intent.status in listOf("PENDING", "SUBMITTED") ||

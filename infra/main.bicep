@@ -57,6 +57,15 @@ module snapshotArtifacts 'modules/snapshot-artifacts.bicep' = {
   }
 }
 
+module artworkLibrary 'modules/artwork-library.bicep' = {
+  name: 'bun-do-artwork-library'
+  scope: development
+  params: {
+    accountName: 'stbundoart${uniqueString(subscription().subscriptionId, resourceGroupName)}'
+    location: location
+  }
+}
+
 module observability 'modules/observability.bicep' = {
   name: 'bun-do-observability'
   scope: development
@@ -105,6 +114,11 @@ module backendHosting 'modules/backend-hosting.bicep' = {
     snapshotAccountName: snapshotArtifacts.outputs.accountName
     snapshotContainerName: snapshotArtifacts.outputs.containerName
     snapshotBlobEndpoint: snapshotArtifacts.outputs.blobEndpoint
+    artworkAccountName: artworkLibrary.outputs.accountName
+    artworkEndpoint: artworkLibrary.outputs.endpoint
+    artworkImagesContainer: artworkLibrary.outputs.imagesContainer
+    artworkCatalogContainer: artworkLibrary.outputs.catalogContainer
+    artworkDeployment: aiInference.outputs.artworkDeployment
     aiAccountName: aiInference.outputs.accountName
     aiEndpoint: aiInference.outputs.endpoint
     lunaDeployment: aiInference.outputs.lunaDeployment

@@ -14,6 +14,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Artwork/Assets/royal-bun-reference.png" LogicalName="BunDo.ArtworkReference" />
+    <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Timer" Version="4.3.1" />
     <EmbeddedResource Include="../../contracts/ai/extraction.schema.json" LogicalName="BunDo.CleanupSchema" />
     <EmbeddedResource Include="../../contracts/ai/capture.schema.json" LogicalName="BunDo.CaptureSchema" />
     <EmbeddedResource Include="../../contracts/ai/adventure-plan.schema.json" LogicalName="BunDo.AdventurePlanSchema" />

@@ -19,6 +19,11 @@ param cosmosDataContributorRoleDefinitionId string
 param snapshotAccountName string
 param snapshotContainerName string
 param snapshotBlobEndpoint string
+param artworkAccountName string
+param artworkEndpoint string
+param artworkImagesContainer string
+param artworkCatalogContainer string
+param artworkDeployment string
 param aiAccountName string
 param aiEndpoint string
 param lunaDeployment string
@@ -95,6 +100,19 @@ resource snapshotAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
     principalType: 'ServicePrincipal'
   }
 }
+
+resource artworkContainers 'Microsoft.Storage/storageAccounts/blobServices/containers@2025-06-01' existing = [for container in [artworkImagesContainer, artworkCatalogContainer]: {
+  name: '${artworkAccountName}/default/${container}'
+}]
+resource artworkAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (container, index) in [artworkImagesContainer, artworkCatalogContainer]: {
+  name: guid(artworkContainers[index].id, identity.id, 'artwork-blob-contributor')
+  scope: artworkContainers[index]
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
+    principalId: identity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}]
 
 resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2025-04-15' existing = {
   name: cosmosAccountName
@@ -213,6 +231,10 @@ resource app 'Microsoft.Web/sites@2024-04-01' = {
         { name: 'WorkspaceStore__Endpoint', value: cosmosEndpoint }
         { name: 'WorkspaceStore__DatabaseName', value: databaseName }
         { name: 'WorkspaceStore__ContainerName', value: containerName }
+        { name: 'Artwork__BlobEndpoint', value: artworkEndpoint }
+        { name: 'Artwork__ImagesContainer', value: artworkImagesContainer }
+        { name: 'Artwork__CatalogContainer', value: artworkCatalogContainer }
+        { name: 'Artwork__Deployment', value: artworkDeployment }
         { name: 'Snapshots__BlobEndpoint', value: snapshotBlobEndpoint }
         { name: 'Snapshots__ContainerName', value: snapshotContainerName }
         // Deliberately worker-only. The host must not export raw request logs.

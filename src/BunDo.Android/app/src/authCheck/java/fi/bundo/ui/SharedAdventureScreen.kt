@@ -11,6 +11,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.CancellationException
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalFocusManager
@@ -48,7 +53,7 @@ internal fun SharedAdventureScreen(snapshot: AdventureSnapshot?, busy: Boolean, 
         if (failed) Text(stringResource(R.string.adventure_failed), color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("adventure-error"))
         if (!allowed) Text(stringResource(R.string.adventure_unavailable))
         if (active != null) {
-            AdventureArtwork(active.artwork)
+            AdventureArtwork(active.artwork, active)
             Text(active.draft.title, style = MaterialTheme.typography.titleLarge)
             if (active.draft.flavor.isNotEmpty()) Text(active.draft.flavor)
             Text(stringResource(R.string.adventure_progress, snapshot.completed, snapshot.total), modifier = Modifier.testTag("adventure-progress"))
@@ -70,7 +75,7 @@ internal fun SharedAdventureScreen(snapshot: AdventureSnapshot?, busy: Boolean, 
             Text(stringResource(R.string.adventure_intro))
             if (status == "READY") for (choice in snapshot!!.proposals) {
                 ElevatedCard(onClick = { preview = choice }, modifier = Modifier.fillMaxWidth().testTag("adventure-proposal-${choice.id}")) {
-                    AdventureArtwork(choice.artwork)
+                    AdventureArtwork(choice.artwork, choice)
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(choice.draft.title, style = MaterialTheme.typography.titleLarge)
                         if (choice.draft.flavor.isNotEmpty()) Text(choice.draft.flavor)
@@ -116,11 +121,30 @@ internal fun SharedAdventureScreen(snapshot: AdventureSnapshot?, busy: Boolean, 
         dismissButton = { TextButton(onClick = { leave = false }) { Text(stringResource(R.string.adventure_not_now)) } })
 }
 
+internal val LocalAdventureArtwork = staticCompositionLocalOf<(suspend (AdventureChoice, Boolean) -> ArtworkResult)?> { null }
+
 @Composable
-internal fun AdventureArtwork(artwork: String) {
-    // Catalog delivery replaces the fallback in its own slice. Unknown keys always retain bundled artwork.
-    Image(painterResource(R.drawable.dojo_garden), null, contentScale = ContentScale.Crop,
-        modifier = Modifier.fillMaxWidth().height(144.dp).testTag("adventure-art-$artwork"))
+internal fun AdventureArtwork(artwork: String, choice: AdventureChoice? = null) {
+    val loader = LocalAdventureArtwork.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var result by remember(choice?.id, loader) { mutableStateOf<ArtworkResult?>(null) }
+    var retry by remember(choice?.id, loader) { mutableIntStateOf(0) }
+    var retried by remember(choice?.id, loader) { mutableIntStateOf(0) }
+    LaunchedEffect(choice?.id, artwork, retry, loader) {
+        if (choice != null && loader != null) lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            do {
+                val requestedRetry = retry > retried; retried = retry
+                result = try { loader(choice, requestedRetry) } catch (e: CancellationException) { throw e }
+                catch (_: Exception) { ArtworkResult("FAILED", result?.image) }
+                if (result?.status in listOf("PENDING", "RUNNING")) kotlinx.coroutines.delay(15_000)
+            } while (result?.status in listOf("PENDING", "RUNNING"))
+        }
+    }
+    val modifier = Modifier.fillMaxWidth().height(144.dp).testTag("adventure-art-$artwork")
+    val image = result?.image
+    if (image != null) Image(image.asImageBitmap(), null, contentScale = ContentScale.Crop, modifier = modifier)
+    else Image(painterResource(R.drawable.dojo_garden), null, contentScale = ContentScale.Crop, modifier = modifier)
+    if (result?.status == "FAILED") TextButton(onClick = { retry++ }) { Text(stringResource(R.string.artwork_retry)) }
 }
 
 @Composable

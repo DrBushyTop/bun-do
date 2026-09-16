@@ -8,6 +8,7 @@ using BunDo.Domain;
 using BunDo.Functions.Households;
 using BunDo.Functions.Identity;
 using BunDo.Functions.Adventures;
+using BunDo.Functions.Artwork;
 using BunDo.Functions.Sync;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -161,6 +162,40 @@ public sealed class AdventureFunctionTests : IDisposable
         var request = Request(Body(), Token());
         request.RequestAborted = new CancellationToken(true);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => new AdventureFunction(Validator, services).Run(request.Request));
+    }
+
+    [Fact]
+    public async Task Artwork_delivery_authenticates_bounds_requests_and_rechecks_membership_after_blob_read()
+    {
+        var documents = Storage(); var images = new Images();
+        using var services = new ServiceCollection().AddSingleton<IHouseholdDocuments>(documents)
+            .AddSingleton<IRegistrationStore>(new Registration(identity, registration, true))
+            .AddSingleton(new ArtworkCatalog(images)).BuildServiceProvider();
+        var function = new ArtworkFunction(Validator, services);
+        var oversized = Request(new string('x', 3000), null);
+        Assert.Equal(401, Assert.IsType<ObjectResult>(await function.Run(oversized.Request)).StatusCode); Assert.Equal(0, oversized.Request.Body.Position);
+        oversized.Request.Headers.Authorization = "Bearer " + Token();
+        Assert.Equal(413, Assert.IsType<ObjectResult>(await function.Run(oversized.Request)).StatusCode);
+        var batch = Guid.NewGuid(); var choice = Guid.NewGuid();
+        documents.State = documents.State with { Adventures = new(new(batch, "CONSUMED", DateTimeOffset.UtcNow),
+            new(choice, batch, 1, new("Private title", "", []), DateTimeOffset.UtcNow, "dojo-v1-home")) };
+        var body = JsonSerializer.Serialize(new { workspaceId = workspace, stateEpoch = epoch, registrationId = registration, batchId = batch, choiceId = choice, action = "image" });
+        var request = Request(body, Token());
+        Assert.IsType<FileContentResult>(await function.Run(request.Request)); Assert.Equal("no-store", request.Response.Headers.CacheControl);
+        var active = documents.State.Adventures;
+        documents.State = documents.State with { Adventures = new(new(batch, "READY", DateTimeOffset.UtcNow.AddDays(-2),
+            DateTimeOffset.UtcNow.AddDays(-1), Proposals: [new(choice, active!.Active!.Draft, "dojo-v1-home")])) };
+        Assert.Equal(409, Assert.IsType<ObjectResult>(await function.Run(Request(body, Token()).Request)).StatusCode);
+        documents.State = documents.State with { Adventures = active };
+        images.AfterRead = () => documents.State = documents.State with { Membership = HouseholdMembership.Create(Guid.NewGuid()) };
+        Assert.Equal(403, Assert.IsType<ObjectResult>(await function.Run(Request(body, Token()).Request)).StatusCode);
+    }
+    private sealed class Images : IArtworkStore {
+        public Action? AfterRead;
+        public Task<StoredArtwork?> ReadAsync(string key, CancellationToken ct) => Task.FromResult<StoredArtwork?>(new(new(ArtworkBrief.All[0], "READY", Guid.NewGuid(), Blob: "image"), "1"));
+        public Task<bool> WriteAsync(string key, string? version, ArtworkEntry entry, CancellationToken ct) => throw new NotSupportedException();
+        public Task PutImageAsync(string name, byte[] bytes, CancellationToken ct) => throw new NotSupportedException();
+        public Task<byte[]> ImageAsync(string name, CancellationToken ct) { AfterRead?.Invoke(); return Task.FromResult("RIFFxxxxWEBP"u8.ToArray()); }
     }
 
     private sealed class Registration(AccountIdentity identity, Guid registration, bool active) : IRegistrationStore

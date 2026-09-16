@@ -55,6 +55,21 @@ resource terra 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = i
   }
 }
 
+// Image generation has an independent low allocation and explicit model upgrades.
+resource artwork 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
+  // The provider rejects concurrent sibling deployment writes.
+  dependsOn: [luna, terra]
+  parent: account
+  name: 'bun-do-artwork'
+  sku: { name: 'GlobalStandard', capacity: 3 }
+  properties: {
+    model: { format: 'OpenAI', name: 'gpt-image-2', version: '2026-04-21' }
+    versionUpgradeOption: 'NoAutoUpgrade'
+    raiPolicyName: 'Microsoft.Default'
+  }
+}
+output artworkDeployment string = artwork.name
+
 output accountName string = account.name
 output endpoint string = 'https://${account.properties.customSubDomainName}.openai.azure.com/openai/v1/'
 output lunaDeployment string = luna.name

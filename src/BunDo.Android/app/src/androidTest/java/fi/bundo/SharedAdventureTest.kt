@@ -6,6 +6,9 @@ import fi.bundo.data.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.CompletableDeferred
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
@@ -44,6 +47,64 @@ class SharedAdventureTest {
         repository.applyAdventure(newer, adventureFixture(state, revision = "5"))
         assertEquals(accepted.toString(), repository.workspace.first()!!.adventure)
         assertTrue(runCatching { repository.applyAdventure(newer, adventureFixture(state.copy(epoch = UUID.randomUUID().toString()))) }.isFailure)
+    }
+    @Test fun artwork_in_flight_never_reserves_command_worker_and_stale_reply_cannot_replace_acceptance() = fixture { db, state, lease, repository ->
+        val initial = repository.prepareJourney(1, 1)!!
+        repository.applyAdventure(initial, adventureFixture(state, active = false))
+        repository.release(initial)
+        val imageRequest = repository.prepareArtwork()!!
+        val command = repository.prepareJourney(2, 1)!!
+        val accepted = adventureFixture(state, revision = "5")
+        assertTrue(repository.applyAdventure(command, accepted))
+        assertNotNull(repository.prepareArtwork()) // Explicit retry also runs while a command owns the worker.
+        assertTrue(repository.applyArtwork(imageRequest, adventureFixture(state, revision = "4")))
+        assertEquals(accepted.toString(), repository.workspace.first()!!.adventure)
+        assertEquals(command.worker, repository.workspace.first()!!.worker)
+        repository.release(command)
+        val sync = repository.prepare(3, 1)!!
+        assertTrue(repository.applyArtwork(imageRequest, accepted))
+        assertEquals(sync.worker, repository.workspace.first()!!.worker)
+        assertEquals("0", db.shared().workspace(state.scope)!!.revision)
+        repository.blockArtwork(imageRequest, "FORBIDDEN")
+        assertNull(repository.prepareArtwork())
+        assertNull(repository.artworkChoice(accepted.getJSONObject("board").getJSONObject("active").getString("id")))
+        assertFalse(repository.applyArtwork(imageRequest, accepted))
+        lease.revoke()
+        assertTrue(runCatching { repository.applyArtwork(imageRequest, accepted) }.exceptionOrNull() is CancellationException)
+    }
+    @Test fun held_image_download_allows_acceptance_and_sync_and_reuses_private_cache_offline() = fixture { _, state, lease, repository ->
+        coroutineScope {
+            val initial = repository.prepareJourney(1, 1)!!
+            val snapshot = adventureFixture(state)
+            repository.applyAdventure(initial, snapshot); repository.release(initial)
+            val request = repository.prepareArtwork()!!
+            val choice = AdventureSnapshot.read(snapshot).active!!
+            val entered = CompletableDeferred<Unit>(); val release = CompletableDeferred<Unit>()
+            val directory = java.io.File(context.cacheDir, "image-${UUID.randomUUID()}")
+            val cache = ArtworkCache(directory, lease)
+            val bitmap = android.graphics.Bitmap.createBitmap(24, 16, android.graphics.Bitmap.Config.ARGB_8888)
+            val bytes = java.io.ByteArrayOutputStream().also { bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 80, it) }.toByteArray()
+            bitmap.recycle()
+            try {
+                val download = async { AdventureArtworkClient.fetch(repository, request, choice, true, cache, "synthetic") { _, body ->
+                    if (body.getString("action") == "image") { entered.complete(Unit); release.await(); bytes }
+                    else {
+                        assertEquals("retry", body.getString("action"))
+                        JSONObject().put("status", "READY").put("key", "dojo-v1-home").put("snapshot", snapshot).toString().toByteArray()
+                    }
+                } }
+                entered.await()
+                val acceptance = repository.prepareJourney(2, 1)!!
+                assertTrue(repository.applyAdventure(acceptance, adventureFixture(state, revision = "5")))
+                repository.release(acceptance)
+                val sync = repository.prepare(3, 1)!!
+                release.complete(Unit)
+                assertEquals(24, download.await().image!!.width)
+                assertEquals(sync.worker, repository.workspace.first()!!.worker)
+                assertEquals(5uL, AdventureSnapshot.read(JSONObject(repository.workspace.first()!!.adventure!!)).revision)
+                assertEquals(16, ArtworkCache(directory, lease).read("dojo-v1-home")!!.height)
+            } finally { release.complete(Unit); directory.deleteRecursively() }
+        }
     }
     @Test fun revokedAccountAndAccessRemovalDoNotRetainAdventureContent() = fixture { db, state, lease, repository ->
         val request = repository.prepareJourney(1000, 1)!!

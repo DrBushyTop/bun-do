@@ -242,3 +242,16 @@ and available. A different installation can see the pending attempt but cannot
 resume its command journal. Either member can explicitly end the attempt.
 Already queued or accepted tasks remain ordinary tasks, including when an
 attempt is ended. Lost replies never imply a rollback of task commands.
+
+## Artwork delivery
+
+The reusable library maps adventures to a fixed vocabulary of generic dojo
+scenes. Only that vocabulary enters image prompts and catalog records. The
+catalog coordinates one leased generation attempt per scene, using the approved
+Bun reference. A timer handles queued images separately from task and adventure
+requests. Interrupted or failed generation requires explicit retry.
+
+The API checks membership, epoch, installation and the current choice before
+serving an image. Android keeps a bounded, account-private cache. Initial
+fallback artwork can become a catalog image, but assigned images do not rotate
+when an adventure is edited. Suggestion expiry does not delete library images.

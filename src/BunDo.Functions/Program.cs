@@ -72,6 +72,23 @@ if (builder.Configuration["AI:Enabled"] == "true")
             new ManagedIdentityCredential(ManagedIdentityId.FromUserAssignedClientId(builder.Configuration["AZURE_CLIENT_ID"]!)),
             new Uri(builder.Configuration["AI:Endpoint"]!), builder.Configuration["AI:LunaDeployment"]!));
 }
+if (!string.IsNullOrEmpty(builder.Configuration["Artwork:BlobEndpoint"]))
+{
+    builder.Services.AddSingleton<BunDo.Functions.Artwork.IArtworkStore>(_ => {
+        var client = new Azure.Storage.Blobs.BlobServiceClient(new Uri(builder.Configuration["Artwork:BlobEndpoint"]!),
+            new ManagedIdentityCredential(ManagedIdentityId.FromUserAssignedClientId(builder.Configuration["AZURE_CLIENT_ID"]!)));
+        return new BunDo.Functions.Artwork.BlobArtworkStore(client.GetBlobContainerClient(builder.Configuration["Artwork:CatalogContainer"]!),
+            client.GetBlobContainerClient(builder.Configuration["Artwork:ImagesContainer"]!));
+    });
+    builder.Services.AddSingleton<BunDo.Functions.Artwork.IArtworkGenerator>(_ => {
+        using var stream = typeof(BunDo.Functions.Artwork.FoundryArtworkGenerator).Assembly.GetManifestResourceStream("BunDo.ArtworkReference")!;
+        using var reference = new MemoryStream(); stream.CopyTo(reference);
+        return new BunDo.Functions.Artwork.FoundryArtworkGenerator(new HttpClient { Timeout = TimeSpan.FromMinutes(4) },
+            new ManagedIdentityCredential(ManagedIdentityId.FromUserAssignedClientId(builder.Configuration["AZURE_CLIENT_ID"]!)),
+            new Uri(builder.Configuration["AI:Endpoint"]!), builder.Configuration["Artwork:Deployment"]!, reference.ToArray());
+    });
+    builder.Services.AddSingleton<BunDo.Functions.Artwork.ArtworkCatalog>();
+}
 if (builder.Configuration["Speech:Enabled"] == "true")
 {
     builder.Services.AddSingleton<BunDo.Functions.Speech.ISpeechProvider>(_ =>
