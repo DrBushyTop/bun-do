@@ -1,6 +1,6 @@
 <resources>
     <string name="journey_title">Bun’s journey</string>
-    <string name="journey_back">Back to Together</string>
+    <string name="journey_back">Back</string>
     <string name="journey_intro">A little way forward, together</string>
     <string name="journey_start_body">As your family finishes tasks, Bun explores the paths beyond the dojo. Each new first completion moves the journey forward. There is no rush.</string>
     <string name="journey_start">Start our journey</string>

@@ -97,6 +97,8 @@ adds the chooser, accepted view and offline projection.
 [private reusable Bun artwork](https://github.com/DrBushyTop/bun-do/issues/62) and
 [the integrated scene and signpost](https://github.com/DrBushyTop/bun-do/issues/63)
 complete the remaining flows. The parent tracks their combined verification.
+[Adventure follow-up fixes](https://github.com/DrBushyTop/bun-do/issues/64) cover
+Back history, useful task groups, voice-led planning and AI ideas from task history.
 
 ## AI usage policy after V2
 

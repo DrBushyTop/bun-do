@@ -52,32 +52,32 @@ class SharedAdventureTest {
         val initial = repository.prepareJourney(1, 1)!!
         repository.applyAdventure(initial, adventureFixture(state, active = false))
         repository.release(initial)
-        val imageRequest = repository.prepareArtwork()!!
+        val imageRequest = repository.prepareAdventureRead()!!
         val command = repository.prepareJourney(2, 1)!!
         val accepted = adventureFixture(state, revision = "5")
         assertTrue(repository.applyAdventure(command, accepted))
-        assertNotNull(repository.prepareArtwork()) // Explicit retry also runs while a command owns the worker.
-        assertTrue(repository.applyArtwork(imageRequest, adventureFixture(state, revision = "4")))
+        assertNotNull(repository.prepareAdventureRead()) // Explicit retry also runs while a command owns the worker.
+        assertTrue(repository.applyAdventureRead(imageRequest, adventureFixture(state, revision = "4")))
         assertEquals(accepted.toString(), repository.workspace.first()!!.adventure)
         assertEquals(command.worker, repository.workspace.first()!!.worker)
         repository.release(command)
         val sync = repository.prepare(3, 1)!!
-        assertTrue(repository.applyArtwork(imageRequest, accepted))
+        assertTrue(repository.applyAdventureRead(imageRequest, accepted))
         assertEquals(sync.worker, repository.workspace.first()!!.worker)
         assertEquals("0", db.shared().workspace(state.scope)!!.revision)
-        repository.blockArtwork(imageRequest, "FORBIDDEN")
-        assertNull(repository.prepareArtwork())
+        repository.blockAdventureRead(imageRequest, "FORBIDDEN")
+        assertNull(repository.prepareAdventureRead())
         assertNull(repository.artworkChoice(accepted.getJSONObject("board").getJSONObject("active").getString("id")))
-        assertFalse(repository.applyArtwork(imageRequest, accepted))
+        assertFalse(repository.applyAdventureRead(imageRequest, accepted))
         lease.revoke()
-        assertTrue(runCatching { repository.applyArtwork(imageRequest, accepted) }.exceptionOrNull() is CancellationException)
+        assertTrue(runCatching { repository.applyAdventureRead(imageRequest, accepted) }.exceptionOrNull() is CancellationException)
     }
     @Test fun held_image_download_allows_acceptance_and_sync_and_reuses_private_cache_offline() = fixture { _, state, lease, repository ->
         coroutineScope {
             val initial = repository.prepareJourney(1, 1)!!
             val snapshot = adventureFixture(state)
             repository.applyAdventure(initial, snapshot); repository.release(initial)
-            val request = repository.prepareArtwork()!!
+            val request = repository.prepareAdventureRead()!!
             val choice = AdventureSnapshot.read(snapshot).active!!
             val entered = CompletableDeferred<Unit>(); val release = CompletableDeferred<Unit>()
             val directory = java.io.File(context.cacheDir, "image-${UUID.randomUUID()}")

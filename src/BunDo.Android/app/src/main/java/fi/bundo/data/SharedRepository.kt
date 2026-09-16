@@ -467,12 +467,12 @@ class SharedRepository(
     internal suspend fun applyAdventure(request: SharedRequest, snapshot: JSONObject): Boolean =
         acceptAdventure(request.workspace, request.worker, snapshot)
 
-    /** Artwork never owns the task/command worker, even while a large image is in flight. */
-    internal suspend fun prepareArtwork(): SharedWorkspace? = lease.access {
+    /** Artwork and read-only ideas never own the task/command worker. */
+    internal suspend fun prepareAdventureRead(): SharedWorkspace? = lease.access {
         current().takeIf { it.blocked == null && dao.recoveryState(scope) == null }
     }
 
-    internal suspend fun applyArtwork(workspace: SharedWorkspace, snapshot: JSONObject): Boolean =
+    internal suspend fun applyAdventureRead(workspace: SharedWorkspace, snapshot: JSONObject): Boolean =
         acceptAdventure(workspace, null, snapshot)
 
     private suspend fun acceptAdventure(workspace: SharedWorkspace, worker: String?, snapshot: JSONObject): Boolean = lease.access {
@@ -597,7 +597,7 @@ class SharedRepository(
 
     suspend fun block(request: SharedRequest, reason: String) = blockAccess(request, reason, false)
 
-    internal suspend fun blockArtwork(workspace: SharedWorkspace, reason: String) =
+    internal suspend fun blockAdventureRead(workspace: SharedWorkspace, reason: String) =
         blockAccess(SharedRequest("", workspace, null), reason, true)
 
     private suspend fun blockAccess(request: SharedRequest, reason: String, artwork: Boolean) = lease.access {

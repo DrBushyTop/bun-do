@@ -10,6 +10,20 @@ public sealed class HouseholdAdventureTests
         DateTimeOffset.UtcNow.AddHours(24), Proposals: [new(Guid.NewGuid(), draft)]));
 
     [Fact]
+    public void Generated_suggestions_require_three_roots_and_different_sets_but_existing_edits_remain_valid()
+    {
+        Assert.False(HouseholdAdventure.ValidSuggestions([Draft("one")]));
+        Assert.False(HouseholdAdventure.ValidSuggestions([Draft("one", "two")]));
+        Assert.True(HouseholdAdventure.ValidSuggestions([Draft("one", "two", "three")]));
+        Assert.False(HouseholdAdventure.ValidSuggestions([Draft("one", "two", "three"), Draft("three", "one", "two")]));
+        Assert.True(HouseholdAdventure.ValidSuggestions([Draft("one", "two", "three"), Draft("one", "two", "four")]));
+        var legacy = Board(Draft("one"));
+        Assert.Equal("SUGGESTIONS_UNAVAILABLE", HouseholdAdventure.Accept(legacy, legacy.Batch!.Id,
+            legacy.Batch.Proposals![0].Id, new Dictionary<string, TaskSnapshot> { ["one"] = Root("one") }, 1, DateTimeOffset.UtcNow).Code);
+        Assert.True(HouseholdAdventure.Valid(Draft("one")));
+    }
+
+    [Fact]
     public void Estimates_text_and_distinct_root_references_are_bounded()
     {
         Assert.True(HouseholdAdventure.Valid(Draft("one")));
@@ -62,9 +76,9 @@ public sealed class HouseholdAdventureTests
     [Fact]
     public void Accept_retry_preserves_choice_and_does_not_resurrect_it_after_close()
     {
-        var board = Board(Draft("one"));
+        var board = Board(Draft("one", "two", "three"));
         var proposal = board.Batch!.Proposals![0]; var batch = board.Batch.Id;
-        var tasks = new Dictionary<string, TaskSnapshot> { ["one"] = Root("one") };
+        var tasks = new[] { "one", "two", "three" }.ToDictionary(id => id, id => Root(id));
         var accepted = HouseholdAdventure.Accept(board, batch, proposal.Id, tasks, 10, DateTimeOffset.UtcNow);
         Assert.Equal("ACCEPTED", accepted.Code); Assert.Equal("CONSUMED", accepted.Board.Batch!.Status);
         Assert.Null(accepted.Board.Batch.Proposals);
@@ -78,7 +92,7 @@ public sealed class HouseholdAdventureTests
     [Fact]
     public void Expired_and_changed_sources_cannot_be_accepted()
     {
-        var board = Board(Draft("one")); var batch = board.Batch!; var id = batch.Proposals![0].Id;
+        var board = Board(Draft("one", "two", "three")); var batch = board.Batch!; var id = batch.Proposals![0].Id;
         Assert.Equal("SUGGESTIONS_UNAVAILABLE", HouseholdAdventure.Accept(board, batch.Id, id,
             new Dictionary<string, TaskSnapshot>(), 1, batch.ExpiresAt!.Value).Code);
         Assert.Equal("SOURCE_UNAVAILABLE", HouseholdAdventure.Accept(board, batch.Id, id,

@@ -5,6 +5,9 @@ import android.graphics.Bitmap
 import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.test.junit4.StateRestorationTester
+import android.view.ViewGroup
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -40,7 +43,7 @@ class SharedTaskUiTest {
     private val alice = UUID.randomUUID().toString()
     private val bob = UUID.randomUUID().toString()
 
-    private fun fixture(language: String, appearance: String, claimed: Boolean = false, fontScale: Float = 1.3f): Pair<AccountData, SharedWorkspace> {
+    private fun fixture(language: String, appearance: String, claimed: Boolean = false, fontScale: Float = 1.3f, restoration: StateRestorationTester? = null): Pair<AccountData, SharedWorkspace> {
         val data = (compose.activity.application as BunDoApplication).accounts.active.value!!
         val workspace = UUID.randomUUID().toString()
         val epoch = UUID.randomUUID().toString()
@@ -69,8 +72,7 @@ class SharedTaskUiTest {
             setLocale(Locale.forLanguageTag(language)); this.fontScale = fontScale
         }
         val translated = compose.activity.createConfigurationContext(configuration)
-        compose.runOnUiThread {
-            compose.activity.setContent {
+        val content: @Composable () -> Unit = {
                 CompositionLocalProvider(LocalContext provides translated, androidx.compose.ui.platform.LocalResources provides translated.resources, LocalConfiguration provides configuration,
                     LocalActivityResultRegistryOwner provides compose.activity) {
                     fi.bundo.ui.HouseholdMotionProvider { BunDoTheme("light") {
@@ -80,10 +82,71 @@ class SharedTaskUiTest {
                         }
                     } }
                 }
-            }
+        }
+        if (restoration == null) compose.runOnUiThread { compose.activity.setContent(content = content) }
+        else {
+            compose.runOnUiThread { compose.activity.findViewById<ViewGroup>(android.R.id.content).removeAllViews() }
+            restoration.setContent(content)
         }
         compose.waitUntil(10_000) { runCatching { compose.onAllNodesWithText("Vie paperit kierrätykseen").fetchSemanticsNodes().isNotEmpty() }.getOrDefault(false) }
         return data to state
+    }
+
+    @Test fun tabHistorySurvivesSavedStateAndDirectHomeClearsIt() {
+        val restoration = StateRestorationTester(compose)
+        fixture("en", "light", fontScale = 1f, restoration = restoration)
+        compose.onNodeWithTag("household-activity").performClick()
+        compose.onNodeWithTag("household-together").performClick()
+        restoration.emulateSavedInstanceStateRestore()
+        compose.onNodeWithTag("household-together").assertIsSelected()
+        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+        compose.onNodeWithTag("household-activity").assertIsSelected()
+        compose.onNodeWithTag("household-together").performClick()
+        compose.onNodeWithTag("household-queue").performClick()
+        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+        compose.onNodeWithTag("household-queue").assertIsSelected()
+        assertFalse(compose.activity.isFinishing)
+    }
+
+    @Test fun systemBackRetracesTabsAndNestedAdventuresWithoutFinishingHome() {
+        fixture("en", "light", fontScale = 1f)
+        fun back() {
+            InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+            compose.waitForIdle()
+        }
+        compose.onNodeWithTag("household-activity").performClick()
+        compose.onNodeWithTag("household-together").performClick()
+        back(); compose.onNodeWithTag("household-activity").assertIsSelected()
+        back(); compose.onNodeWithTag("household-queue").assertIsSelected()
+        back(); assertFalse(compose.activity.isFinishing)
+        compose.onNodeWithTag("household-activity").performClick()
+        compose.onNodeWithTag("settings").performClick()
+        back(); compose.onNodeWithTag("household-activity").assertIsSelected()
+        back(); compose.onNodeWithTag("household-queue").assertIsSelected()
+        compose.onNodeWithTag("adventure-signpost").performClick()
+        compose.onNodeWithTag("adventure-create").performScrollTo().performClick()
+        back(); compose.onNodeWithTag("adventure-screen").assertIsDisplayed()
+        back(); compose.onNodeWithTag("household-queue").assertIsSelected()
+        repeat(2) { back() }; assertFalse(compose.activity.isFinishing)
+    }
+
+    @Test fun backGestureReturnsToPreviousTabAndDoesNotExitHome() {
+        org.junit.Assume.assumeTrue(android.provider.Settings.Secure.getInt(compose.activity.contentResolver, "navigation_mode", 0) == 2)
+        fixture("en", "light", fontScale = 1f)
+        compose.onNodeWithTag("household-activity").performClick()
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        val metrics = compose.activity.resources.displayMetrics
+        fun gesture() {
+            val y = metrics.heightPixels / 2
+            automation.executeShellCommand("input swipe 1 $y ${metrics.widthPixels / 2} $y 350").use {
+                java.io.FileInputStream(it.fileDescriptor).use { stream -> stream.readBytes() }
+            }
+            compose.waitForIdle()
+        }
+        gesture()
+        compose.waitUntil(5_000) { compose.onAllNodes(hasTestTag("household-queue") and isSelected()).fetchSemanticsNodes().isNotEmpty() }
+        gesture(); assertFalse(compose.activity.isFinishing)
+        compose.onNodeWithTag("capture").assertIsDisplayed()
     }
 
     @Test fun journeyOpensFromTogetherAndReturnsToTasksWithoutChangingThem() {
@@ -470,6 +533,7 @@ class SharedTaskUiTest {
         compose.onNodeWithTag("queue-confirm-complete").performClick()
         compose.onNodeWithText("Undo").performClick()
         compose.waitUntil(5000) { runBlocking { data.database.shared().intents(state.scope).size == 2 } }
+        compose.waitUntil(5000) { compose.onAllNodesWithText("Vie paperit kierrätykseen").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Vie paperit kierrätykseen").assertExists()
         assertEquals(listOf("CompleteTask", "ReopenTask"), runBlocking { data.database.shared().intents(state.scope).map { it.kind } })
         screenshot("finish-en-queue.png")

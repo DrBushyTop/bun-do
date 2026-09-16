@@ -41,7 +41,7 @@ internal object AdventureArtworkClient {
         val cache = ArtworkCache(File(checkNotNull(data.directory), "adventure-artwork"), data.lease)
         val current = repository.artworkChoice(choice.id) ?: return@withContext ArtworkResult("UNAVAILABLE")
         if (!retry && current.artwork != "dojo-garden") cache.read(current.artwork)?.let { return@withContext ArtworkResult("READY", it) }
-        val workspace = repository.prepareArtwork() ?: return@withContext ArtworkResult("UNAVAILABLE")
+        val workspace = repository.prepareAdventureRead() ?: return@withContext ArtworkResult("UNAVAILABLE")
         (context.applicationContext as BunDoApplication).withAccountToken(data) { token ->
             fetch(repository, workspace, current, retry, cache, token).also { data.lease.check() }
         }
@@ -58,10 +58,10 @@ internal object AdventureArtworkClient {
             val reply = JSONObject(String(sendRequest(token, body), Charsets.UTF_8))
             val status = reply.getString("status"); val key = reply.getString("key")
             val image = if (status == "READY") cache.read(key) ?: cache.save(key, sendRequest(token, body.put("action", "image"))) else null
-            check(repository.applyArtwork(workspace, reply.getJSONObject("snapshot")))
+            check(repository.applyAdventureRead(workspace, reply.getJSONObject("snapshot")))
             return ArtworkResult(status, image)
         } catch (failure: SyncFailure) {
-            if (failure.code in listOf("FORBIDDEN", "REGISTRATION_RETIRED", "EPOCH_CHANGED")) repository.blockArtwork(workspace, failure.code)
+            if (failure.code in listOf("FORBIDDEN", "REGISTRATION_RETIRED", "EPOCH_CHANGED")) repository.blockAdventureRead(workspace, failure.code)
             throw failure
         }
     }

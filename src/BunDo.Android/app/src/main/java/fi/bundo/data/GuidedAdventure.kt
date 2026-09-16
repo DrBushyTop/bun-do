@@ -41,6 +41,23 @@ internal data class GuidedCreation(val id: String, val version: String, val draf
 
 /** The approval checkpoint and queued task IDs survive process death. Only ordinary sync creates tasks. */
 internal object GuidedAdventure {
+    suspend fun ideas(repository: SharedRepository, token: String, language: String,
+        send: suspend (String, SharedWorkspace, JSONObject) -> JSONObject = AdventureEndpoint()::send): List<String> {
+        val workspace = checkNotNull(repository.prepareAdventureRead())
+        try {
+            val result = send(token, workspace, JSONObject().put("action", "ideas").put("language", language))
+            val array = result.getJSONArray("ideas")
+            require(array.length() == 3)
+            val ideas = (0 until array.length()).map(array::getString)
+            require(ideas.all { it.isNotBlank() && it == it.trim() && it.codePointCount(0, it.length) <= 160 && it.none(Char::isISOControl) } &&
+                ideas.map { it.lowercase(java.util.Locale.ROOT) }.distinct().size == ideas.size)
+            check(repository.applyAdventureRead(workspace, result.getJSONObject("snapshot")))
+            return ideas
+        } catch (failure: SyncFailure) {
+            if (failure.code in listOf("FORBIDDEN", "REGISTRATION_RETIRED", "EPOCH_CHANGED")) repository.blockAdventureRead(workspace, failure.code)
+            throw failure
+        }
+    }
     suspend fun plan(context: Context, repository: SharedRepository, token: String, outcome: String, minutes: Int?,
         send: suspend (String, SharedWorkspace, JSONObject) -> JSONObject = AdventureEndpoint()::send) {
         val request = prepare(context, repository)

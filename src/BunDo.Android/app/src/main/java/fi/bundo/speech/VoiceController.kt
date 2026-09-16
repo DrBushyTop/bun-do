@@ -31,6 +31,8 @@ import java.net.URI
 import javax.net.ssl.HttpsURLConnection
 import kotlin.coroutines.coroutineContext
 
+data class ReviewUse(val id: String, val target: fi.bundo.data.VoiceTarget?, val draft: VoiceDraft)
+
 data class VoiceState(
     val loaded: Boolean = false,
     val modelReady: Boolean = false,
@@ -46,6 +48,7 @@ data class VoiceState(
     val reviewId: String? = null,
     val reviewTarget: fi.bundo.data.VoiceTarget? = null,
     val draft: VoiceDraft? = null,
+    val reviewUse: ReviewUse? = null,
     val localOnly: Boolean = false,
     val keepAudio: Boolean = false,
     val analyze: Boolean = true,
@@ -121,7 +124,7 @@ class VoiceController(
         mutable.update { it.copy(localOnly = localOnly, keepAudio = keepAudio, analyze = analyze) }
     }
     fun clearMessage() { mutable.update { it.copy(message = "") } }
-    fun closeReview() { mutable.update { it.copy(reviewId = null, draft = null) } }
+    fun closeReview() { mutable.update { it.copy(reviewId = null, draft = null, reviewUse = null) } }
     fun openReview(id: String) = start("LOADING") {
         reviewWrite?.join()
         val row = withContext(Dispatchers.IO) { checkNotNull(store.get(id)) }
@@ -149,6 +152,17 @@ class VoiceController(
             val saved = store.commit(id, draft.transcript, draft)
             mutable.update { it.copy(saved = saved, reviewId = null, draft = null, message = "SAVED") }
         }
+    }
+    fun useReview(id: String, draft: VoiceDraft) = start("SAVING") {
+        check(state.value.reviewId == id)
+        reviewWrite?.join()
+        val row = withContext(Dispatchers.IO) { store.prepareReviewUse(id, draft) }
+        mutable.update { it.copy(draft = draft, reviewUse = ReviewUse(id, row.workspaceScope?.let { scope -> fi.bundo.data.VoiceTarget(scope) }, draft)) }
+    }
+    fun acknowledgeReviewUse(id: String) = start("SAVING") {
+        val result = checkNotNull(state.value.reviewUse).also { check(it.id == id) }
+        withContext(Dispatchers.IO) { store.useReview(id, result.draft) }
+        closeReview()
     }
 
     fun permissionDenied() { mutable.update { it.copy(message = "PERMISSION") } }

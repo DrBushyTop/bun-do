@@ -1,6 +1,6 @@
 <resources>
     <string name="adventure_title">Adventure</string>
-    <string name="adventure_back">Back to Together</string>
+    <string name="adventure_back">Back</string>
     <string name="adventure_intro">Choose a little adventure from the tasks already in your family’s queue.</string>
     <string name="adventure_open">Our adventure</string>
     <string name="adventure_preview">Preview tasks</string>
@@ -9,7 +9,7 @@
     <string name="adventure_complete">Adventure complete. A little bow from Bun.</string>
     <string name="adventure_failed">Couldn’t connect, or the adventure changed. Check the current choice and try again.</string>
     <string name="adventure_unavailable">Connect to see your family’s adventure.</string>
-    <string name="adventure_empty">The task list is clear. Bun can rest.</string>
+    <string name="adventure_empty">Adventures bring at least three main tasks together. Add a few tasks or plan something new.</string>
     <string name="adventure_generating">Bun is finding a shared thread. Refresh in a moment.</string>
     <string name="adventure_generation_failed">Fresh suggestions aren’t available. You can retry when online.</string>
     <string name="adventure_expired">These suggestions have expired. Refresh online for new ones.</string>

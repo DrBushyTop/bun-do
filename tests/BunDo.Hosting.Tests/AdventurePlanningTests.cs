@@ -20,7 +20,7 @@ public sealed class AdventurePlanningTests : IDisposable
     private AdventureService Service(Func<CancellationToken, Task<bool>>? valid = null) => new(documents, registrationActive: valid, planner: planner);
     private async Task Start() => epoch = (await new HouseholdService(documents).CreateAsync(member, workspace, default)).Household!.StateEpoch;
     private Task<AdventureSnapshot> Read() => Service().ReadAsync(member, workspace, epoch, default);
-    private static GuidedDraft Draft() => new("A quiet corner", "", [new(null, "Sort papers", "Make room", 1, 15), new(null, "Wipe shelf", "A fresh start", 1, 10)]);
+    private static GuidedDraft Draft() => new("A quiet corner", "", [new(null, "Sort papers", "Make room", 1, 15), new(null, "Wipe shelf", "A fresh start", 1, 10), new(null, "Put things back", "Finish", 1, 5)]);
     private sealed class Planner : IAdventurePlanner {
         public GuidedDraft Value = Draft();
         public Task<GuidedDraft> PlanAsync(string outcome, int? minutes, IReadOnlyList<AdventureInput> tasks, CancellationToken ct) => Task.FromResult(Value);
@@ -28,7 +28,9 @@ public sealed class AdventurePlanningTests : IDisposable
     [Fact] public async Task Empty_queue_draft_changes_nothing_then_partial_acceptance_resumes_without_duplicate_tasks()
     {
         await Start(); var original = await Read();
-        var draft = await Service().PlanAsync(member, workspace, epoch, "Clear a corner", 30, default);
+        var generated = await Service().PlanAsync(member, workspace, epoch, "Clear a corner", 30, default);
+        Assert.Equal(3, generated.Phases.Length);
+        var draft = generated with { Phases = generated.Phases.Take(2).ToArray() }; // The user may remove suggested work.
         Assert.Equal(original.Revision, (await Read()).Revision);
         var id = Guid.NewGuid();
         await Service().BeginCreationAsync(member, workspace, epoch, registration, id, original.Revision, draft, default);

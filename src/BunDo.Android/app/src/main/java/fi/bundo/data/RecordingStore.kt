@@ -44,11 +44,11 @@ interface RecordingDao {
     suspend fun insert(recording: VoiceRecording)
     @Query("UPDATE voice_recordings SET state = :state, reason = :reason WHERE id = :id")
     suspend fun update(id: String, state: String, reason: String = "")
-    @Query("UPDATE voice_recordings SET state = 'FAILED', reason = :reason WHERE id = :id AND state != 'COMMITTED'")
+    @Query("UPDATE voice_recordings SET state = 'FAILED', reason = :reason WHERE id = :id AND state NOT IN ('COMMITTED', 'USED')")
     suspend fun failUncommitted(id: String, reason: String)
     @Query("UPDATE voice_recordings SET state = 'COMMITTED', committedTaskId = :taskId WHERE id = :id")
     suspend fun markCommitted(id: String, taskId: String)
-    @Query("UPDATE voice_recordings SET state = 'REVIEW', review = :review, reason = '' WHERE id = :id AND state != 'COMMITTED'")
+    @Query("UPDATE voice_recordings SET state = 'REVIEW', review = :review, reason = '' WHERE id = :id AND state NOT IN ('COMMITTED', 'USED')")
     suspend fun saveReview(id: String, review: String)
     @Query("DELETE FROM voice_recordings WHERE id = :id")
     suspend fun delete(id: String)
@@ -169,9 +169,24 @@ class RecordingStore(
     suspend fun review(id: String, draft: VoiceDraft) = lease.access {
         lease.check()
         val row = checkNotNull(dao.get(id))
-        check(row.state != "COMMITTED")
+        check(row.state !in setOf("COMMITTED", "USED"))
         dao.saveReview(id, draft.json())
         if (!row.keepAudio) deleteAudioUnsafe(id)
+    }
+    private suspend fun reviewedForUse(id: String, draft: VoiceDraft): VoiceRecording {
+        val row = checkNotNull(dao.get(id))
+        check(row.state == "REVIEW")
+        require(draft.valid)
+        row.workspaceScope?.let { check(checkNotNull(database.shared().workspace(it)).blocked == null) }
+        dao.saveReview(id, draft.json())
+        return row
+    }
+    /** Keep the durable review until the receiving editor acknowledges delivery. */
+    suspend fun prepareReviewUse(id: String, draft: VoiceDraft) = lease.access { reviewedForUse(id, draft) }
+    /** Reuse reviewed text in another editor without creating a task. Retention remains opt-in. */
+    suspend fun useReview(id: String, draft: VoiceDraft) = lease.access {
+        val row = reviewedForUse(id, draft)
+        if (row.keepAudio) dao.update(id, "USED") else deleteUnsafe(id)
     }
     suspend fun exportable(id: String) = lease.access {
         val row = dao.get(id)
@@ -189,6 +204,7 @@ class RecordingStore(
         database.withTransaction {
             lease.check()
             val record = checkNotNull(dao.get(id))
+            check(record.state != "USED")
             check(record.review != null || record.expiresAt > System.currentTimeMillis())
             retained = record.keepAudio && record.reviewRequired
             target = record.workspaceScope?.let { VoiceTarget(it) }

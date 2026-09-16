@@ -49,14 +49,14 @@ public sealed class AdventureFunction(AccessTokens tokens, IServiceProvider serv
         bool confirmed = false;
         AdventureDraft? draft = null;
         GuidedDraft? plan = null;
-        string? outcome = null; int? minutes = null; string[] roots = [];
+        string? language = null; string? outcome = null; int? minutes = null; string[] roots = [];
         try
         {
             using var json = JsonDocument.Parse(bytes.AsMemory(0, length), new JsonDocumentOptions { MaxDepth = 8 });
             var root = json.RootElement;
             action = root.GetProperty("action").GetString() ?? "";
             string[] fields = action switch {
-                "plan" => ["outcome", "minutes"], "beginCreation" => ["creationId", "version", "draft"],
+                "ideas" => ["language"], "plan" => ["outcome", "minutes"], "beginCreation" => ["creationId", "version", "draft"],
                 "finishCreation" => ["creationId", "roots"], "cancelCreation" => ["creationId", "confirmed"],
                 "read" => [], "refresh" or "retry" => ["batchId"], "accept" => ["batchId", "proposalId"],
                 "edit" => ["adventureId", "version", "draft"], "leave" => ["adventureId", "version", "confirmed"],
@@ -76,6 +76,7 @@ public sealed class AdventureFunction(AccessTokens tokens, IServiceProvider serv
                     text != version.ToString(CultureInfo.InvariantCulture)) throw new JsonException();
             }
             if (action is "leave" or "cancelCreation") confirmed = root.GetProperty("confirmed").GetBoolean();
+            if (action == "ideas") language = root.GetProperty("language").GetString() ?? throw new JsonException();
             if (action == "plan") {
                 outcome = root.GetProperty("outcome").GetString();
                 minutes = root.GetProperty("minutes").ValueKind == JsonValueKind.Null ? null : root.GetProperty("minutes").GetInt32();
@@ -102,11 +103,13 @@ public sealed class AdventureFunction(AccessTokens tokens, IServiceProvider serv
             var member = HouseholdIdentity.Member(auth.Identity!);
             var service = new AdventureService(documents, services.GetService<IAdventureProvider>(),
                 registrationActive: token => registrations.IsActiveAsync(auth.Identity!, registration, token),
-                planner: services.GetService<IAdventurePlanner>());
+                planner: services.GetService<IAdventurePlanner>(), ideasProvider: services.GetService<IAdventureIdeasProvider>());
             Activity.Current?.SetTag("operation.stage", action);
             GuidedDraft? generated = null;
+            string[]? ideas = null;
             switch (action)
             {
+                case "ideas": ideas = await service.IdeasAsync(member, workspace, epoch, language!, ct); break;
                 case "plan": generated = await service.PlanAsync(member, workspace, epoch, outcome!, minutes, ct); break;
                 case "beginCreation": await service.BeginCreationAsync(member, workspace, epoch, registration, id, version, plan!, ct); break;
                 case "finishCreation": await service.FinishCreationAsync(member, workspace, epoch, registration, id, roots, ct); break;
@@ -121,7 +124,7 @@ public sealed class AdventureFunction(AccessTokens tokens, IServiceProvider serv
             Activity.Current?.SetTag("adventure.batch_status", snapshot.Board.Batch?.Status ?? "NONE");
             Activity.Current?.SetTag("adventure.active", snapshot.Board.Active is not null);
             return new ContentResult { ContentType = "application/json", StatusCode = 200,
-                Content = generated is null ? JsonSerializer.Serialize(snapshot, SyncJson.Options) :
+                Content = ideas is not null ? JsonSerializer.Serialize(new { snapshot, ideas }, SyncJson.Options) : generated is null ? JsonSerializer.Serialize(snapshot, SyncJson.Options) :
                     JsonSerializer.Serialize(new { snapshot, draft = generated }, SyncJson.Options) };
         }
         catch (SyncException error) { return Failure(error.Code, error.Code is "FORBIDDEN" or "REGISTRATION_RETIRED" ? 403 : error.Code == "BUSY" ? 503 : 409); }

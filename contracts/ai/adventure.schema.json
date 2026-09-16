@@ -47,10 +47,14 @@
                   "type": "integer"
                 }
               }
-            }
+            },
+            "minItems": 3,
+            "maxItems": 8
           }
         }
-      }
+      },
+      "minItems": 1,
+      "maxItems": 2
     }
   }
 }

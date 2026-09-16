@@ -75,7 +75,7 @@ fun VoiceSettings(controller: VoiceController, onReview: () -> Unit, modifier: M
                 if (preview) {
                     TextButton(onClick = { controller.openReview(recording.id) }, enabled = !state.busy,
                         modifier = Modifier.testTag("voice-resume-${recording.id}")) { Text(stringResource(R.string.voice_resume_draft)) }
-                } else if (recording.state != "COMMITTED") {
+                } else if (recording.state !in setOf("COMMITTED", "USED")) {
                     if (recording.reason.isNotEmpty()) Text(stringResource(voiceMessageResource(recording.reason)))
                     TextButton(onClick = { controller.retry(recording.id) }, enabled = !state.busy) { Text(stringResource(R.string.retry)) }
                 }

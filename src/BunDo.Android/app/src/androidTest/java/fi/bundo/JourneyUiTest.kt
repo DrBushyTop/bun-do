@@ -97,7 +97,7 @@ class JourneyUiTest {
         screen(snapshot = journeyFixture().put("journey", JSONObject.NULL), short = true)
         compose.onNodeWithTag("journey-start").performScrollTo().assertIsDisplayed().performClick()
         assertEquals(1, starts)
-        compose.onNodeWithText("Back to Together").performScrollTo().performClick()
+        compose.onNodeWithText("Back").performScrollTo().performClick()
         assertEquals(1, backs)
     }
     @Test fun hiddenWorldDoesNotHideJourneyOrResetItsProgress() {

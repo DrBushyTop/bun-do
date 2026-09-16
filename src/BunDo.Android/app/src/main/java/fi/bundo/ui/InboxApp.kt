@@ -106,6 +106,7 @@ fun InboxApp(
     onWelcome: (() -> Unit)? = null,
     queueTopBar: (@Composable (@Composable () -> Unit) -> Unit)? = null,
     queueSideNavigation: (@Composable () -> Unit)? = null,
+    onHomeBack: () -> Unit = {},
 ) {
     var feedback by remember { mutableStateOf<HouseholdFeedback?>(null) }
     var settings by rememberSaveable { mutableStateOf(false) }
@@ -122,10 +123,11 @@ fun InboxApp(
             editor != null -> model.closeEditor(commit = false)
             voiceSettings -> voiceSettings = false
             settings -> settings = false
-            else -> selectedId = null
+            selectedId != null -> selectedId = null
+            else -> onHomeBack()
         }
     }
-    BackHandler(enabled = editor != null || settings || selectedId != null, onBack = back)
+    BackHandler(onBack = back)
     BoxWithConstraints(Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }) {
         val wide = maxWidth >= 840.dp
         val short = maxHeight < 480.dp

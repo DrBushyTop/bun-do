@@ -17,7 +17,12 @@ internal fun adventureTask(title: String = "Shopping list", done: Boolean = fals
 internal fun adventureFixture(state: SharedWorkspace, root: JSONObject = adventureTask(), active: Boolean = true, revision: String = "3"): JSONObject {
     val batch = UUID.randomUUID().toString()
     val draft = AdventureDraft("A little kitchen adventure", "Make room for a quiet evening.", listOf(AdventurePhase(root.getString("id"), "Gather the good things", 1, 15)))
-    fun proposal() = JSONObject().put("id", UUID.randomUUID().toString()).put("draft", draft.json()).put("artwork", "dojo-garden")
+    var proposalIndex = 0
+    fun proposal(): JSONObject {
+        val choice = if (active) draft else draft.copy(phases = draft.phases + listOf(
+            AdventurePhase("extra-one", "Make room", 1, 5), AdventurePhase("extra-${++proposalIndex}", "Settle in", 1, 5)))
+        return JSONObject().put("id", UUID.randomUUID().toString()).put("draft", choice.json()).put("artwork", "dojo-garden")
+    }
     val batchJson = JSONObject().put("id", batch).put("status", if (active) "CONSUMED" else "READY")
         .put("createdAt", Instant.now().toString()).put("expiresAt", Instant.now().plusSeconds(86400).toString())
         .put("proposals", if (active) JSONObject.NULL else JSONArray().put(proposal()).put(proposal()))

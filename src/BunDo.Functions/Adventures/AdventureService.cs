@@ -12,7 +12,7 @@ public sealed record AdventureSnapshot(Guid WorkspaceId, Guid StateEpoch, ulong 
 
 /// <summary>A dedicated online operation. Inference never runs inside ordinary task sync.</summary>
 public sealed partial class AdventureService(IHouseholdDocuments documents, IAdventureProvider? provider = null, TimeProvider? time = null,
-    Func<CancellationToken, Task<bool>>? registrationActive = null, IAdventurePlanner? planner = null)
+    Func<CancellationToken, Task<bool>>? registrationActive = null, IAdventurePlanner? planner = null, IAdventureIdeasProvider? ideasProvider = null)
 {
     public const int MaximumInputBytes = 64 * 1024;
     public const int MaximumInputRoots = 32;
@@ -25,7 +25,8 @@ public sealed partial class AdventureService(IHouseholdDocuments documents, IAdv
         var view = await Load(member, workspace, epoch, false, [], ct);
         var board = view.State.Value.Adventures ?? new();
         // Expiration is a read projection, not a background timer or an inference trigger.
-        if (board.Batch is { Status: "READY" } batch && batch.ExpiresAt <= clock.GetUtcNow())
+        if (board.Batch is { Status: "READY" } batch && (batch.ExpiresAt <= clock.GetUtcNow() ||
+            !HouseholdAdventure.ValidSuggestions(batch.Proposals?.Select(p => p.Draft).ToArray())))
             board = board with { Batch = batch with { Status = "EXPIRED", Proposals = null } };
         if (board.Batch is { Status: "RUNNING" } running && running.LeaseUntil <= clock.GetUtcNow())
             board = board with { Batch = running with { Status = "FAILED", Error = "INTERRUPTED" } };
@@ -44,11 +45,12 @@ public sealed partial class AdventureService(IHouseholdDocuments documents, IAdv
             var batch = board.Batch;
             var now = clock.GetUtcNow();
             if (board.Active is not null || board.Creation is not null || batch?.Id != expectedBatch) return;
-            if (batch is { Status: "READY" } && batch.ExpiresAt > now ||
+            if (batch is { Status: "READY" } && batch.ExpiresAt > now &&
+                HouseholdAdventure.ValidSuggestions(batch.Proposals?.Select(p => p.Draft).ToArray()) ||
                 batch is { Status: "RUNNING" } && batch.LeaseUntil > now) return;
             if (batch is { Status: "FAILED" or "RUNNING" } && !retry) return;
             // EMPTY is rechecked on online visits so newly captured tasks can become suggestions.
-            var nextBatch = view.Input.Length == 0 ? new AdventureBatch(id, "EMPTY", now) :
+            var nextBatch = view.Input.Length < HouseholdAdventure.MinimumSuggestedPhases ? new AdventureBatch(id, "EMPTY", now) :
                 provider is null ? new AdventureBatch(id, "FAILED", now, Error: "PROVIDER_UNAVAILABLE") :
                 new AdventureBatch(id, "RUNNING", now, LeaseUntil: now.AddMinutes(2));
             if (!await Commit(view.State, board with { Batch = nextBatch }, ct)) continue;
@@ -65,7 +67,8 @@ public sealed partial class AdventureService(IHouseholdDocuments documents, IAdv
         catch (HttpRequestException) { failure = "PROVIDER_UNAVAILABLE"; }
         ct.ThrowIfCancellationRequested();
         var inputs = owned.Input.ToDictionary(t => t.RootId, StringComparer.Ordinal);
-        if (failure is null && (drafts is not { Length: 2 } || drafts.Any(d => !HouseholdAdventure.Valid(d) ||
+        if (failure is null && (!HouseholdAdventure.ValidSuggestions(drafts) ||
+            drafts!.Length != (owned.Input.Length == HouseholdAdventure.MinimumSuggestedPhases ? 1 : 2) || drafts.Any(d =>
             d.Phases.Any(p => !inputs.ContainsKey(p.RootId))))) failure = "INVALID_OUTPUT";
         Activity.Current?.SetTag("ai.mode", "ADVENTURE");
         Activity.Current?.SetTag("ai.result", failure ?? "VALID_OUTPUT");

@@ -1,6 +1,6 @@
 <resources>
     <string name="adventure_title">Seikkailu</string>
-    <string name="adventure_back">Takaisin yhdessä-näkymään</string>
+    <string name="adventure_back">Takaisin</string>
     <string name="adventure_intro">Valitkaa pieni yhteinen seikkailu jo olemassa olevista tehtävistä.</string>
     <string name="adventure_open">Yhteinen seikkailu</string>
     <string name="adventure_preview">Katso tehtävät</string>
@@ -9,7 +9,7 @@
     <string name="adventure_complete">Seikkailu valmis. Bun kiittää kumarruksella.</string>
     <string name="adventure_failed">Yhteys ei onnistunut tai seikkailu muuttui. Tarkista tilanne ja yritä uudelleen.</string>
     <string name="adventure_unavailable">Yhdistä verkkoon nähdäksesi perheen seikkailun.</string>
-    <string name="adventure_empty">Tehtävälista on tyhjä. Bun voi levätä.</string>
+    <string name="adventure_empty">Seikkailu kokoaa vähintään kolme päätehtävää. Lisää tehtäviä tai suunnittele jotain uutta.</string>
     <string name="adventure_generating">Bun etsii tehtäville yhteistä suuntaa. Päivitä hetken kuluttua.</string>
     <string name="adventure_generation_failed">Uusia ehdotuksia ei nyt saatu. Voit yrittää uudelleen verkossa.</string>
     <string name="adventure_expired">Nämä ehdotukset ovat vanhentuneet. Päivitä verkossa saadaksesi uudet.</string>

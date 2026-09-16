@@ -45,6 +45,29 @@ class VoiceReviewTest {
             db.close(); context.deleteDatabase(name); root.deleteRecursively()
         }
     }
+    @Test fun reusingReviewedTextNeverCreatesTasksAndHonorsAudioRetention() = runBlocking {
+        for (keep in listOf(false, true)) Fixture().use { f ->
+            val id = f.recording(keep = keep, shared = true)
+            val draft = VoiceDraft.from("Make a quiet workspace")
+            f.store.review(id, draft)
+            f.store.prepareReviewUse(id, draft)
+            assertEquals("REVIEW", f.db.recordings().get(id)!!.state)
+            f.store.recover()
+            assertEquals(draft, VoiceDraft.parse(f.db.recordings().get(id)!!.review!!))
+            f.store.useReview(id, draft)
+            assertTrue(f.db.shared().intents(f.workspace.scope).isEmpty())
+            if (keep) {
+                assertEquals("USED", f.db.recordings().get(id)!!.state)
+                assertTrue(f.store.exportable(id)); f.store.recover()
+                assertEquals("USED", f.db.recordings().get(id)!!.state)
+                assertTrue(runCatching { f.store.commit(id, draft.transcript, draft) }.isFailure)
+                assertTrue(runCatching { f.store.review(id, draft) }.isFailure)
+            } else {
+                assertNull(f.db.recordings().get(id)); assertFalse(f.store.audio(id).exists())
+            }
+        }
+    }
+
     @Test fun longVoiceDraftExportsAndImportsWithoutDroppingText() {
         val original = "🥕".repeat(4000)
         val edited = "🌿".repeat(4000)

@@ -15,7 +15,13 @@ public sealed record AdventureProgress(int Completed, int Total, bool IsComplete
 
 public static class HouseholdAdventure
 {
+    public const int MinimumSuggestedPhases = 3;
     public const int MaximumPhases = 8;
+    // Creation/editing may deliberately remove work. Only generated suggestions have this minimum.
+    public static bool ValidSuggestions(AdventureDraft[]? drafts) => drafts is { Length: >= 1 and <= 2 } &&
+        drafts.All(d => Valid(d) && d.Phases.Length >= MinimumSuggestedPhases) &&
+        (drafts.Length == 1 || !drafts[0].Phases.Select(p => p.RootId).ToHashSet(StringComparer.Ordinal)
+            .SetEquals(drafts[1].Phases.Select(p => p.RootId)));
     public static bool Valid(AdventureDraft? draft, bool allowEmpty = false) => draft is not null &&
         Text(draft.Title, 160) && Text(draft.Flavor, 600, empty: true) && draft.Phases is { } phases &&
         phases.Length <= MaximumPhases && (allowEmpty || phases.Length > 0) &&
@@ -37,7 +43,8 @@ public static class HouseholdAdventure
         if (board.Batch is not { Status: "READY" } batch || batch.Id != batchId || batch.ExpiresAt <= now)
             return ("SUGGESTIONS_UNAVAILABLE", board);
         var proposal = batch.Proposals?.SingleOrDefault(p => p.Id == proposalId);
-        if (proposal is null) return ("SUGGESTIONS_UNAVAILABLE", board);
+        if (proposal is null || !ValidSuggestions(batch.Proposals?.Select(p => p.Draft).ToArray()))
+            return ("SUGGESTIONS_UNAVAILABLE", board);
         if (proposal.Draft.Phases.Any(p => !tasks.TryGetValue(p.RootId, out var task) || !Candidate(task)))
             return ("SOURCE_UNAVAILABLE", board);
         return ("ACCEPTED", board with {

@@ -52,7 +52,7 @@ optional flavor text and references to main tasks. A main task is a root task,
 including a root with a checklist. Playful phase names never hide the actual
 task or checklist text.
 
-Keep the prototype's two-proposal chooser and one accepted adventure per
+Keep the prototype's alternative-proposal chooser and one accepted adventure per
 household. Either member can accept it, contribute without joining separately,
 and edit phase names or advisory estimates. Acceptance does not claim tasks.
 An accepted adventure neither copies existing tasks nor changes their
@@ -74,8 +74,12 @@ use a checklist position as a durable identity.
 
 AI generation replaces the prototype's canned proposals. The automatic set
 groups existing tasks only, around a shared outcome or useful work session.
-Do not invent tasks to fill the chooser. An empty queue offers the guided
-creator instead of manufacturing obligations.
+Each generated adventure groups at least three distinct main tasks. Two
+alternatives may overlap, but must not contain the same root set with different
+names or ordering. With exactly three eligible roots, offer one adventure. With
+fewer than three, offer the guided creator without inventing work to fill the
+chooser. Existing accepted adventures remain valid, and users may still remove
+references or edit a generated draft down to fewer tasks.
 
 Both members see the same suggestion set. Unaccepted suggestions have a
 24-hour lifetime. Once expired, generate a replacement during the next online
@@ -92,8 +96,16 @@ Coordinate concurrent requests so two devices cannot publish competing sets.
 ## Help me plan an adventure
 
 Provide an explicit creator alongside the rotating suggestions. Ask
-"What would you like to get done?", with optional available time and starter
-prompts for people who need guidance. For example, "Make the balcony ready for
+"What would you like to get done?", with optional available time. Offer the existing immediate recording, analysis
+and editable review flow alongside typing. Using reviewed speech fills the
+adventure outcome, not the task queue; audio retention remains opt-in.
+
+People can explicitly request AI starter ideas from current household tasks and
+recent task history. Treat completed work as context, not an obligation to repeat
+it. Exclude deleted tasks and checklist fragments. Keep this context private,
+bounded and scoped to the current household, with no changes to tasks or the
+shared adventure. Failure leaves typing and recording available. Selecting an
+idea only fills the outcome; planning and approval remain explicit. For example, "Make the balcony ready for
 summer" produces an editable adventure draft with suggested work.
 
 Clearly distinguish references to existing tasks from proposed new tasks.

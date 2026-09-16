@@ -156,6 +156,29 @@ public sealed class AdventureFunctionTests : IDisposable
     }
 
     [Fact]
+    public async Task Ideas_route_returns_private_suggestions_without_task_or_board_writes()
+    {
+        var documents = Storage();
+        using var services = new ServiceCollection().AddSingleton<IHouseholdDocuments>(documents)
+            .AddSingleton<IRegistrationStore>(new Registration(identity, registration, true))
+            .AddSingleton<IAdventureIdeasProvider>(new Ideas()).BuildServiceProvider();
+        using var trace = new Activity("ideas-function").Start();
+        var request = Request(Body("ideas").Replace("}", ",\"language\":\"fi\"}"), Token());
+        var result = Assert.IsType<ContentResult>(await new AdventureFunction(Validator, services).Run(request.Request));
+        Assert.Equal(200, result.StatusCode); Assert.Equal("no-store", request.Response.Headers.CacheControl);
+        using var json = JsonDocument.Parse(result.Content!);
+        Assert.Equal(3, json.RootElement.GetProperty("ideas").GetArrayLength());
+        Assert.Equal("0", json.RootElement.GetProperty("snapshot").GetProperty("revision").GetString());
+        Assert.Equal(0, documents.Writes);
+        Assert.Equal("ADVENTURE_IDEAS", trace.GetTagItem("ai.mode"));
+        Assert.DoesNotContain("Private", JsonSerializer.Serialize(trace.TagObjects.ToDictionary(t => t.Key, t => t.Value)));
+    }
+    private sealed class Ideas : IAdventureIdeasProvider {
+        public Task<string[]> SuggestAsync(IReadOnlyList<AdventureIdeaInput> tasks, string language, CancellationToken ct) =>
+            Task.FromResult(new[] { "Private corner idea", "Private balcony idea", "Private workspace idea" });
+    }
+
+    [Fact]
     public async Task Cancellation_is_not_reported_as_success()
     {
         using var services = Services(Storage());

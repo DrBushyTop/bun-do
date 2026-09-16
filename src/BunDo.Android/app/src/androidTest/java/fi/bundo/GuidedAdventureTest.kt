@@ -4,6 +4,10 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import fi.bundo.data.*
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.async
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.coroutineScope
+import org.json.JSONArray
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.*
@@ -24,6 +28,27 @@ class GuidedAdventureTest {
     private fun empty(state: SharedWorkspace, revision: String = "3") = adventureFixture(state, active = false, revision = revision).apply {
         getJSONObject("board").put("batch", JSONObject.NULL)
     }
+    @Test fun ideas_are_fenced_and_do_not_hold_task_sync_or_create_work() = fixture { db, state, repository ->
+        coroutineScope {
+            val entered = CompletableDeferred<Unit>(); val released = CompletableDeferred<Unit>()
+            val pending = async { GuidedAdventure.ideas(repository, "token", "fi") { _, _, action ->
+                assertEquals("ideas", action.getString("action")); assertEquals("fi", action.getString("language"))
+                entered.complete(Unit); released.await()
+                JSONObject().put("snapshot", empty(state)).put("ideas", JSONArray(listOf("Nurkka kuntoon", "Parveke valmiiksi", "Työpiste kuntoon")))
+            } }
+            entered.await()
+            val sync = repository.prepare(100, 1)!!
+            released.complete(Unit); assertEquals(3, pending.await().size)
+            assertTrue(db.shared().intents(state.scope).isEmpty())
+            repository.release(sync)
+        }
+        val result = runCatching { GuidedAdventure.ideas(repository, "token", "en") { _, _, _ ->
+            repository.blockAdventureRead(repository.prepareAdventureRead()!!, "FORBIDDEN")
+            JSONObject().put("snapshot", empty(state)).put("ideas", JSONArray(listOf("One", "Two", "Three")))
+        } }
+        assertTrue(result.isFailure)
+    }
+
     @Test fun generation_and_editable_review_create_nothing_until_explicit_approval() = fixture { db, state, repository ->
         GuidedAdventure.plan(context, repository, "token", "Clear a corner", null) { _, _, action ->
             assertEquals("plan", action.getString("action")); JSONObject().put("snapshot", empty(state)).put("draft", draft.json())

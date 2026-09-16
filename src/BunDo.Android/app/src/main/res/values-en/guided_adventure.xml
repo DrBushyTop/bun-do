@@ -1,7 +1,7 @@
 <resources>
-    <string name="guided_back">Back to adventure</string>
+    <string name="guided_back">Back</string>
     <string name="guided_title">Help me plan an adventure</string>
-    <string name="guided_error">The adventure could not start yet. Your draft is safe. Check your connection and try again.</string>
+    <string name="guided_error">We could not finish this step. Your changes are safe. Check your connection and try again.</string>
     <string name="guided_pending">Adding the approved tasks. The adventure starts only when they have reached the family queue.</string>
     <string name="guided_resume">Continue starting</string>
     <string name="guided_other_device">Continue on the device that approved this plan, or end this attempt below.</string>
@@ -17,8 +17,6 @@
     <string name="guided_approve">Add tasks and start adventure</string>
     <string name="guided_discard">Discard draft</string>
     <string name="guided_outcome">What would you like to get done?</string>
-    <string name="guided_prompt_balcony">Make the balcony ready for summer</string>
-    <string name="guided_prompt_corner">Clear one cluttered corner</string>
     <string name="guided_time">Minutes available, optional</string>
     <string name="guided_preview_hint">Bun will suggest a draft online. Nothing enters the queue until you approve it.</string>
     <string name="guided_plan">Make a draft</string>
@@ -28,4 +26,9 @@
     <string name="guided_stars">Estimated difficulty: %1$d of 3 stars</string>
     <string name="guided_outcome_invalid">Use one line of text, up to 1,000 characters.</string>
     <string name="guided_time_invalid">Enter a whole number from 1 to 1,440, or leave this empty.</string>
+    <string name="guided_record">Speak your idea</string>
+    <string name="guided_use_recording">Use for adventure</string>
+    <string name="guided_ideas">Suggest ideas for us</string>
+    <string name="guided_ideas_refresh">Suggest other ideas</string>
+    <string name="guided_ideas_hint">AI uses your family’s current tasks and recent task history. Ideas add nothing until you approve.</string>
 </resources>

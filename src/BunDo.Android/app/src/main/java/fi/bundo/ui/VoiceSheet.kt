@@ -30,7 +30,8 @@ import fi.bundo.speech.VoiceController
 @Composable
 fun VoiceSheet(controller: VoiceController, onDismiss: () -> Unit, onType: () -> Unit,
     onSaved: (String) -> Unit, target: VoiceTarget? = null, autoStart: Boolean = false,
-    onSettings: (() -> Unit)? = null) {
+    onSettings: (() -> Unit)? = null, onUseDraft: ((VoiceDraft) -> Unit)? = null,
+    useDraftLabel: String? = null) {
     val state by controller.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current
@@ -54,6 +55,13 @@ fun VoiceSheet(controller: VoiceController, onDismiss: () -> Unit, onType: () ->
         state.saved?.let {
             controller.acknowledgeSaved()
             if (it.target == target) onSaved(it.taskId) else savedElsewhere = true
+        }
+    }
+    LaunchedEffect(state.reviewUse, state.busy, target) {
+        val result = state.reviewUse
+        if (!state.busy && result != null && result.target == target && onUseDraft != null) {
+            onUseDraft(result.draft)
+            controller.acknowledgeReviewUse(result.id)
         }
     }
     DisposableEffect(lifecycle, controller) {
@@ -102,7 +110,8 @@ fun VoiceSheet(controller: VoiceController, onDismiss: () -> Unit, onType: () ->
                     val draft = state.draft
                     val id = state.reviewId
                     if (draft != null && id != null) {
-                        VoiceReview(id, draft, controller, allowItems = state.reviewTarget != null)
+                        if (onUseDraft != null && state.reviewTarget != target) Text(stringResource(R.string.voice_saved_elsewhere))
+                        else VoiceReview(id, draft, controller, allowItems = state.reviewTarget != null, useDraft = onUseDraft != null, useDraftLabel)
                     } else {
                         Button(onClick = record, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("record")) {
                             Text(stringResource(R.string.voice_record))
@@ -121,7 +130,8 @@ fun VoiceSheet(controller: VoiceController, onDismiss: () -> Unit, onType: () ->
 }
 
 @Composable
-private fun VoiceReview(id: String, initial: VoiceDraft, controller: VoiceController, allowItems: Boolean) {
+private fun VoiceReview(id: String, initial: VoiceDraft, controller: VoiceController, allowItems: Boolean,
+    useDraft: Boolean = false, useDraftLabel: String? = null) {
     var json by rememberSaveable(id) { mutableStateOf(initial.json()) }
     var original by rememberSaveable(id) { mutableStateOf(false) }
     val draft = VoiceDraft.parse(json)
@@ -143,8 +153,11 @@ private fun VoiceReview(id: String, initial: VoiceDraft, controller: VoiceContro
     if (original) Text(draft.transcript, style = MaterialTheme.typography.bodyMedium)
     val accepted = draft.copy(title = draft.title.trim(), items = draft.items.map(String::trim).filter(String::isNotEmpty))
     if (!accepted.valid) Text(stringResource(R.string.voice_review_invalid), color = MaterialTheme.colorScheme.error)
-    Button(onClick = { controller.saveReview(id, accepted) }, enabled = accepted.valid,
-        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("voice-review-save")) { Text(stringResource(R.string.save)) }
+    Button(onClick = {
+        if (useDraft) controller.useReview(id, accepted)
+        else controller.saveReview(id, accepted)
+    }, enabled = accepted.valid,
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("voice-review-save")) { Text(useDraftLabel ?: stringResource(R.string.save)) }
     TextButton(onClick = { controller.delete(id) }, modifier = Modifier.heightIn(min = 48.dp).testTag("voice-review-delete")) {
         Text(stringResource(R.string.voice_discard_draft))
     }

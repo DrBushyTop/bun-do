@@ -17,17 +17,21 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import fi.bundo.R
 import fi.bundo.data.*
+import fi.bundo.speech.VoiceController
 import org.json.JSONObject
 
 @Composable
 internal fun GuidedAdventureScreen(creation: GuidedCreation?, remote: JSONObject?, busy: Boolean, failed: Boolean,
     tasks: Map<String, JSONObject>, canStart: Boolean, onPlan: (String, Int?) -> Unit, onApprove: (GuidedDraft) -> Unit,
-    onResume: () -> Unit, onDiscard: () -> Unit, onCancel: () -> Unit, onBack: () -> Unit) {
+    onResume: () -> Unit, onDiscard: () -> Unit, onCancel: () -> Unit, onBack: () -> Unit,
+    voice: VoiceController? = null, voiceTarget: VoiceTarget? = null,
+    ideas: List<String> = emptyList(), onIdeas: (() -> Unit)? = null) {
     BackHandler(onBack = onBack)
     var outcome by rememberSaveable { mutableStateOf("") }
     var minutes by rememberSaveable { mutableStateOf("") }
     var draft by remember(creation?.id) { mutableStateOf(creation?.draft) }
     var confirmCancel by remember { mutableStateOf(false) }
+    var recording by rememberSaveable { mutableStateOf(false) }
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = LocalFocusManager.current
     Column(Modifier.fillMaxSize().widthIn(max = 640.dp).verticalScroll(rememberScrollState()).imePadding().padding(24.dp)
@@ -83,10 +87,21 @@ internal fun GuidedAdventureScreen(creation: GuidedCreation?, remote: JSONObject
             OutlinedTextField(outcome, { outcome = it }, label = { Text(stringResource(R.string.guided_outcome)) },
                 modifier = Modifier.fillMaxWidth().testTag("guided-outcome"), isError = invalidOutcome,
                 supportingText = { if (invalidOutcome) Text(stringResource(R.string.guided_outcome_invalid), Modifier.testTag("guided-outcome-error")) })
-            val prompt1 = stringResource(R.string.guided_prompt_balcony)
-            val prompt2 = stringResource(R.string.guided_prompt_corner)
-            TextButton(onClick = { outcome = prompt1 }) { Text(prompt1) }
-            TextButton(onClick = { outcome = prompt2 }) { Text(prompt2) }
+            if (voice != null) OutlinedButton(onClick = {
+                focus.clearFocus(); keyboard?.hide()
+                voice.closeReview(); voice.acknowledgeSaved(); recording = true
+            }, enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("guided-record")) {
+                Text(stringResource(R.string.guided_record))
+            }
+            if (onIdeas != null) {
+                TextButton(onClick = onIdeas, enabled = !busy && canStart, modifier = Modifier.testTag("guided-ideas")) {
+                    Text(stringResource(if (ideas.isEmpty()) R.string.guided_ideas else R.string.guided_ideas_refresh))
+                }
+                Text(stringResource(R.string.guided_ideas_hint), style = MaterialTheme.typography.bodySmall)
+                ideas.forEachIndexed { index, idea ->
+                    TextButton(onClick = { outcome = idea }, enabled = !busy, modifier = Modifier.testTag("guided-idea-$index")) { Text(idea) }
+                }
+            }
             OutlinedTextField(minutes, { minutes = it }, label = { Text(stringResource(R.string.guided_time)) }, singleLine = true,
                 modifier = Modifier.fillMaxWidth().testTag("guided-time"), isError = invalidTime,
                 supportingText = { if (invalidTime) Text(stringResource(R.string.guided_time_invalid), Modifier.testTag("guided-time-error")) })
@@ -98,6 +113,14 @@ internal fun GuidedAdventureScreen(creation: GuidedCreation?, remote: JSONObject
             }
         }
     }
+    if (recording && voice != null) VoiceSheet(voice,
+        onDismiss = { recording = false }, onType = { recording = false }, onSaved = {},
+        target = voiceTarget, autoStart = true, useDraftLabel = stringResource(R.string.guided_use_recording),
+        onUseDraft = { reviewed ->
+            outcome = (listOf(reviewed.title, reviewed.description) + reviewed.items).filter(String::isNotBlank)
+                .joinToString(". ").replace(Regex("\\s+"), " ").trim()
+            recording = false
+        })
     if (confirmCancel) AlertDialog(onDismissRequest = { confirmCancel = false }, title = { Text(stringResource(R.string.guided_cancel)) },
         text = { Text(stringResource(R.string.guided_cancel_hint)) }, confirmButton = { TextButton(onClick = { confirmCancel = false; onCancel() }) {
             Text(stringResource(R.string.guided_cancel)) } }, dismissButton = { TextButton(onClick = { confirmCancel = false }) { Text(stringResource(R.string.adventure_not_now)) } })

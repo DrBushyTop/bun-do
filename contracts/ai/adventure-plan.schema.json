@@ -48,7 +48,9 @@
             ]
           }
         }
-      }
+      },
+      "minItems": 3,
+      "maxItems": 8
     }
   }
 }

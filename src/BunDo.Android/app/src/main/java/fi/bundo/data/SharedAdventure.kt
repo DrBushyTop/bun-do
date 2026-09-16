@@ -43,7 +43,9 @@ internal data class AdventureSnapshot(val workspaceId: String, val epoch: String
     val completed get() = active?.draft?.phases?.count { phase -> available(tasks[phase.rootId]) && tasks[phase.rootId]?.optString("lifecycle") == "COMPLETED" } ?: 0
     val complete get() = total > 0 && completed == total
     fun batchStatus(now: Instant): String? = when {
-        status == "READY" && (expiresAt == null || now >= expiresAt) -> "EXPIRED"
+        status == "READY" && (expiresAt == null || now >= expiresAt ||
+            proposals.any { it.draft.phases.size < 3 } || proposals.size == 2 &&
+            proposals[0].draft.phases.map { it.rootId }.toSet() == proposals[1].draft.phases.map { it.rootId }.toSet()) -> "EXPIRED"
         status == "RUNNING" && (leaseUntil == null || now >= leaseUntil) -> "FAILED"
         else -> status
     }
@@ -81,10 +83,10 @@ internal data class AdventureSnapshot(val workspaceId: String, val epoch: String
             val expires = batch?.nullableString("expiresAt")?.let(Instant::parse)
             val lease = batch?.nullableString("leaseUntil")?.let(Instant::parse)
             val proposals = batch?.optJSONArray("proposals")?.let { array ->
-                require(array.length() == 2 && status == "READY")
-                (0 until array.length()).map { choice(array.getJSONObject(it), false) }.also { require(it.map { c -> c.id }.distinct().size == 2) }
+                require(array.length() in 1..2 && status == "READY")
+                (0 until array.length()).map { choice(array.getJSONObject(it), false) }.also { require(it.map { c -> c.id }.distinct().size == it.size) }
             } ?: emptyList()
-            require(status != "READY" || proposals.size == 2 && expires != null)
+            require(status != "READY" || proposals.size in 1..2 && expires != null)
             require(status != "RUNNING" || lease != null)
             val active = board.optJSONObject("active")?.let { choice(it, true) }
             require(active == null || status == "CONSUMED" && batch?.getString("id") == active.batchId)

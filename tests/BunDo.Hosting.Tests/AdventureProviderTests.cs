@@ -9,9 +9,9 @@ namespace BunDo.Hosting.Tests;
 
 public sealed class AdventureProviderTests
 {
-    private static object Draft(string title = "Lempeä seikkailu") => new { title, flavor = "", phases = new[] {
-        new { rootId = "one", name = "A useful phase", stars = 2, minutes = 15 } } };
-    private static string Content() => JsonSerializer.Serialize(new { proposals = new[] { Draft(), Draft("A different session") } });
+    private static object Draft(string title = "Lempeä seikkailu", string last = "three") => new { title, flavor = "", phases = new[] { "one", "two", last }.Select(rootId =>
+        new { rootId, name = "A useful phase", stars = 2, minutes = 15 }).ToArray() };
+    private static string Content() => JsonSerializer.Serialize(new { proposals = new[] { Draft(), Draft("A different session", "four") } });
     private static byte[] Response(string text, string status = "completed") => JsonSerializer.SerializeToUtf8Bytes(new {
         status, output = new[] { new { type = "message", content = new[] { new { type = "output_text", text } } } },
         usage = new { input_tokens = 50, output_tokens = 100 },

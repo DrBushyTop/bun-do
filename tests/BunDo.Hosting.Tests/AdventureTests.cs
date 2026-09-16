@@ -30,7 +30,14 @@ public sealed class AdventureTests : IDisposable
         var result = await new SyncService(documents).SubmitAsync(member, new(workspace, epoch, device, ++sequence, command), default);
         Assert.Equal("ACCEPTED", result.Code); return result.Receipt!.Task!;
     }
-    private Task<TaskSnapshot> Capture() => Send(new CreateTask(TaskIdentity.ForCreate(device, sequence + 1), "Private shopping canary"));
+    private async Task<TaskSnapshot> Capture()
+    {
+        var root = await Send(new CreateTask(TaskIdentity.ForCreate(device, sequence + 1), "Private shopping canary"));
+        // Existing tests need a useful proposal set; keep the primary source first in the fake provider.
+        if (sequence == 1) for (var i = 0; i < 3; i++)
+            await Send(new CreateTask(TaskIdentity.ForCreate(device, sequence + 1), $"Supporting task {i}"));
+        return root;
+    }
     private async Task<AcceptedAdventure> Accept()
     {
         var batch = (await Read()).Board.Batch!;
@@ -41,9 +48,30 @@ public sealed class AdventureTests : IDisposable
     private async Task<TaskSnapshot> ReadTask(string id) => (await documents.ReadAsync<TaskSnapshot>(workspace.ToString(), WorkspaceCommit.TaskId(id), default))!.Value;
 
     [Fact]
+    public async Task Fewer_than_three_roots_skip_inference_and_three_roots_offer_one_adventure()
+    {
+        await Start(); Guid? batch = null;
+        for (var count = 0; count <= 3; count++) {
+            if (count > 0) await Send(new CreateTask(TaskIdentity.ForCreate(device, sequence + 1), $"Task {count}"));
+            await Refresh(batch); var result = (await Read()).Board.Batch!; batch = result.Id;
+            Assert.Equal(count < 3 ? "EMPTY" : "READY", result.Status);
+            Assert.Equal(count < 3 ? 0 : 1, provider.Calls);
+            if (count == 3) Assert.Equal(3, Assert.Single(result.Proposals!).Draft.Phases.Length);
+        }
+    }
+    [Fact]
+    public async Task Duplicate_sets_and_undersized_provider_proposals_never_publish()
+    {
+        await Start(); await Capture(); provider.SameSet = true; await Refresh();
+        var batch = (await Read()).Board.Batch!; Assert.Equal("INVALID_OUTPUT", batch.Error);
+        provider.SameSet = false; provider.TooShort = true; await Refresh(batch.Id, true);
+        Assert.Equal("INVALID_OUTPUT", (await Read()).Board.Batch!.Error);
+    }
+
+    [Fact]
     public async Task Shared_batch_persists_and_accepted_adventure_never_expires_or_changes_tasks()
     {
-        await Start(); var root = await Capture(); await Refresh();
+        await Start(); var root = await Capture(); var taskRevision = (await Read()).Revision; await Refresh();
         var batch = (await Read()).Board.Batch!;
         Assert.Equal("READY", batch.Status); Assert.Equal(2, batch.Proposals!.Length);
         Assert.Equal(clock.Now.AddHours(24), batch.ExpiresAt);
@@ -58,7 +86,7 @@ public sealed class AdventureTests : IDisposable
         Assert.Equal(1, provider.Calls);
         Assert.Null(read.Board.Batch!.Proposals);
         var pull = await new SyncService(documents).PullAsync(member, workspace, epoch, null, [], "ACCEPTED", default);
-        Assert.All(pull.Groups.Where(g => g.Revision > 1).SelectMany(g => g.Parts), part => Assert.Empty(part.EntityIds));
+        Assert.All(pull.Groups.Where(g => g.Revision > taskRevision).SelectMany(g => g.Parts), part => Assert.Empty(part.EntityIds));
     }
 
     [Fact]
@@ -176,6 +204,9 @@ public sealed class AdventureTests : IDisposable
         await Start(); var root = await Capture();
         root = await Send(new SplitTask(root.Id, ChecklistTasks.Versions(root), ["Milk", "Eggs"], root.TitleVersion.Human, root.DescriptionVersion.Human));
         await Refresh(); var active = await Accept();
+        foreach (var phase in active.Draft.Phases.Where(p => p.RootId != root.Id)) {
+            var other = await TaskById(phase.RootId); await Send(new CompleteTask(other.Id, ChecklistTasks.Versions(other)));
+        }
         foreach (var id in root.ChildOrder!.Value) { var child = await TaskById(id); await Send(new CompleteTask(id, ChecklistTasks.Versions(child))); }
         Assert.True((await Read()).Progress!.IsComplete);
         var racing = new Interleaved(documents) { BeforeCommit = async () => {
@@ -183,7 +214,7 @@ public sealed class AdventureTests : IDisposable
         }};
         Assert.Equal("ADVENTURE_NOT_COMPLETE", (await Assert.ThrowsAsync<SyncException>(() =>
             Service(racing).CloseAsync(member, workspace, epoch, active.Id, active.Version, false, false, default))).Code);
-        Assert.Equal(0, (await Read()).Progress!.Completed); Assert.Equal(1, (await Read()).Progress!.Total);
+        Assert.Equal(2, (await Read()).Progress!.Completed); Assert.Equal(3, (await Read()).Progress!.Total);
         Assert.Equal(2, (await Read()).Progress!.Roots[0].Checklist.Length);
         var reopened = await TaskById(root.ChildOrder.Value[0]); await Send(new CompleteTask(reopened.Id, ChecklistTasks.Versions(reopened)));
         await Service().CloseAsync(member, workspace, epoch, active.Id, active.Version, false, false, default);
@@ -318,15 +349,17 @@ public sealed class AdventureTests : IDisposable
     {
         public int Calls;
         public Func<Task>? Before;
-        public bool InventRoot;
+        public bool InventRoot, SameSet, TooShort;
         public IReadOnlyList<AdventureInput>? LastInput;
         public async Task<AdventureDraft[]> GenerateAsync(IReadOnlyList<AdventureInput> tasks, CancellationToken ct)
         {
             Calls++; LastInput = tasks;
             if (Before is { } before) await before();
-            AdventureDraft Draft(string title) => new(title, "", tasks.Take(8).Select(t =>
+            var ordered = tasks.OrderBy(t => t.Title, StringComparer.Ordinal).ToArray();
+            AdventureDraft Draft(string title, IEnumerable<AdventureInput> roots) => new(title, "", (TooShort ? roots.Take(1) : roots).Select(t =>
                 new AdventurePhase(InventRoot ? "invented" : t.RootId, "A useful phase", 1, 10)).ToArray());
-            return [Draft("A gentle session"), Draft("Another way")];
+            return ordered.Length == 3 ? [Draft("A gentle session", ordered)] :
+                [Draft("A gentle session", ordered.Take(3)), Draft("Another way", SameSet ? ordered.Take(3).Reverse() : ordered.Take(2).Append(ordered[3]))];
         }
     }
     private sealed class Interleaved(IHouseholdDocuments inner) : IHouseholdDocuments

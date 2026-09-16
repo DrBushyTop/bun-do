@@ -5,7 +5,7 @@ import android.graphics.Bitmap
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.*
 import androidx.compose.ui.test.*
@@ -33,6 +33,8 @@ class GuidedAdventureUiTest {
     private var planned: Pair<String, Int?>? = null
     private var approved: GuidedDraft? = null
     private var resumed = false
+    private var ideas by mutableStateOf(emptyList<String>())
+    private var ideaRequests = 0
     private fun screen(stage: String? = null, language: String = "en", scale: Float = 1f, failed: Boolean = false) {
         val creation = stage?.let { GuidedCreation(UUID.randomUUID().toString(), "3", draft, it) }
         val config = Configuration(compose.activity.resources.configuration).apply { setLocale(Locale.forLanguageTag(language)); fontScale = scale }
@@ -43,12 +45,27 @@ class GuidedAdventureUiTest {
                 CompositionLocalProvider(LocalDensity provides Density(density.density, scale)) {
                     BunDoTheme("light") { Surface { Box(Modifier.safeDrawingPadding()) {
                         GuidedAdventureScreen(creation, null, false, failed, mapOf(existing.getString("id") to existing), true,
-                            { outcome, minutes -> planned = outcome to minutes }, { approved = it }, { resumed = true }, {}, {}, {})
+                            { outcome, minutes -> planned = outcome to minutes }, { approved = it }, { resumed = true }, {}, {}, {},
+                            ideas = ideas, onIdeas = { ideaRequests++; ideas = listOf("Plan $ideaRequests: make a workspace", "Prepare a reading corner", "Tidy the balcony") })
                     } } }
                 }
             }
         } }
     }
+    @Test fun requestedIdeasRemainOptionalAndCanBeRefreshed() {
+        screen()
+        compose.onNodeWithText("Make the balcony ready for summer").assertDoesNotExist()
+        compose.onNodeWithTag("guided-ideas").performScrollTo().performClick()
+        assertEquals(1, ideaRequests); assertNull(planned); assertNull(approved)
+        compose.onNodeWithTag("guided-idea-0").performScrollTo().performClick()
+        compose.onNodeWithTag("guided-outcome").performScrollTo().assertTextContains("Plan 1", substring = true)
+        compose.onNodeWithTag("guided-ideas").performScrollTo().performClick()
+        assertEquals(2, ideaRequests)
+        compose.onNodeWithTag("guided-idea-0").performScrollTo().assertTextEquals("Plan 2: make a workspace")
+        screenshot("guided-ai-ideas")
+        assertNull(planned); assertNull(approved)
+    }
+
     @Test fun empty_queue_can_request_a_draft_without_adding_tasks() {
         screen()
         compose.onNodeWithTag("guided-outcome").performScrollTo().performTextInput("Clear a corner")

@@ -37,6 +37,7 @@ class WorldSceneUiTest {
         val me = UUID.randomUUID().toString()
         val initial = adventureWorkspace().copy(registration = data.registrationId!!)
         state = initial.copy(scope = "${initial.workspaceId}/${initial.epoch}/${data.registrationId}", revision = "3",
+            progress = JSONObject().put("activity", JSONArray()).toString(),
             membership = JSONObject().put("me", me).put("ownerId", me).put("members", JSONArray().put(JSONObject().put("id", me).put("active", true).put("displayName", "Alice"))).toString())
         tasks = if (empty) emptyList() else listOf(adventureTask("Shopping list", complete), adventureTask("Water the plants", complete))
         state = state.copy(adventure = tasks.firstOrNull()?.let { adventureFixture(state, it).toString() })

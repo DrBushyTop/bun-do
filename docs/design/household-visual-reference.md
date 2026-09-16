@@ -136,3 +136,10 @@ and [#35](https://github.com/DrBushyTop/bun-do/issues/35), verify this handoff.
 Completed capture, speech and claim/order foundations remain closed. Their
 remaining visual adoption belongs to the open tickets above. Profile editing
 and combo animations remain separate V2 ideas, not implemented prototype flows.
+
+## Back navigation
+
+System Back and the Back gesture retrace selected household tabs and nested
+views to the task homepage. At the homepage, Back does not exit the app.
+Editors, settings, dialogs and recording sheets handle Back before tab history.
+Selecting the task homepage directly clears that tab history.

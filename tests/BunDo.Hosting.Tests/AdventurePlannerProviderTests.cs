@@ -9,13 +9,14 @@ namespace BunDo.Hosting.Tests;
 
 public sealed class AdventurePlannerProviderTests
 {
-    private const string Draft = """{"title":"Nurkka kuntoon","flavor":"","phases":[{"rootId":null,"taskTitle":"Sort papers","name":"Make room","stars":1,"minutes":15}]}""";
+    private const string SingleDraft = """{"title":"Nurkka kuntoon","flavor":"","phases":[{"rootId":null,"taskTitle":"Sort papers","name":"Make room","stars":1,"minutes":15}]}""";
+    private static string Draft => SingleDraft.Replace("}]}", "},{\"rootId\":null,\"taskTitle\":\"Wipe shelf\",\"name\":\"Fresh start\",\"stars\":1,\"minutes\":5},{\"rootId\":null,\"taskTitle\":\"Put things back\",\"name\":\"Settle in\",\"stars\":1,\"minutes\":5}]}");
     private static byte[] Response(string text) => JsonSerializer.SerializeToUtf8Bytes(new { status = "completed", output = new[] {
         new { type = "message", content = new[] { new { type = "output_text", text } } } } });
     [Fact] public void Strict_plan_rejects_mixed_reference_and_new_task_invalid_estimates_and_unknown_fields()
     {
         Assert.Equal("Sort papers", FoundryAdventurePlanner.ParseResponse(Response(Draft)).Phases[0].TaskTitle);
-        foreach (var invalid in new[] { "null", "{}", Draft.Replace("\"rootId\":null", "\"rootId\":\"existing\""),
+        foreach (var invalid in new[] { "null", "{}", SingleDraft, Draft.Replace("\"rootId\":null", "\"rootId\":\"existing\""),
             Draft.Replace("\"stars\":1", "\"stars\":4"), Draft.Replace("\"flavor\":\"\"", "\"flavor\":\"\",\"extra\":true") })
             Assert.Equal("INVALID_OUTPUT", Assert.Throws<CleanupProviderException>(() => FoundryAdventurePlanner.ParseResponse(Response(invalid))).Code);
     }
