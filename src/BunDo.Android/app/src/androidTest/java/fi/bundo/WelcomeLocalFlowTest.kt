@@ -142,6 +142,19 @@ class WelcomeLocalFlowTest {
             compose.onNodeWithTag("welcome-enter").performScrollTo().performClick()
             compose.waitUntil(30_000) { !welcomes[1].state.value.visible }
             assertEquals(homeId, stores[1].active.value!!.selectedHousehold.value)
+            // Journey starts through the production Android transport and fenced cache.
+            val joined = stores[1].active.value!!
+            val workspace = joined.database.shared().workspaces(joined.registrationId!!).single { it.workspaceId == homeId }
+            val repository = SharedRepository(joined.database, joined.lease, workspace.scope, workspace.registration)
+            models[1].withAccountToken(joined) { token, _ -> SharedJourney.refresh(app, repository, token, enable = true) }
+            val started = JourneyProgress.read(JSONObject(joined.database.shared().workspace(workspace.scope)!!.progress!!))!!
+            assertEquals(0, started.credits)
+            models[1].withAccountToken(joined) { token, _ -> SharedJourney.refresh(app, repository, token, enable = true) }
+            models[1].withAccountToken(joined) { token, _ -> SharedJourney.refresh(app, repository, token, enable = false) }
+            val ownerJourney = models[0].withAccountToken(stores[0].active.value!!) { token, registration ->
+                JourneyProgress.read(JourneyEndpoint().send(token, workspace.copy(registration = registration), enable = false))!!
+            }
+            assertEquals(started, ownerJourney)
         } finally {
             compose.runOnUiThread { compose.activity.setContent { Text("Local walkthrough finished") } }
             if (homeId != null) {

@@ -70,6 +70,23 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
     var views by remember { mutableStateOf(false) }
     var tools by rememberSaveable { mutableStateOf(false) }
     var destination by rememberSaveable(selected.scope) { mutableStateOf("queue") }
+    var journeyBusy by remember(data.lease.generation, selected.scope) { mutableStateOf(false) }
+    var journeyFailed by remember(data.lease.generation, selected.scope) { mutableStateOf(false) }
+    fun journey(enable: Boolean) {
+        if (journeyBusy) return
+        journeyBusy = true
+        journeyFailed = false
+        scope.launch {
+            try {
+                (context.applicationContext as BunDoApplication).withAccountToken(data) { token ->
+                    SharedJourney.refresh(context, repository, token, enable)
+                }
+                SharedSyncWorker.request(context, data)
+            } catch (error: CancellationException) { throw error }
+            catch (_: Exception) { journeyFailed = true }
+            finally { journeyBusy = false }
+        }
+    }
     var history by rememberSaveable(selected.scope) { mutableStateOf(false) }
     var deleted by rememberSaveable(selected.scope) { mutableStateOf(false) }
     var snoozed by rememberSaveable(selected.scope) { mutableStateOf(false) }
@@ -166,11 +183,13 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
         onDispose { owner.lifecycle.removeObserver(observer); if (!data.lease.active) model.hide() }
     }
     InboxApp(state, model, appearance, onAppearance, voice = data.voice, voiceTarget = VoiceTarget(selected.scope), onAccount = onAccount, onWelcome = onWelcome, queueTitle = selected.name,
-        queueNavigation = { SharedHouseholdNavigation(destination) { destination = it } },
+        queueNavigation = { SharedHouseholdNavigation(if (destination == "journey") "together" else destination) { destination = it } },
         queueContent = if (destination != "queue") ({ onOpen ->
-            SharedProgressScreen(current?.progress?.takeIf { current?.blocked == null && recovery == null },
-                destination == "activity", byId, membership,
-                { SharedSyncWorker.request(context, data) }, onOpen)
+            val progress = current?.progress?.takeIf { current?.blocked == null && recovery == null }
+            if (destination == "journey") SharedJourneyScreen(progress, journeyBusy, journeyFailed,
+                current != null && current?.blocked == null && recovery == null, { journey(true) }, { journey(false) }, { destination = "together" })
+            else SharedProgressScreen(progress, destination == "activity", byId, membership,
+                { SharedSyncWorker.request(context, data) }, onOpen, { destination = "journey" })
         }) else null,
         canEdit = current?.blocked == null, queueTasks = queueRows,
         onSplit = if (state.editor?.let { it.key == InboxRepository.NEW_DRAFT || byId[it.key]?.let { task ->

@@ -1,0 +1,26 @@
+<resources>
+    <string name="journey_title">Bun’s journey</string>
+    <string name="journey_back">Back to Together</string>
+    <string name="journey_intro">A little way forward, together</string>
+    <string name="journey_start_body">As your family finishes tasks, Bun explores the paths beyond the dojo. Each new first completion moves the journey forward. There is no rush.</string>
+    <string name="journey_start">Start our journey</string>
+    <string name="journey_start_hint">Starts online for the whole family. Earlier completions stay in your statistics.</string>
+    <string name="journey_open">See Bun’s journey</string>
+    <string name="journey_unavailable">Connect and refresh to see your family’s journey.</string>
+    <string name="journey_failed">Couldn’t reach the family just now. Check your connection and try again.</string>
+    <string name="journey_progress">First completions at this stop: %1$d / %2$d</string>
+    <string name="journey_at">Bun is at %1$s</string>
+    <string name="journey_explanation">New first completions count after sync, even outside adventures. Reopening a task never takes a step away.</string>
+    <string name="journey_resting">Bun has reached the end of this path and can rest here. Your family’s completions still count.</string>
+    <string name="journey_history">Paths travelled</string>
+    <string name="journey_route_dojo">From dojo to garden</string>
+    <string name="journey_route_other">Another path</string>
+    <string name="journey_location_other">Stop %1$d</string>
+    <string name="journey_dojo_gate">Dojo gate</string>
+    <string name="journey_bamboo_path">Bamboo path</string>
+    <string name="journey_moss_bridge">Moss bridge</string>
+    <string name="journey_cedar_ridge">Cedar ridge</string>
+    <string name="journey_lantern_garden">Lantern garden</string>
+    <string name="journey_here">Here now</string>
+    <string name="journey_visited">Visited</string>
+</resources>

@@ -67,3 +67,11 @@ Older households have no journey until a member enables it.
 ## Required proof
 
 Verify capture-relative dates, date-only and Helsinki DST behavior, repeated worker delivery, offline completion followed by reconnection, schedule edit/stop races, delete/undo and older-occurrence reopen. Verify that checklist completion and reopen/recomplete grant one credit, purged task content does not erase totals, week/month boundaries use acceptance time, and an unfinished current week does not prematurely erase the streak. Tests should exercise these behaviors rather than reproduce old scheduling or reconstruction machinery.
+
+On Android, Together opens the journey without enabling it. Starting requires an
+explicit online action; the same action is safe to retry after a lost response.
+The ordinary sync-worker lease fences dedicated journey replies, without freezing
+or submitting queued task edits. The cache accepts validated server progress only,
+rejects older or reset journey snapshots and clears on lost household access.
+Cached progress remains readable offline, with its last update time and a retry
+control. The existing world-visibility setting also controls journey decoration.

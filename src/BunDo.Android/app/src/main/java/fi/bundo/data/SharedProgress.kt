@@ -14,12 +14,16 @@ internal object SharedProgress {
         val old = previous?.let(::JSONObject)
         if (old != null && (old.decimal("revision") > snapshot.decimal("revision") ||
                 Instant.parse(old.getString("asOf")) > Instant.parse(snapshot.getString("asOf")))) return previous
+        val journey = JourneyProgress.read(snapshot)
+        val before = old?.let(JourneyProgress::read)
+        if (before != null && (journey == null || !journey.follows(before))) return previous
         return snapshot.toString()
     }
     fun validate(value: JSONObject) {
         val revision = value.decimal("revision")
         val asOf = Instant.parse(value.getString("asOf"))
         val stats = value.getJSONObject("statistics")
+        JourneyProgress.read(value)
         val zone = ZoneId.of(stats.getString("zoneId"))
         val today = LocalDate.parse(stats.getString("today"))
         require(asOf.atZone(zone).toLocalDate() == today)

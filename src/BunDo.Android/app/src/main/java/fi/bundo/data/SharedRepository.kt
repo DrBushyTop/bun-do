@@ -419,13 +419,18 @@ class SharedRepository(
         dao.task(scope, id)?.snapshot?.let(::JSONObject)?.nullableString("initialPlacement")
     }
 
-    suspend fun prepare(now: Long, boot: Int): SharedRequest? = lease.access {
+    suspend fun prepare(now: Long, boot: Int): SharedRequest? = prepare(now, boot, journeyOnly = false)
+
+    internal suspend fun prepareJourney(now: Long, boot: Int): SharedRequest? = prepare(now, boot, journeyOnly = true)
+
+    private suspend fun prepare(now: Long, boot: Int, journeyOnly: Boolean): SharedRequest? = lease.access {
         database.withTransaction {
             val state = current()
             if (state.blocked != null || state.worker != null && state.workerBoot == boot && state.workerUntil > now)
                 return@withTransaction null
+            if (journeyOnly && dao.recoveryState(scope) != null) return@withTransaction null
             val intents = dao.intents(scope)
-            var next = intents.firstOrNull { it.status in listOf("PENDING", "SUBMITTED") }
+            var next = if (journeyOnly) null else intents.firstOrNull { it.status in listOf("PENDING", "SUBMITTED") }
             if (dao.recoveryState(scope) != null) next = null
             if (next != null && next.frozen == null) {
                 val receipts = intents.filter { it.receipt != null }.associate { it.sequence to JSONObject(it.receipt!!) }
@@ -438,6 +443,19 @@ class SharedRepository(
             dao.saveWorkspace(state.copy(worker = worker, workerUntil = now + 150_000, workerBoot = boot))
             lease.check()
             SharedRequest(worker, state, next?.frozen)
+        }
+    }
+
+    internal suspend fun applyJourney(request: SharedRequest, snapshot: JSONObject): Boolean = lease.access {
+        database.withTransaction {
+            val state = current()
+            if (state.worker != request.worker || state.blocked != null || dao.recoveryState(scope) != null)
+                return@withTransaction false
+            check(request.workspace.scope == state.scope && request.workspace.epoch == state.epoch &&
+                request.workspace.workspaceId == state.workspaceId && request.workspace.registration == state.registration)
+            dao.saveWorkspace(state.copy(progress = SharedProgress.accept(state.progress, snapshot)))
+            lease.check()
+            true
         }
     }
 

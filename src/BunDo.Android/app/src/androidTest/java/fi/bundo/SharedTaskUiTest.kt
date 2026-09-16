@@ -86,6 +86,19 @@ class SharedTaskUiTest {
         return data to state
     }
 
+    @Test fun journeyOpensFromTogetherAndReturnsToTasksWithoutChangingThem() {
+        val (data, state) = fixture("en", "light", fontScale = 2f)
+        runBlocking { data.database.shared().saveWorkspace(state.copy(progress = journeyFixture().toString())) }
+        compose.onNodeWithTag("household-together").performClick()
+        compose.onNodeWithTag("journey-open").performScrollTo().performClick()
+        compose.onNodeWithTag("journey-progress").performScrollTo().assertTextEquals("First completions at this stop: 2 / 5")
+        compose.onNodeWithTag("household-queue").performClick()
+        compose.onNodeWithText("Vie paperit kierrätykseen").assertExists()
+        assertEquals(2, runBlocking { data.database.shared().projectionRows(state.scope, "initial") }.count {
+            !JSONObject(it.snapshot).has("entityType")
+        })
+    }
+
     @Test fun householdDestinationsOpenActivityTasksAndKeepTogetherAccessibleAtLargeText() {
         val (data, state) = fixture("en", "light", fontScale = 2f)
         val id = runBlocking {
