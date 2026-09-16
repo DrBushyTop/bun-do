@@ -21,7 +21,9 @@ caption, route heading or collapse control competes with the work.
 
 Reuse the approved dojo, hammock, paperwork and joy artwork. Keep warm paper,
 ink-green controls and the existing Material type roles. The signpost is a native
-clickable surface with a small drawn directional sign, not another illustrated card.
+clickable warm-paper signpost inset from the scene edges, with a small scroll
+in a sage-colored seal. This follows the prototype's signpost rather than a
+full-width settings row. Keep its existing native type and touch target.
 
 ## Content and hierarchy
 
@@ -34,6 +36,12 @@ in those flows, while the entry reports completed/total main tasks.
 A completed adventure keeps a filled progress bar and completed label. A short
 seal pulse is acknowledged durably. Bun's brief joy scene follows accepted
 completion events, not pending commands. No bitmap loops or animation gates actions.
+
+On an active adventure, the approved Bun silhouette marks the end of the
+completed trail. It moves only when task progress changes. An occasional amber
+reflection crosses the completed portion, with a small glow at Bun's feet.
+The uncompleted trail never fills on its own. Completed, compact, world-hidden
+and reduced-motion states keep a static trail. Backgrounding stops the effect.
 
 ## Adaptation and access
 

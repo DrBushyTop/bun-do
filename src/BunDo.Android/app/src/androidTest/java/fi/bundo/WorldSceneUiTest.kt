@@ -32,15 +32,28 @@ class WorldSceneUiTest {
     private lateinit var data: AccountData
     private lateinit var state: SharedWorkspace
     private lateinit var tasks: List<JSONObject>
-    private fun fixture(language: String = "en", scale: Float = 1f, complete: Boolean = false, empty: Boolean = false) {
+    private fun fixture(language: String = "en", scale: Float = 1f, complete: Boolean = false, empty: Boolean = false, adventureProgress: Int? = null) {
         data = (compose.activity.application as BunDoApplication).accounts.active.value!!
         val me = UUID.randomUUID().toString()
         val initial = adventureWorkspace().copy(registration = data.registrationId!!)
         state = initial.copy(scope = "${initial.workspaceId}/${initial.epoch}/${data.registrationId}", revision = "3",
             progress = JSONObject().put("activity", JSONArray()).toString(),
             membership = JSONObject().put("me", me).put("ownerId", me).put("members", JSONArray().put(JSONObject().put("id", me).put("active", true).put("displayName", "Alice"))).toString())
-        tasks = if (empty) emptyList() else listOf(adventureTask("Shopping list", complete), adventureTask("Water the plants", complete))
-        state = state.copy(adventure = tasks.firstOrNull()?.let { adventureFixture(state, it).toString() })
+        tasks = if (empty) emptyList() else if (adventureProgress != null)
+            listOf("Clear the counter", "Sort the cupboard", "Plan supper", "Pick up groceries").mapIndexed { i, title -> adventureTask(title, i < adventureProgress) }
+        else listOf(adventureTask("Shopping list", complete), adventureTask("Water the plants", complete))
+        state = state.copy(adventure = tasks.firstOrNull()?.let {
+            val snapshot = adventureFixture(state, it)
+            if (adventureProgress != null) {
+                snapshot.getJSONObject("board").getJSONObject("active").put("draft",
+                    AdventureDraft(if (language == "fi") "Keittiö kuntoon" else "A calmer kitchen", "",
+                        tasks.map { task -> AdventurePhase(task.getString("id"), task.getString("title"), 1, 10) }).json())
+                snapshot.getJSONObject("progress").put("total", tasks.size).put("completed", adventureProgress).put("isComplete", adventureProgress == tasks.size)
+                    .put("roots", JSONArray(tasks.map { task -> JSONObject().put("rootId", task.getString("id"))
+                        .put("available", true).put("task", task).put("checklist", JSONArray()) }))
+            }
+            snapshot.toString()
+        })
         runBlocking {
             data.database.shared().saveWorkspace(state)
             val order = SharedTaskActions.orderEntity(JSONArray(tasks.map { it.getString("id") }), "3")
@@ -64,6 +77,39 @@ class WorldSceneUiTest {
             compose.onAllNodesWithTag(if (empty) "world-rest" else "signpost-progress", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("adventure-signpost").assertIsDisplayed()
+    }
+    @Test fun active_adventure_shows_real_progress_in_the_home_signpost() {
+        fixture(adventureProgress = 2)
+        compose.onNodeWithTag("signpost-progress", useUnmergedTree = true).assertTextEquals("2 / 4 main tasks")
+        compose.onNodeWithTag("capture").assertIsDisplayed()
+        screenshot("adventure-home-active")
+        if (InstrumentationRegistry.getArguments().getString("adventurePreview") == "true") {
+            // Only this isolated synthetic fixture changes; never starts an owner's adventure.
+            compose.mainClock.autoAdvance = false
+            File(compose.activity.getExternalFilesDir(null), "adventure-preview-ready").writeText("ready")
+            fun showFrames(milliseconds: Int) {
+                repeat(milliseconds / 16) { compose.mainClock.advanceTimeByFrame(); android.os.SystemClock.sleep(16) }
+            }
+            showFrames(6500)
+            runBlocking {
+                val next = JSONObject(tasks[2].toString()).put("lifecycle", "COMPLETED").put("lifecycleVersion", "2")
+                data.database.shared().saveBase(SharedBase(state.scope, next.getString("id"), next.toString()))
+                data.database.shared().saveProjection(SharedProjection(state.scope, next.getString("id"), next.toString()))
+            }
+            showFrames(1000)
+            compose.waitUntil(10_000) { compose.onAllNodesWithText("3 / 4 main tasks").fetchSemanticsNodes().isNotEmpty() }
+            showFrames(8500)
+            compose.mainClock.autoAdvance = true
+        }
+        compose.onNodeWithTag("adventure-signpost").performClick()
+        compose.onNodeWithTag("adventure-screen").assertIsDisplayed()
+    }
+    @Test fun large_finnish_adventure_progress_keeps_capture_and_navigation() {
+        fixture(language = "fi", scale = 2f, adventureProgress = 2)
+        compose.onNodeWithTag("household-world").assertDoesNotExist()
+        compose.onNodeWithTag("signpost-progress", useUnmergedTree = true).assertTextEquals("2 / 4 päätehtävää")
+        compose.onNodeWithTag("capture").assertIsDisplayed()
+        screenshot("adventure-home-fi-large")
     }
     @Test fun continuous_scene_signpost_and_capture_survive_reorder_and_world_off() {
         val prefs = compose.activity.getSharedPreferences("appearance", 0)
@@ -113,6 +159,7 @@ class WorldSceneUiTest {
     @Test fun empty_household_keeps_explicit_creator_entry() {
         fixture(empty = true)
         compose.onNodeWithTag("world-rest").assertIsDisplayed()
+        screenshot("adventure-home-idle")
         compose.onNodeWithTag("adventure-signpost").performClick()
         compose.onNodeWithTag("adventure-create").performScrollTo().performClick()
         compose.onNodeWithTag("guided-outcome").performScrollTo().assertIsDisplayed()

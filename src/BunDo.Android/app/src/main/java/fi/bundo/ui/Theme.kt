@@ -7,10 +7,19 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+
+/** The prototype's warm signpost, separate from ordinary task surfaces. */
+internal data class AdventureSignpostColors(val paper: Color, val seal: Color, val track: Color, val amber: Color)
+
+@Composable
+internal fun adventureSignpostColors() = if (MaterialTheme.colorScheme.surface.luminance() > .5f)
+    AdventureSignpostColors(Color(0xFFF1EDDF), Color(0xFFDBE6CC), Color(0xFFC4CFB9), Color(0xFFE7BD70))
+else AdventureSignpostColors(Color(0xFF292A21), Color(0xFF374735), Color(0xFF576249), Color(0xFFE7BD70))
 
 private val LightColors = lightColorScheme(
     primary = Color(0xFF245B48), onPrimary = Color.White,

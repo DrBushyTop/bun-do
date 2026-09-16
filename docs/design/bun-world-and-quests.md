@@ -32,6 +32,14 @@ bottom of this scene. Keep filters in a compact selector beside the task count.
 Hide the scene during reordering and keep an optional world-off setting. Cap
 header height on short screens so capture and the list remain reachable.
 
+The front-page adventure entry follows the prototype's inset warm-paper
+signpost, with a scroll seal, title and actual main-task count. While an
+adventure is active, the approved Bun silhouette marks the end of its completed
+trail. An occasional amber glint passes through that completed portion.
+Bun's position changes only with task progress, never with elapsed time.
+The effect is silent and stops offscreen, on completion, with decorative
+motion disabled, or when the compact/world-hidden presentation is needed.
+
 Bun is a calm royal martial-arts master, with a simple gi, tied belt and small
 restrained crown in scene illustrations. The approved app logo stays unchanged.
 No weapons or combat are needed; household chores are the Way of the Bun.

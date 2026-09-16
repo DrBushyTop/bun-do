@@ -3,7 +3,9 @@ package fi.bundo.ui
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -61,17 +63,19 @@ internal fun HouseholdScene(scene: String, visible: Boolean, adventure: Adventur
         Column(Modifier.fillMaxWidth()) {
             topBar()
             if (illustrated) Spacer(Modifier.fillMaxWidth().height(112.dp).testTag("world-$scene"))
-            AdventureSignpost(adventure, onAdventure, acknowledge)
+            AdventureSignpost(adventure, onAdventure, acknowledge, animated = illustrated)
         }
     }
 }
 
 @Composable
-internal fun AdventureSignpost(snapshot: AdventureSnapshot?, onOpen: () -> Unit, acknowledge: suspend (String) -> Boolean, compact: Boolean = false) {
+internal fun AdventureSignpost(snapshot: AdventureSnapshot?, onOpen: () -> Unit, acknowledge: suspend (String) -> Boolean,
+    compact: Boolean = false, animated: Boolean = true) {
     val active = snapshot?.active
     val complete = snapshot?.complete == true
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val motion = LocalHouseholdMotion.current
+    val colors = adventureSignpostColors()
     val stamp = remember(active?.id) { Animatable(1f) }
     LaunchedEffect(active?.id, complete, motion.enabled) {
         if (active != null && complete) lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -81,11 +85,18 @@ internal fun AdventureSignpost(snapshot: AdventureSnapshot?, onOpen: () -> Unit,
             }
         }
     }
-    Surface(onClick = onOpen, modifier = Modifier.fillMaxWidth().testTag("adventure-signpost"),
-        color = MaterialTheme.colorScheme.surfaceContainer, contentColor = MaterialTheme.colorScheme.onSurface) {
-        Row(Modifier.padding(horizontal = 16.dp, vertical = if (compact) 4.dp else 8.dp).heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically,
+    Surface(onClick = onOpen, modifier = Modifier.fillMaxWidth()
+        .padding(horizontal = if (compact) 4.dp else 16.dp).padding(bottom = if (compact) 0.dp else 8.dp).testTag("adventure-signpost"),
+        shape = RoundedCornerShape(12.dp), color = colors.paper, contentColor = MaterialTheme.colorScheme.primary) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = if (compact) 4.dp else 10.dp).heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Icon(painterResource(R.drawable.adventure_sign), null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
+            Box(Modifier.size(if (compact) 32.dp else 40.dp)
+                .background(if (complete) MaterialTheme.colorScheme.primary else colors.seal, RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center) {
+                Icon(painterResource(if (complete) R.drawable.bun_do else R.drawable.adventure_scroll), null,
+                    tint = if (complete) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(if (compact) 22.dp else 26.dp).graphicsLayer { scaleX = stamp.value; scaleY = stamp.value })
+            }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(if (complete) stringResource(R.string.adventure_complete_short) else
                     if (compact) stringResource(R.string.adventure_title) else active?.draft?.title ?: stringResource(R.string.adventure_title),
@@ -94,9 +105,11 @@ internal fun AdventureSignpost(snapshot: AdventureSnapshot?, onOpen: () -> Unit,
                     val accessibleProgress = stringResource(R.string.adventure_progress, snapshot.completed, snapshot.total)
                     Text(if (compact) "${snapshot.completed} / ${snapshot.total}" else
                         pluralStringResource(R.plurals.adventure_signpost_progress, snapshot.total, snapshot.completed, snapshot.total), style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.testTag("signpost-progress").semantics { contentDescription = accessibleProgress })
-                    LinearProgressIndicator(progress = { if (snapshot.total == 0) 0f else snapshot.completed.toFloat() / snapshot.total },
-                        modifier = Modifier.fillMaxWidth().clearAndSetSemantics { }, gapSize = 0.dp, drawStopIndicator = {})
+                    key(active.id) {
+                        BunAdventureTrail(snapshot.completed, snapshot.total, animated && !compact, compact)
+                    }
                 }
             }
             Icon(if (complete) Icons.Outlined.CheckCircle else Icons.AutoMirrored.Outlined.ArrowForward, null,
