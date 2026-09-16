@@ -89,7 +89,7 @@ internal fun WelcomeRoute(store: WelcomeStore, account: AccountData?, signIn: Si
                         val accepted: (fi.bundo.household.Household) -> Unit = { home ->
                             store.accepted(request, home.id)
                         }
-                        if (progress.step == WelcomeStep.CREATE) model?.create(request.name.trim(), request.displayName.trim(), request.createId, accepted)
+                        if (request.step == WelcomeStep.CREATE) model?.create(request.name.trim(), request.displayName.trim(), request.createId, accepted)
                         else model?.redeem(request.link, request.displayName.trim(), accepted)
                     } catch (error: CancellationException) { throw error }
                     catch (_: Exception) { enterFailed = true }
