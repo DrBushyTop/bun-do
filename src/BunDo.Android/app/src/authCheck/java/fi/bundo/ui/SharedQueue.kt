@@ -70,7 +70,7 @@ internal fun SharedQueue(
     }
     val ids = preview ?: fullIds
     val shown = if (reorder) ids.mapNotNull(byId::get).map(SharedProtocol::inbox) else rows.filter { row ->
-        val task = checkNotNull(byId[row.id])
+        val task = byId[row.id] ?: return@filter false
         val leaves = if (task.optBoolean("isChecklist")) fi.bundo.data.SharedChecklistActions.childIds(task)
             .mapNotNull(byId::get).filter { it.isNull("deletion") && it.optString("lifecycle", "OPEN") == "OPEN" }
             else listOf(task)

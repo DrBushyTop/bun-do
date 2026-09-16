@@ -90,8 +90,13 @@ The first implementation slice is
 [Show Bun's shared journey with explicit online start and offline progress](https://github.com/DrBushyTop/bun-do/issues/58)
 adds its native readout.
 [Generate and persist shared adventures from existing household tasks](https://github.com/DrBushyTop/bun-do/issues/59)
-adds the shared proposal and acceptance backend. Native adventures, integrated
-world scenes, guided creation and private reusable artwork remain in the parent issue.
+adds the shared proposal and acceptance backend.
+[Preview and manage shared adventures in native Android](https://github.com/DrBushyTop/bun-do/issues/60)
+adds the chooser, accepted view and offline projection.
+[Guided adventure creation](https://github.com/DrBushyTop/bun-do/issues/61),
+[private reusable Bun artwork](https://github.com/DrBushyTop/bun-do/issues/62) and
+[the integrated scene and signpost](https://github.com/DrBushyTop/bun-do/issues/63)
+complete the remaining flows. The parent tracks their combined verification.
 
 ## AI usage policy after V2
 

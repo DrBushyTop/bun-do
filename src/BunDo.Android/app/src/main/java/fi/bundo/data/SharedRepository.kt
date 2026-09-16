@@ -23,6 +23,11 @@ class SharedRepository(
     }
     override val tasks = taskStates.map { rows -> rows.map(SharedProtocol::inbox) }
     override val drafts = dao.drafts(scope).map { rows -> rows.filterNot { it.key.startsWith("checklist:") }.map { EditorDraft(it.key, it.title, it.description, it.savedAt, it.details) } }
+    internal val adventure = combine(dao.observeWorkspace(scope), dao.observeBase(scope), dao.observeAllIntents()) { state, base, intents ->
+        state?.takeIf { it.blocked == null }?.adventure?.let { saved ->
+            AdventureSnapshot.read(JSONObject(saved)).project(state, base.map { JSONObject(it.snapshot) }, intents.filter { it.scope == scope }.sortedBy { it.sequence.toULong() })
+        }
+    }
     val workspace = dao.observeWorkspace(scope)
     val problems = dao.problems(scope)
     val recovery = dao.observeRecovery(scope)
@@ -459,6 +464,35 @@ class SharedRepository(
         }
     }
 
+    internal suspend fun applyAdventure(request: SharedRequest, snapshot: JSONObject): Boolean = lease.access {
+        database.withTransaction {
+            val state = current()
+            if (state.worker != request.worker || state.blocked != null || dao.recoveryState(scope) != null) return@withTransaction false
+            check(request.workspace.scope == state.scope && request.workspace.epoch == state.epoch &&
+                request.workspace.workspaceId == state.workspaceId && request.workspace.registration == state.registration)
+            val parsed = AdventureSnapshot.read(snapshot)
+            check(parsed.workspaceId == state.workspaceId && parsed.epoch == state.epoch)
+            val prior = state.adventure?.let { AdventureSnapshot.read(JSONObject(it)) }
+            if (prior == null || parsed.revision > prior.revision || parsed.revision == prior.revision && sameJson(snapshot, JSONObject(state.adventure)))
+                dao.saveWorkspace(state.copy(adventure = snapshot.toString()))
+            lease.check()
+            true
+        }
+    }
+
+    internal suspend fun acknowledgeAdventure(id: String, seal: Boolean): Boolean = lease.access {
+        database.withTransaction {
+            val state = current()
+            if (state.blocked != null || dao.recoveryState(scope) != null) return@withTransaction false
+            val saved = state.adventure?.let { AdventureSnapshot.read(JSONObject(it)) } ?: return@withTransaction false
+            if (saved.active?.id != id || (if (seal) state.adventureSeal else state.adventureBow) == id) return@withTransaction false
+            val projected = saved.project(state, dao.base(scope).map { JSONObject(it.snapshot) }, dao.intents(scope))
+            if (!projected.complete) return@withTransaction false
+            dao.saveWorkspace(if (seal) state.copy(adventureSeal = id) else state.copy(adventureBow = id))
+            true
+        }
+    }
+
     suspend fun release(request: SharedRequest) = lease.access {
         database.withTransaction {
             val state = current()
@@ -470,7 +504,7 @@ class SharedRepository(
         database.withTransaction {
             val state = current()
             if (state.worker != request.worker) return@withTransaction
-            dao.saveWorkspace(state.copy(blocked = reason, worker = null, progress = null))
+            dao.saveWorkspace(state.copy(blocked = reason, worker = null, progress = null, adventure = null, adventureBow = null, adventureSeal = null))
             for (intent in dao.intents(scope)) {
                 val quarantine = intent.status in listOf("PENDING", "SUBMITTED") ||
                     intent.status == "ACCEPTED" && intent.receipt?.let { JSONObject(it).decimal("effectRevision") > state.revision.toULong() } == true

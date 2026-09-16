@@ -155,6 +155,15 @@ class WelcomeLocalFlowTest {
                 JourneyProgress.read(JourneyEndpoint().send(token, workspace.copy(registration = registration), enable = false))!!
             }
             assertEquals(started, ownerJourney)
+            models[1].withAccountToken(joined) { token, _ -> SharedAdventure.send(app, repository, token, JSONObject().put("action", "visit")) }
+            val adventure = AdventureSnapshot.read(JSONObject(joined.database.shared().workspace(workspace.scope)!!.adventure!!))
+            assertEquals("EMPTY", adventure.status)
+            val ownerAdventure = models[0].withAccountToken(stores[0].active.value!!) { token, registration ->
+                AdventureSnapshot.read(AdventureEndpoint().send(token, workspace.copy(registration = registration), JSONObject().put("action", "read")))
+            }
+            assertEquals(adventure.batchId, ownerAdventure.batchId)
+            assertEquals(adventure.revision, ownerAdventure.revision)
+
         } finally {
             compose.runOnUiThread { compose.activity.setContent { Text("Local walkthrough finished") } }
             if (homeId != null) {

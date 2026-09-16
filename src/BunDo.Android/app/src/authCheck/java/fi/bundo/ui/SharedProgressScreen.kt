@@ -26,7 +26,7 @@ import java.time.format.FormatStyle
 
 @Composable
 internal fun SharedProgressScreen(progress: String?, activity: Boolean, tasks: Map<String, JSONObject>, membership: JSONObject?,
-    onRefresh: () -> Unit, onOpen: (String) -> Unit, onJourney: (() -> Unit)? = null) {
+    onRefresh: () -> Unit, onOpen: (String) -> Unit, onJourney: (() -> Unit)? = null, onAdventure: (() -> Unit)? = null) {
     val snapshot = progress?.let(::JSONObject)
     val locale = LocalConfiguration.current.locales[0]
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -35,6 +35,8 @@ internal fun SharedProgressScreen(progress: String?, activity: Boolean, tasks: M
         TextButton(onClick = onRefresh, modifier = Modifier.testTag("progress-refresh")) { Text(stringResource(R.string.household_refresh)) }
         if (!activity && onJourney != null) OutlinedButton(onClick = onJourney,
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("journey-open")) { Text(stringResource(R.string.journey_open)) }
+        if (!activity && onAdventure != null) OutlinedButton(onClick = onAdventure,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("adventure-open")) { Text(stringResource(R.string.adventure_open)) }
         if (snapshot == null) {
             Text(stringResource(R.string.progress_unavailable))
             return@Column
