@@ -16,6 +16,7 @@
   <ItemGroup>
     <EmbeddedResource Include="../../contracts/ai/extraction.schema.json" LogicalName="BunDo.CleanupSchema" />
     <EmbeddedResource Include="../../contracts/ai/capture.schema.json" LogicalName="BunDo.CaptureSchema" />
+    <EmbeddedResource Include="../../contracts/ai/adventure-plan.schema.json" LogicalName="BunDo.AdventurePlanSchema" />
     <EmbeddedResource Include="../../contracts/ai/adventure.schema.json" LogicalName="BunDo.AdventureSchema" />
     <EmbeddedResource Include="../../contracts/ai/split.schema.json" LogicalName="BunDo.SplitSchema" />
     <ProjectReference Include="../BunDo.Domain/BunDo.Domain.csproj" />

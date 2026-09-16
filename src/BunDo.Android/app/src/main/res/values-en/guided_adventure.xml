@@ -1,0 +1,31 @@
+<resources>
+    <string name="guided_back">Back to adventure</string>
+    <string name="guided_title">Help me plan an adventure</string>
+    <string name="guided_error">The adventure could not start yet. Your draft is safe. Check your connection and try again.</string>
+    <string name="guided_pending">Adding the approved tasks. The adventure starts only when they have reached the family queue.</string>
+    <string name="guided_resume">Continue starting</string>
+    <string name="guided_other_device">Continue on the device that approved this plan, or end this attempt below.</string>
+    <string name="guided_cancel">End this attempt</string>
+    <string name="guided_cancel_hint">Ends this start attempt for the family. Tasks already added or waiting to sync stay in the queue.</string>
+    <string name="guided_review_hint">Make this your own. Only the new tasks you keep will be added. Existing tasks stay unchanged.</string>
+    <string name="guided_name">Adventure name</string>
+    <string name="guided_new_task">New task</string>
+    <string name="guided_existing_task">Already in your queue</string>
+    <string name="guided_task">Task</string>
+    <string name="guided_remove">Leave out</string>
+    <string name="guided_invalid">Keep at least one task. Check names and estimates before starting.</string>
+    <string name="guided_approve">Add tasks and start adventure</string>
+    <string name="guided_discard">Discard draft</string>
+    <string name="guided_outcome">What would you like to get done?</string>
+    <string name="guided_prompt_balcony">Make the balcony ready for summer</string>
+    <string name="guided_prompt_corner">Clear one cluttered corner</string>
+    <string name="guided_time">Minutes available, optional</string>
+    <string name="guided_preview_hint">Bun will suggest a draft online. Nothing enters the queue until you approve it.</string>
+    <string name="guided_plan">Make a draft</string>
+    <string name="guided_ended">This start attempt has ended. Tasks already added or waiting to sync stay in your queue.</string>
+    <string name="guided_acknowledge">Got it</string>
+    <string name="guided_difficulty">Estimated difficulty</string>
+    <string name="guided_stars">Estimated difficulty: %1$d of 3 stars</string>
+    <string name="guided_outcome_invalid">Use one line of text, up to 1,000 characters.</string>
+    <string name="guided_time_invalid">Enter a whole number from 1 to 1,440, or leave this empty.</string>
+</resources>

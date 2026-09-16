@@ -30,7 +30,7 @@ import java.time.Instant
 @Composable
 internal fun SharedAdventureScreen(snapshot: AdventureSnapshot?, busy: Boolean, failed: Boolean, allowed: Boolean,
     tasks: Map<String, JSONObject>, onAction: (JSONObject) -> Unit, onOpen: (String) -> Unit, onBack: () -> Unit,
-    onAcknowledge: suspend (String) -> Boolean = { false }) {
+    onAcknowledge: suspend (String) -> Boolean = { false }, onCreate: (() -> Unit)? = null) {
     BackHandler(onBack = onBack)
     var now by remember { mutableStateOf(Instant.now()) }
     LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(1000); now = Instant.now() } }
@@ -64,6 +64,8 @@ internal fun SharedAdventureScreen(snapshot: AdventureSnapshot?, busy: Boolean, 
             if (snapshot.complete) Button(onClick = { onAction(action("dismiss")) }, enabled = allowed && !busy,
                 modifier = Modifier.testTag("adventure-dismiss")) { Text(stringResource(R.string.adventure_dismiss)) }
             TextButton(onClick = { leave = true }, enabled = allowed && !busy, modifier = Modifier.testTag("adventure-leave")) { Text(stringResource(R.string.adventure_leave)) }
+        } else if (snapshot?.creation != null) {
+            Text(stringResource(R.string.guided_pending))
         } else {
             Text(stringResource(R.string.adventure_intro))
             if (status == "READY") for (choice in snapshot!!.proposals) {
@@ -81,6 +83,9 @@ internal fun SharedAdventureScreen(snapshot: AdventureSnapshot?, busy: Boolean, 
                 "FAILED" -> R.string.adventure_generation_failed; "EXPIRED" -> R.string.adventure_expired
                 else -> R.string.adventure_unavailable
             }), modifier = Modifier.testTag("adventure-status"))
+        }
+        if (active == null && onCreate != null) OutlinedButton(onClick = onCreate, modifier = Modifier.testTag("adventure-create")) {
+            Text(stringResource(if (snapshot?.creation != null) R.string.guided_resume else R.string.guided_title))
         }
         TextButton(onClick = { onAction(if (status == "FAILED") JSONObject().put("action", "retry").put("batchId", snapshot?.batchId)
             else JSONObject().put("action", "visit")) }, enabled = allowed && !busy, modifier = Modifier.testTag("adventure-refresh")) {

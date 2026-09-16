@@ -1,0 +1,31 @@
+<resources>
+    <string name="guided_back">Takaisin seikkailuun</string>
+    <string name="guided_title">Suunnitellaan seikkailu</string>
+    <string name="guided_error">Seikkailu ei vielä käynnistynyt. Luonnos on tallessa. Tarkista yhteys ja yritä uudelleen.</string>
+    <string name="guided_pending">Hyväksytyt tehtävät lisätään perheen listalle. Seikkailu alkaa vasta, kun ne ovat tallentuneet.</string>
+    <string name="guided_resume">Jatka aloittamista</string>
+    <string name="guided_other_device">Jatka laitteella, jolla hyväksyit suunnitelman, tai lopeta tämä yritys alta.</string>
+    <string name="guided_cancel">Lopeta tämä yritys</string>
+    <string name="guided_cancel_hint">Lopettaa tämän aloitusyrityksen koko perheeltä. Jo lisätyt tai synkronointia odottavat tehtävät jäävät listalle.</string>
+    <string name="guided_review_hint">Muokkaa suunnitelma omaksesi. Vain säilyttämäsi uudet tehtävät lisätään. Olemassa olevat tehtävät eivät muutu.</string>
+    <string name="guided_name">Seikkailun nimi</string>
+    <string name="guided_new_task">Uusi tehtävä</string>
+    <string name="guided_existing_task">Jo tehtävälistalla</string>
+    <string name="guided_task">Tehtävä</string>
+    <string name="guided_remove">Jätä pois</string>
+    <string name="guided_invalid">Säilytä vähintään yksi tehtävä. Tarkista nimet ja arviot ennen aloittamista.</string>
+    <string name="guided_approve">Lisää tehtävät ja aloita seikkailu</string>
+    <string name="guided_discard">Hylkää luonnos</string>
+    <string name="guided_outcome">Mitä haluaisit saada aikaan?</string>
+    <string name="guided_prompt_balcony">Valmistellaan parveke kesään</string>
+    <string name="guided_prompt_corner">Raivataan yksi nurkka</string>
+    <string name="guided_time">Aikaa minuutteina, vapaaehtoinen</string>
+    <string name="guided_preview_hint">Bun ehdottaa luonnosta verkossa. Listalle ei lisätä mitään ennen hyväksyntääsi.</string>
+    <string name="guided_plan">Tee luonnos</string>
+    <string name="guided_ended">Tämä aloitusyritys on päättynyt. Jo lisätyt tai synkronointia odottavat tehtävät jäävät listalle.</string>
+    <string name="guided_acknowledge">Selvä</string>
+    <string name="guided_difficulty">Arvioitu vaikeus</string>
+    <string name="guided_stars">Arvioitu vaikeus tähdin: %1$d / 3</string>
+    <string name="guided_outcome_invalid">Kirjoita yhdelle riville, enintään 1 000 merkkiä.</string>
+    <string name="guided_time_invalid">Anna kokonaisluku väliltä 1–1 440 tai jätä tyhjäksi.</string>
+</resources>

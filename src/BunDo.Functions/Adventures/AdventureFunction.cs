@@ -48,12 +48,16 @@ public sealed class AdventureFunction(AccessTokens tokens, IServiceProvider serv
         ulong version = 0;
         bool confirmed = false;
         AdventureDraft? draft = null;
+        GuidedDraft? plan = null;
+        string? outcome = null; int? minutes = null; string[] roots = [];
         try
         {
             using var json = JsonDocument.Parse(bytes.AsMemory(0, length), new JsonDocumentOptions { MaxDepth = 8 });
             var root = json.RootElement;
             action = root.GetProperty("action").GetString() ?? "";
             string[] fields = action switch {
+                "plan" => ["outcome", "minutes"], "beginCreation" => ["creationId", "version", "draft"],
+                "finishCreation" => ["creationId", "roots"], "cancelCreation" => ["creationId", "confirmed"],
                 "read" => [], "refresh" or "retry" => ["batchId"], "accept" => ["batchId", "proposalId"],
                 "edit" => ["adventureId", "version", "draft"], "leave" => ["adventureId", "version", "confirmed"],
                 "dismiss" => ["adventureId", "version"], _ => throw new JsonException(),
@@ -63,14 +67,25 @@ public sealed class AdventureFunction(AccessTokens tokens, IServiceProvider serv
             if (action is "refresh" or "retry" or "accept")
                 batch = root.GetProperty("batchId").ValueKind == JsonValueKind.Null && action != "accept" ? null : Id(root, "batchId");
             if (action == "accept") proposal = Id(root, "proposalId");
-            if (action is "edit" or "leave" or "dismiss")
+            if (action is "beginCreation" or "finishCreation" or "cancelCreation") id = Id(root, "creationId");
+            if (action is "edit" or "leave" or "dismiss" or "beginCreation")
             {
-                id = Id(root, "adventureId");
+                if (action != "beginCreation") id = Id(root, "adventureId");
                 var text = root.GetProperty("version").GetString();
                 if (!ulong.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out version) ||
                     text != version.ToString(CultureInfo.InvariantCulture)) throw new JsonException();
             }
-            if (action == "leave") confirmed = root.GetProperty("confirmed").GetBoolean();
+            if (action is "leave" or "cancelCreation") confirmed = root.GetProperty("confirmed").GetBoolean();
+            if (action == "plan") {
+                outcome = root.GetProperty("outcome").GetString();
+                minutes = root.GetProperty("minutes").ValueKind == JsonValueKind.Null ? null : root.GetProperty("minutes").GetInt32();
+                if (outcome is null) throw new JsonException();
+            }
+            if (action == "beginCreation") {
+                plan = FoundryAdventurePlanner.ParseDraft(root.GetProperty("draft"));
+                if (!GuidedAdventure.Valid(plan)) throw new JsonException();
+            }
+            if (action == "finishCreation") roots = root.GetProperty("roots").EnumerateArray().Select(r => r.GetString() ?? throw new JsonException()).ToArray();
             if (action == "edit")
             {
                 draft = FoundryAdventureProvider.ParseDraft(root.GetProperty("draft"));
@@ -86,10 +101,16 @@ public sealed class AdventureFunction(AccessTokens tokens, IServiceProvider serv
         {
             var member = HouseholdIdentity.Member(auth.Identity!);
             var service = new AdventureService(documents, services.GetService<IAdventureProvider>(),
-                registrationActive: token => registrations.IsActiveAsync(auth.Identity!, registration, token));
+                registrationActive: token => registrations.IsActiveAsync(auth.Identity!, registration, token),
+                planner: services.GetService<IAdventurePlanner>());
             Activity.Current?.SetTag("operation.stage", action);
+            GuidedDraft? generated = null;
             switch (action)
             {
+                case "plan": generated = await service.PlanAsync(member, workspace, epoch, outcome!, minutes, ct); break;
+                case "beginCreation": await service.BeginCreationAsync(member, workspace, epoch, registration, id, version, plan!, ct); break;
+                case "finishCreation": await service.FinishCreationAsync(member, workspace, epoch, registration, id, roots, ct); break;
+                case "cancelCreation": await service.CancelCreationAsync(member, workspace, epoch, id, confirmed, ct); break;
                 case "refresh": case "retry": await service.RefreshAsync(member, workspace, epoch, batch, action == "retry", ct); break;
                 case "accept": await service.AcceptAsync(member, workspace, epoch, batch!.Value, proposal, ct); break;
                 case "edit": await service.EditAsync(member, workspace, epoch, id, version, draft!, ct); break;
@@ -100,7 +121,8 @@ public sealed class AdventureFunction(AccessTokens tokens, IServiceProvider serv
             Activity.Current?.SetTag("adventure.batch_status", snapshot.Board.Batch?.Status ?? "NONE");
             Activity.Current?.SetTag("adventure.active", snapshot.Board.Active is not null);
             return new ContentResult { ContentType = "application/json", StatusCode = 200,
-                Content = JsonSerializer.Serialize(snapshot, SyncJson.Options) };
+                Content = generated is null ? JsonSerializer.Serialize(snapshot, SyncJson.Options) :
+                    JsonSerializer.Serialize(new { snapshot, draft = generated }, SyncJson.Options) };
         }
         catch (SyncException error) { return Failure(error.Code, error.Code is "FORBIDDEN" or "REGISTRATION_RETIRED" ? 403 : error.Code == "BUSY" ? 503 : 409); }
         catch (HouseholdStorageFullException) { return Failure("STORAGE_FULL", 409); }

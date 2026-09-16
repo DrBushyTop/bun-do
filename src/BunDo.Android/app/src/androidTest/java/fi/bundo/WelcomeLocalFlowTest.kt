@@ -164,6 +164,31 @@ class WelcomeLocalFlowTest {
             assertEquals(adventure.batchId, ownerAdventure.batchId)
             assertEquals(adventure.revision, ownerAdventure.revision)
 
+            // Synthetic edited plan, real HTTP reservation, ordinary sync commands and final shared start.
+            val guided = GuidedDraft("A quiet corner", "", listOf(GuidedPhase(null, "Sort papers", "Make room", 1, 15)))
+            val planRequest = repository.prepareJourney(android.os.SystemClock.elapsedRealtime(),
+                android.provider.Settings.Global.getInt(app.contentResolver, android.provider.Settings.Global.BOOT_COUNT, 0))!!
+            try { repository.saveGuidedPlan(planRequest, JSONObject(joined.database.shared().workspace(workspace.scope)!!.adventure!!), guided) }
+            finally { repository.release(planRequest) }
+            repository.approveGuidedCreation(guided)
+            models[1].withAccountToken(joined) { token, _ -> GuidedAdventure.resume(app, repository, token) }
+            val queuedIds = repository.guidedCreation()!!.roots!!
+            models[1].withAccountToken(joined) { token, _ ->
+                repeat(4) {
+                    val request = repository.prepare(android.os.SystemClock.elapsedRealtime(),
+                        android.provider.Settings.Global.getInt(app.contentResolver, android.provider.Settings.Global.BOOT_COUNT, 0))!!
+                    try { repository.apply(request, SharedEndpoint().send(token, request)) } finally { repository.release(request) }
+                }
+                GuidedAdventure.resume(app, repository, token)
+            }
+            val startedAdventure = AdventureSnapshot.read(JSONObject(joined.database.shared().workspace(workspace.scope)!!.adventure!!))
+            assertEquals(queuedIds, startedAdventure.active!!.draft.phases.map { it.rootId })
+            assertNull(repository.guidedCreation())
+            val ownerStarted = models[0].withAccountToken(stores[0].active.value!!) { token, registration ->
+                AdventureSnapshot.read(AdventureEndpoint().send(token, workspace.copy(registration = registration), JSONObject().put("action", "read")))
+            }
+            assertEquals(startedAdventure.active!!.id, ownerStarted.active!!.id)
+
         } finally {
             compose.runOnUiThread { compose.activity.setContent { Text("Local walkthrough finished") } }
             if (homeId != null) {

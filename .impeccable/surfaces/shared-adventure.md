@@ -2,7 +2,7 @@
 version: 1
 slug: "shared-adventure"
 primary_target: "src/BunDo.Android/app/src/authCheck/java/fi/bundo/ui/SharedAdventureScreen.kt"
-related_targets: ["src/BunDo.Android/app/src/authCheck/java/fi/bundo/ui/SharedProgressScreen.kt"]
+related_targets: ["src/BunDo.Android/app/src/authCheck/java/fi/bundo/ui/SharedProgressScreen.kt", "src/BunDo.Android/app/src/authCheck/java/fi/bundo/ui/GuidedAdventureScreen.kt"]
 ---
 
 # Shared adventure
@@ -21,5 +21,7 @@ visible until dismissed; a short Bun bow is acknowledged durably before motion.
 Keep all content scrollable with 48 dp controls, readable Finnish and English,
 and wrapped large text. Preserve cached work on connection failure and distinguish
 unavailable source tasks. Artwork always has a bundled fallback. The queue remains
-the place for ordinary task actions and Undo. The integrated signpost and guided
-creator extend this flow in subsequent slices.
+the place for ordinary task actions and Undo. The guided creator asks for an outcome and optional minutes, then separates
+existing references from editable new tasks. Explicit approval reserves the
+shared start; pending sync remains visible and recoverable without claiming
+success. The integrated signpost extends this flow in its own slice.

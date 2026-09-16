@@ -101,6 +101,25 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
             finally { adventureBusy = false }
         }
     }
+    val creation = current?.adventureCreation?.let(GuidedCreation::read)
+    fun guidedAction(work: suspend (String) -> Unit) {
+        if (adventureBusy) return
+        adventureBusy = true; adventureFailed = false
+        scope.launch {
+            try { (context.applicationContext as BunDoApplication).withAccountToken(data) { token -> work(token) }
+                SharedSyncWorker.request(context, data)
+            } catch (error: CancellationException) { throw error }
+            catch (_: Exception) { adventureFailed = true }
+            finally { adventureBusy = false }
+        }
+    }
+    LaunchedEffect(current?.revision, creation?.stage, destination) {
+        if (destination == "creator" && creation?.stage == "QUEUED")
+            guidedAction { token -> GuidedAdventure.resume(context, repository, token) }
+    }
+    LaunchedEffect(adventure?.active?.id) {
+        if (destination == "creator" && adventure?.active != null) destination = "adventure"
+    }
     LaunchedEffect(destination, selected.scope) {
         if (destination == "adventure") adventureAction(JSONObject().put("action", "visit"))
     }
@@ -200,12 +219,24 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
         onDispose { owner.lifecycle.removeObserver(observer); if (!data.lease.active) model.hide() }
     }
     InboxApp(state, model, appearance, onAppearance, voice = data.voice, voiceTarget = VoiceTarget(selected.scope), onAccount = onAccount, onWelcome = onWelcome, queueTitle = selected.name,
-        queueNavigation = { SharedHouseholdNavigation(if (destination in listOf("journey", "adventure")) "together" else destination) { destination = it } },
+        queueNavigation = { SharedHouseholdNavigation(if (destination in listOf("journey", "adventure", "creator")) "together" else destination) { destination = it } },
         queueContent = if (destination != "queue") ({ onOpen ->
             val progress = current?.progress?.takeIf { current?.blocked == null && recovery == null }
-            if (destination == "adventure") SharedAdventureScreen(adventure?.takeIf { recovery == null && current?.blocked == null },
+            if (destination == "creator") GuidedAdventureScreen(creation, adventure?.creation, adventureBusy, adventureFailed, byId,
+                current?.blocked == null && recovery == null && adventure?.active == null,
+                { outcome, minutes -> guidedAction { token -> GuidedAdventure.plan(context, repository, token, outcome, minutes) } },
+                { draft -> guidedAction { token -> repository.approveGuidedCreation(draft); GuidedAdventure.resume(context, repository, token) } },
+                { guidedAction { token -> GuidedAdventure.resume(context, repository, token) } },
+                { scope.launch { repository.discardGuidedReview() } },
+                { guidedAction { token ->
+                    val pending = checkNotNull(adventure?.creation)
+                    SharedAdventure.send(context, repository, token, JSONObject().put("action", "cancelCreation").put("creationId", pending.getString("id")).put("confirmed", true))
+                    // The shared reservation is gone; any already queued tasks remain ordinary tasks.
+                    repository.clearCancelledGuidedCreation(pending.getString("id"))
+                } }, { destination = "adventure" })
+            else if (destination == "adventure") SharedAdventureScreen(adventure?.takeIf { recovery == null && current?.blocked == null },
                 adventureBusy, adventureFailed, current != null && current?.blocked == null && recovery == null,
-                byId, ::adventureAction, onOpen, { destination = "together" }, { repository.acknowledgeAdventure(it, false) })
+                byId, ::adventureAction, onOpen, { destination = "together" }, { repository.acknowledgeAdventure(it, false) }, { destination = "creator" })
             else if (destination == "journey") SharedJourneyScreen(progress, journeyBusy, journeyFailed,
                 current != null && current?.blocked == null && recovery == null, { journey(true) }, { journey(false) }, { destination = "together" })
             else SharedProgressScreen(progress, destination == "activity", byId, membership,

@@ -63,7 +63,7 @@ class SharedSyncTest {
 
     @Test fun retainedSharedBuildsUpgradeWithoutRewritingPendingBytesOrRecordingDeadlines() = runBlocking {
         // First shared-data build and the last schema before workspace recording recovery.
-        for (version in listOf(5, 11, 12, 14)) {
+        for (version in listOf(5, 11, 12, 14, 15)) {
             val name = "retained-upgrade-${UUID.randomUUID()}.db"
             names += name
             val frozen = " {\"pending\":\"exact original bytes\"} "
@@ -82,7 +82,7 @@ class SharedSyncTest {
             assertEquals("Keep me", intent.description)
             assertEquals("Unfinished", db.shared().allDrafts().single().title)
             assertEquals(200L, db.recordings().all().single().expiresAt)
-            assertEquals(15, db.openHelper.readableDatabase.version)
+            assertEquals(16, db.openHelper.readableDatabase.version)
             assertTrue(db.recordings().all().single().keepAudio)
         }
     }

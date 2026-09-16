@@ -9,7 +9,7 @@ public sealed record AdventureBatch(Guid Id, string Status, DateTimeOffset Creat
 public sealed record AcceptedAdventure(Guid Id, Guid BatchId, ulong Version, AdventureDraft Draft,
     DateTimeOffset AcceptedAt, string Artwork = "dojo-garden");
 // Only one bounded batch and one accepted adventure. No task content or adventure history accumulates here.
-public sealed record AdventureBoard(AdventureBatch? Batch = null, AcceptedAdventure? Active = null);
+public sealed record AdventureBoard(AdventureBatch? Batch = null, AcceptedAdventure? Active = null, AdventureCreation? Creation = null);
 public sealed record AdventureRoot(string RootId, bool Available, TaskSnapshot? Task, TaskSnapshot[] Checklist);
 public sealed record AdventureProgress(int Completed, int Total, bool IsComplete, AdventureRoot[] Roots);
 
@@ -33,6 +33,7 @@ public static class HouseholdAdventure
     {
         if (board.Active is { } active)
             return (active.Id == proposalId && active.BatchId == batchId ? "ACCEPTED" : "ADVENTURE_ACTIVE", board);
+        if (board.Creation is not null) return ("CREATION_PENDING", board);
         if (board.Batch is not { Status: "READY" } batch || batch.Id != batchId || batch.ExpiresAt <= now)
             return ("SUGGESTIONS_UNAVAILABLE", board);
         var proposal = batch.Proposals?.SingleOrDefault(p => p.Id == proposalId);

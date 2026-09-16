@@ -38,7 +38,7 @@ internal data class AdventureChoice(val id: String, val draft: AdventureDraft, v
     val batchId: String? = null, val version: String? = null)
 internal data class AdventureSnapshot(val workspaceId: String, val epoch: String, val revision: ULong,
     val batchId: String?, val status: String?, val expiresAt: Instant?, val leaseUntil: Instant?, val proposals: List<AdventureChoice>,
-    val active: AdventureChoice?, val roots: List<JSONObject>, val tasks: Map<String, JSONObject> = emptyMap()) {
+    val active: AdventureChoice?, val roots: List<JSONObject>, val tasks: Map<String, JSONObject> = emptyMap(), val creation: JSONObject? = null) {
     val total get() = active?.draft?.phases?.size ?: 0
     val completed get() = active?.draft?.phases?.count { phase -> available(tasks[phase.rootId]) && tasks[phase.rootId]?.optString("lifecycle") == "COMPLETED" } ?: 0
     val complete get() = total > 0 && completed == total
@@ -88,6 +88,11 @@ internal data class AdventureSnapshot(val workspaceId: String, val epoch: String
             require(status != "RUNNING" || lease != null)
             val active = board.optJSONObject("active")?.let { choice(it, true) }
             require(active == null || status == "CONSUMED" && batch?.getString("id") == active.batchId)
+            val creation = board.optJSONObject("creation")?.also { pending ->
+                uuid(pending.getString("id")); uuid(pending.getString("memberId")); uuid(pending.getString("registrationId"))
+                require(pending.decimal("revision") <= revision && active == null)
+                Instant.parse(pending.getString("startedAt")); GuidedDraft.read(pending.getJSONObject("draft"))
+            }
             val progress = json.optJSONObject("progress")
             require((active == null) == (progress == null))
             val roots = progress?.getJSONArray("roots")?.let { array ->
@@ -108,7 +113,7 @@ internal data class AdventureSnapshot(val workspaceId: String, val epoch: String
                 } else require(root.isNull("task") && children.length() == 0)
             }
             return AdventureSnapshot(uuid(json.getString("workspaceId")), uuid(json.getString("stateEpoch")), revision,
-                batch?.getString("id")?.let(::uuid), status, expires, lease, proposals, active, roots)
+                batch?.getString("id")?.let(::uuid), status, expires, lease, proposals, active, roots, creation = creation)
         }
     }
 }
@@ -123,7 +128,7 @@ internal object SharedAdventure {
                 val read = sendRequest(token, request.workspace, JSONObject().put("action", "read"))
                 check(repository.applyAdventure(request, read))
                 val snapshot = AdventureSnapshot.read(read)
-                if (snapshot.active == null && snapshot.batchStatus(Instant.now()) in listOf(null, "EMPTY", "EXPIRED", "CONSUMED"))
+                if (snapshot.active == null && snapshot.creation == null && snapshot.batchStatus(Instant.now()) in listOf(null, "EMPTY", "EXPIRED", "CONSUMED"))
                     check(repository.applyAdventure(request, sendRequest(token, request.workspace, JSONObject().put("action", "refresh")
                         .put("batchId", snapshot.batchId ?: JSONObject.NULL))))
             } else {

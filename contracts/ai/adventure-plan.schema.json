@@ -1,0 +1,54 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "title",
+    "flavor",
+    "phases"
+  ],
+  "properties": {
+    "title": {
+      "type": "string"
+    },
+    "flavor": {
+      "type": "string"
+    },
+    "phases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rootId",
+          "taskTitle",
+          "name",
+          "stars",
+          "minutes"
+        ],
+        "properties": {
+          "rootId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "stars": {
+            "type": "integer"
+          },
+          "minutes": {
+            "type": "integer"
+          },
+          "taskTitle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

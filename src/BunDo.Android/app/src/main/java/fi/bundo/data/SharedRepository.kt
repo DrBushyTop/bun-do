@@ -480,6 +480,83 @@ class SharedRepository(
         }
     }
 
+    internal suspend fun guidedCreation(): GuidedCreation? = lease.access { current().adventureCreation?.let(GuidedCreation::read) }
+
+    internal suspend fun saveGuidedPlan(request: SharedRequest, snapshot: JSONObject, draft: GuidedDraft) {
+        check(applyAdventure(request, snapshot))
+        lease.access { database.withTransaction {
+            val state = current()
+            check(state.worker == request.worker && state.adventureCreation?.let(GuidedCreation::read)?.stage !in listOf("APPROVED", "QUEUED"))
+            val parsed = AdventureSnapshot.read(snapshot)
+            check(parsed.active == null && parsed.creation == null)
+            dao.saveWorkspace(state.copy(adventureCreation = GuidedCreation(java.util.UUID.randomUUID().toString(),
+                parsed.revision.toString(), draft, "REVIEW").json().toString()))
+        } }
+    }
+    internal suspend fun approveGuidedCreation(draft: GuidedDraft) = lease.access {
+        database.withTransaction {
+            val state = current(); check(state.blocked == null && dao.recoveryState(scope) == null)
+            val local = GuidedCreation.read(checkNotNull(state.adventureCreation)); check(local.stage == "REVIEW")
+            GuidedDraft.read(draft.json())
+            val snapshot = AdventureSnapshot.read(JSONObject(checkNotNull(state.adventure)))
+            check(snapshot.active == null && snapshot.creation == null)
+            dao.saveWorkspace(state.copy(adventureCreation = local.copy(draft = draft, version = snapshot.revision.toString(), stage = "APPROVED").json().toString()))
+        }
+    }
+    internal suspend fun queueGuidedCreation(request: SharedRequest, id: String): GuidedCreation = lease.access {
+        database.withTransaction {
+            val state = current(); check(state.worker == request.worker && state.blocked == null && dao.recoveryState(scope) == null)
+            val local = GuidedCreation.read(checkNotNull(state.adventureCreation)); check(local.id == id)
+            if (local.stage == "QUEUED") return@withTransaction local
+            check(local.stage == "APPROVED")
+            val remote = AdventureSnapshot.read(JSONObject(checkNotNull(state.adventure))).creation!!
+            check(remote.getString("id") == id && remote.getString("registrationId") == registration)
+            // Use the reservation's approved content, not a late local edit.
+            val approved = GuidedDraft.read(remote.getJSONObject("draft"))
+            val roots = approved.phases.map { phase -> phase.rootId ?: commitInTransaction(
+                EditorDraft(InboxRepository.NEW_DRAFT, checkNotNull(phase.taskTitle), ""), false) }
+            val queued = local.copy(draft = approved, stage = "QUEUED", roots = roots)
+            dao.saveWorkspace(current().copy(adventureCreation = queued.json().toString()))
+            queued
+        }
+    }
+    internal suspend fun endGuidedCreation(request: SharedRequest, id: String) = lease.access {
+        database.withTransaction {
+            val state = current(); check(state.worker == request.worker)
+            if (state.adventureCreation?.let(GuidedCreation::read)?.id == id) dao.saveWorkspace(state.copy(adventureCreation = null))
+        }
+    }
+    internal suspend fun stopGuidedCreation(request: SharedRequest, id: String) = lease.access {
+        database.withTransaction {
+            val state = current(); check(state.worker == request.worker)
+            val local = state.adventureCreation?.let(GuidedCreation::read)
+            if (local?.id == id && local.stage == "QUEUED")
+                dao.saveWorkspace(state.copy(adventureCreation = local.copy(stage = "ENDED").json().toString()))
+        }
+    }
+    internal suspend fun resetUnstartedGuidedCreation(request: SharedRequest) = lease.access {
+        database.withTransaction {
+            val state = current(); check(state.worker == request.worker)
+            val local = state.adventureCreation?.let(GuidedCreation::read) ?: return@withTransaction
+            if (local.stage == "APPROVED") dao.saveWorkspace(state.copy(adventureCreation = local.copy(stage = "REVIEW").json().toString()))
+        }
+    }
+    internal suspend fun clearCancelledGuidedCreation(id: String) = lease.access {
+        database.withTransaction {
+            val state = current()
+            val snapshot = state.adventure?.let { AdventureSnapshot.read(JSONObject(it)) }
+            check(snapshot?.creation == null)
+            if (state.adventureCreation?.let(GuidedCreation::read)?.id == id) dao.saveWorkspace(state.copy(adventureCreation = null))
+        }
+    }
+    internal suspend fun discardGuidedReview() = lease.access {
+        database.withTransaction {
+            val state = current()
+            check(state.adventureCreation?.let(GuidedCreation::read)?.stage in listOf("REVIEW", "ENDED"))
+            dao.saveWorkspace(state.copy(adventureCreation = null))
+        }
+    }
+
     internal suspend fun acknowledgeAdventure(id: String, seal: Boolean): Boolean = lease.access {
         database.withTransaction {
             val state = current()
@@ -504,7 +581,7 @@ class SharedRepository(
         database.withTransaction {
             val state = current()
             if (state.worker != request.worker) return@withTransaction
-            dao.saveWorkspace(state.copy(blocked = reason, worker = null, progress = null, adventure = null, adventureBow = null, adventureSeal = null))
+            dao.saveWorkspace(state.copy(blocked = reason, worker = null, progress = null, adventure = null, adventureBow = null, adventureSeal = null, adventureCreation = null))
             for (intent in dao.intents(scope)) {
                 val quarantine = intent.status in listOf("PENDING", "SUBMITTED") ||
                     intent.status == "ACCEPTED" && intent.receipt?.let { JSONObject(it).decimal("effectRevision") > state.revision.toULong() } == true

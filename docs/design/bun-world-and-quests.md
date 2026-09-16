@@ -228,3 +228,17 @@ XP, difficulty-based progress weights, boss health bars, percentage "peacefulnes
 decay, cosmetic economies, procedurally expanding dojos and autonomous agents
 are not implied by this study. Existing V2 profile/combo ideas remain separate.
 Do not replace the simple V1 weekly streak with a new game metric.
+
+## Recovering an approved creation
+
+The backend reserves the shared adventure before Android queues new work.
+The reservation records the approving member and installation, the edited draft
+and its identity. Competing starts cannot replace it. Android atomically records
+ordinary create commands and their task IDs with its approval checkpoint, then
+uses normal sync. Retrying after a restart reuses those commands and IDs.
+
+The backend starts the adventure only after all referenced roots are accepted
+and available. A different installation can see the pending attempt but cannot
+resume its command journal. Either member can explicitly end the attempt.
+Already queued or accepted tasks remain ordinary tasks, including when an
+attempt is ended. Lost replies never imply a rollback of task commands.

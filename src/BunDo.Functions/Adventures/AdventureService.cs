@@ -11,8 +11,8 @@ public sealed record AdventureSnapshot(Guid WorkspaceId, Guid StateEpoch, ulong 
     AdventureBoard Board, AdventureProgress? Progress);
 
 /// <summary>A dedicated online operation. Inference never runs inside ordinary task sync.</summary>
-public sealed class AdventureService(IHouseholdDocuments documents, IAdventureProvider? provider = null, TimeProvider? time = null,
-    Func<CancellationToken, Task<bool>>? registrationActive = null)
+public sealed partial class AdventureService(IHouseholdDocuments documents, IAdventureProvider? provider = null, TimeProvider? time = null,
+    Func<CancellationToken, Task<bool>>? registrationActive = null, IAdventurePlanner? planner = null)
 {
     public const int MaximumInputBytes = 64 * 1024;
     public const int MaximumInputRoots = 32;
@@ -43,7 +43,7 @@ public sealed class AdventureService(IHouseholdDocuments documents, IAdventurePr
             var board = view.State.Value.Adventures ?? new();
             var batch = board.Batch;
             var now = clock.GetUtcNow();
-            if (board.Active is not null || batch?.Id != expectedBatch) return;
+            if (board.Active is not null || board.Creation is not null || batch?.Id != expectedBatch) return;
             if (batch is { Status: "READY" } && batch.ExpiresAt > now ||
                 batch is { Status: "RUNNING" } && batch.LeaseUntil > now) return;
             if (batch is { Status: "FAILED" or "RUNNING" } && !retry) return;
@@ -73,7 +73,7 @@ public sealed class AdventureService(IHouseholdDocuments documents, IAdventurePr
         {
             var view = await Load(member, workspace, epoch, false, inputs.Keys, ct);
             var board = view.State.Value.Adventures ?? new();
-            if (board.Active is not null || board.Batch is not { Status: "RUNNING" } batch || batch.Id != id) return;
+            if (board.Active is not null || board.Creation is not null || board.Batch is not { Status: "RUNNING" } batch || batch.Id != id) return;
             var now = clock.GetUtcNow();
             if (batch.LeaseUntil <= now) failure = "INTERRUPTED";
             if (failure is null && inputs.Keys.Any(root => !view.Tasks.TryGetValue(root, out var task) ||
@@ -169,6 +169,7 @@ public sealed class AdventureService(IHouseholdDocuments documents, IAdventurePr
             var board = before.Value.Adventures;
             var roots = (board?.Active?.Draft.Phases ?? []).Select(p => p.RootId)
                 .Concat((board?.Batch?.Proposals ?? []).SelectMany(p => p.Draft.Phases.Select(phase => phase.RootId)))
+                .Concat(board?.Creation?.Draft.Phases.Select(p => p.RootId).OfType<string>() ?? [])
                 .Concat(extra).Distinct(StringComparer.Ordinal).ToArray();
             async Task ReadTask(string id)
             {

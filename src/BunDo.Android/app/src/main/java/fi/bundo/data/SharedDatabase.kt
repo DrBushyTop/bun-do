@@ -34,6 +34,7 @@ data class SharedWorkspace(
     val adventure: String? = null,
     val adventureBow: String? = null,
     val adventureSeal: String? = null,
+    val adventureCreation: String? = null,
 )
 
 @Entity(tableName = "shared_base", primaryKeys = ["scope", "generation", "id"])
