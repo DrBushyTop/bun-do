@@ -26,6 +26,7 @@ The browser's canned suggestions are not evidence that either integration ships.
 
 | Slice | Blocked by |
 | --- | --- |
+| [Simplify voice capture with editable task analysis and opt-in audio history](https://github.com/DrBushyTop/bun-do/issues/55) | None |
 | [Accept and retry typed task commands in an executable sync model](https://github.com/DrBushyTop/bun-do/issues/15) | None |
 | [Capture and edit typed tasks offline in the native Android shell](https://github.com/DrBushyTop/bun-do/issues/16) | None |
 | [Deploy the isolated Bun Do development stack with Bicep](https://github.com/DrBushyTop/bun-do/issues/17) | None |

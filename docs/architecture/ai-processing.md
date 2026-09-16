@@ -1,10 +1,32 @@
 # AI cleanup and checklist split
 
-V1 uses one configured model for cleanup and split. [Clarify](https://github.com/DrBushyTop/bun-do/issues/29) and [optional placement, escalation and worker recovery](https://github.com/DrBushyTop/bun-do/issues/49) are V2 work. This replaces the earlier full AI job/accounting contract.
+V1 uses one configured model for capture analysis, cleanup and split. [Clarify](https://github.com/DrBushyTop/bun-do/issues/29) and [optional placement, escalation and worker recovery](https://github.com/DrBushyTop/bun-do/issues/49) are V2 work. This replaces the earlier full AI job/accounting contract.
+
+## Voice capture review
+
+The September 16, 2026 owner request adds analysis before saving a new voice
+capture. Transcription remains a separate stage. Persist its text locally before
+analysis, and remove temporary audio unless the user opted to keep recordings.
+An authenticated, cancellable request may suggest a title, description and direct
+checklist items. It does not create or mutate shared tasks. A shopping list uses
+product names with quantities and qualifiers, not a repeated "buy" action.
+Single actions need no invented steps. Preserve excess or ambiguous content in
+the description instead of dropping it.
+
+Show an editable preview and original transcript. Saving explicitly accepts the
+edited result. Create the original capture, accepted text edit and any checklist
+split in one local transaction through the existing command machinery. Each
+command retains its ordinary sync preconditions and dependency handling. Do not
+promise all-or-nothing server acceptance across those commands. Offline or failed
+analysis leaves the transcript editable; do not silently repeat a paid request.
+The same account lease and fixed recording destination fence delayed results.
+Settings can disable automatic analysis independently of local-only speech.
+
+Existing-task cleanup and split retain the durable workflow below.
 
 ## Boundary and useful result
 
-Android submits authenticated AI intent through the normal command path. The backend owns prompts, provider credentials, validation and canonical writes. A task and its original text exist before cleanup succeeds. AI failure never blocks manual task work.
+For existing tasks, Android submits authenticated AI intent through the normal command path. The backend owns prompts, provider credentials, validation and canonical writes. A task and its original text exist before cleanup succeeds. AI failure never blocks manual task work.
 
 Cleanup may propose or update title, description and content language using the task's original language. Explicit deadlines use capture time; ambiguous deadlines require confirmation. V1 does not extract areas, reorder tasks, create repeat schedules or change claims, completion, membership, IDs or hierarchy. The date/details slice adds explicit due extraction after initial text cleanup. [Recurrence extraction](https://github.com/DrBushyTop/bun-do/issues/44) and [explicitly requested queue placement](https://github.com/DrBushyTop/bun-do/issues/49) are deferred to V2, with human confirmation for schedules and stale-result guards for moves.
 

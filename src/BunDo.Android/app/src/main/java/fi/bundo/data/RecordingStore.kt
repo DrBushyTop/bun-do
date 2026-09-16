@@ -1,6 +1,7 @@
 package fi.bundo.data
 
 import android.annotation.SuppressLint
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Entity
 import androidx.room.Insert
@@ -22,6 +23,10 @@ data class VoiceRecording(
     val checklistTaskId: String? = null,
     val workspaceScope: String? = null,
     val committedTaskId: String? = null,
+    @ColumnInfo(defaultValue = "1") val keepAudio: Boolean = true,
+    @ColumnInfo(defaultValue = "0") val reviewRequired: Boolean = false,
+    val review: String? = null,
+    val captureContext: String? = null,
 )
 
 data class VoiceTarget(val scope: String, val taskId: String? = null)
@@ -43,6 +48,8 @@ interface RecordingDao {
     suspend fun failUncommitted(id: String, reason: String)
     @Query("UPDATE voice_recordings SET state = 'COMMITTED', committedTaskId = :taskId WHERE id = :id")
     suspend fun markCommitted(id: String, taskId: String)
+    @Query("UPDATE voice_recordings SET state = 'REVIEW', review = :review, reason = '' WHERE id = :id AND state != 'COMMITTED'")
+    suspend fun saveReview(id: String, review: String)
     @Query("DELETE FROM voice_recordings WHERE id = :id")
     suspend fun delete(id: String)
 }
@@ -68,14 +75,14 @@ class RecordingStore(
     fun checkActive() = lease.check()
 
     @SuppressLint("UsableSpace") // Conservative preflight; do not count or evict reclaimable caches.
-    suspend fun begin(now: Long = System.currentTimeMillis(), target: VoiceTarget? = null): VoiceRecording = lease.access {
+    suspend fun begin(now: Long = System.currentTimeMillis(), target: VoiceTarget? = null, keepAudio: Boolean = true, reviewRequired: Boolean = false): VoiceRecording = lease.access {
         pruneUnsafe(now)
         val existing = dao.all()
         if (existing.size >= MAX_RECORDINGS ||
             directory.listFiles().orEmpty().sumOf { it.length() } + MAX_AUDIO_BYTES > MAX_RETAINED_BYTES ||
             directory.usableSpace < MAX_AUDIO_BYTES + 8 * 1024 * 1024) throw RecordingStorageFull()
         val record = VoiceRecording(UUID.randomUUID().toString(), now, now + RETAIN_MILLIS, "RECORDING", checklistScope = target?.takeIf { it.taskId != null }?.scope, checklistTaskId = target?.taskId,
-            workspaceScope = target?.takeIf { it.taskId == null }?.scope)
+            workspaceScope = target?.takeIf { it.taskId == null }?.scope, keepAudio = keepAudio, reviewRequired = reviewRequired, captureContext = SharedProtocol.context(java.time.Instant.ofEpochMilli(now)))
         dao.insert(record) // Persist intent before opening the microphone or creating audio.
         record
     }
@@ -83,7 +90,9 @@ class RecordingStore(
     suspend fun recover(now: Long = System.currentTimeMillis()) = lease.access {
         pruneUnsafe(now)
         dao.all().forEach {
-            if (it.state == "COMMITTED") deleteUnsafe(it.id)
+            if (it.review != null && !it.keepAudio) deleteAudioUnsafe(it.id)
+            if (it.state == "COMMITTED" && (!it.keepAudio || !it.reviewRequired)) deleteUnsafe(it.id)
+            else if (!it.keepAudio && it.review == null) deleteUnsafe(it.id)
             else if (it.state in setOf("RECORDING", "TRANSCRIBING"))
                 dao.update(it.id, "FAILED", "INTERRUPTED")
         }
@@ -96,7 +105,9 @@ class RecordingStore(
     private suspend fun pruneUnsafe(now: Long) {
         directory.listFiles()?.filter { it.isDirectory && it.name.matches(Regex("\\.import-[a-f0-9-]{36}")) }
             ?.forEach { check(it.deleteRecursively()) { "Interrupted import cleanup failed" } }
-        dao.all().filter { it.expiresAt <= now }.forEach { deleteUnsafe(it.id) }
+        dao.all().filter { it.expiresAt <= now }.forEach {
+            if (it.state == "REVIEW") deleteAudioUnsafe(it.id) else deleteUnsafe(it.id)
+        }
     }
 
     /** Explicit migration copy, with a stable local ID so a lost response cannot duplicate a transcript. */
@@ -141,32 +152,52 @@ class RecordingStore(
 
     suspend fun available(id: String): Boolean = lease.access {
         val record = dao.get(id) ?: return@access false
+        if (record.review != null) return@access false
         if (record.expiresAt <= System.currentTimeMillis()) {
             deleteUnsafe(id)
             return@access false
         }
-        record.state != "COMMITTED"
+        record.state != "COMMITTED" && record.review == null
     }
 
-    suspend fun failed(id: String, reason: String) = lease.access { dao.failUncommitted(id, reason) }
+    suspend fun failed(id: String, reason: String) = lease.access {
+        val row = dao.get(id) ?: return@access
+        if (!row.keepAudio && row.review == null) deleteUnsafe(id)
+        else if (row.review == null) dao.failUncommitted(id, reason)
+    }
+    suspend fun get(id: String) = lease.access { dao.get(id) }
+    suspend fun review(id: String, draft: VoiceDraft) = lease.access {
+        lease.check()
+        val row = checkNotNull(dao.get(id))
+        check(row.state != "COMMITTED")
+        dao.saveReview(id, draft.json())
+        if (!row.keepAudio) deleteAudioUnsafe(id)
+    }
+    suspend fun exportable(id: String) = lease.access {
+        val row = dao.get(id)
+        row != null && row.keepAudio && (row.state != "COMMITTED" || row.reviewRequired) && row.expiresAt > System.currentTimeMillis() && audio(id).exists()
+    }
     suspend fun transcribing(id: String) = lease.access { dao.update(id, "TRANSCRIBING") }
 
-    suspend fun commit(id: String, transcript: String): SavedRecording = lease.access {
+    suspend fun commit(id: String, transcript: String, draft: VoiceDraft? = null): SavedRecording = lease.access {
         val text = transcript.trim()
         require(text.isNotEmpty() && InboxLimits.length(text) <= InboxLimits.DESCRIPTION)
+        require(draft == null || draft.valid)
+        var retained = false
         var taskId = "voice-$id"
         var target: VoiceTarget? = null
         database.withTransaction {
             lease.check()
             val record = checkNotNull(dao.get(id))
-            check(record.expiresAt > System.currentTimeMillis())
+            check(record.review != null || record.expiresAt > System.currentTimeMillis())
+            retained = record.keepAudio && record.reviewRequired
             target = record.workspaceScope?.let { VoiceTarget(it) }
                 ?: record.checklistScope?.let { VoiceTarget(it, record.checklistTaskId) }
             if (record.state == "COMMITTED" && record.committedTaskId != null) taskId = record.committedTaskId
             else if (record.workspaceScope != null) {
                 val workspace = checkNotNull(database.shared().workspace(record.workspaceScope))
                 check(workspace.blocked == null)
-                taskId = SharedRepository(database, lease, workspace.scope, workspace.registration).captureRecordingInTransaction(text, record.createdAt)
+                taskId = SharedRepository(database, lease, workspace.scope, workspace.registration).captureRecordingInTransaction(text, record.createdAt, draft, record.captureContext)
             } else if (record.checklistScope != null && record.checklistTaskId != null) {
                 val shared = database.shared()
                 val workspace = checkNotNull(shared.workspace(record.checklistScope))
@@ -182,10 +213,12 @@ class RecordingStore(
                     shared.saveDraft(draft.copy(details = details.toString(), savedAt = System.currentTimeMillis()))
                 }
             } else if (record.state != "COMMITTED" && database.inbox().task(taskId) == null) {
-                val title = text.substring(0, text.offsetByCodePoints(0, minOf(InboxLimits.length(text), InboxLimits.TITLE)))
-                val description = if (title == text) "" else text
+                val original = VoiceDraft.from(text)
+                val title = draft?.title ?: original.title
+                val description = draft?.description ?: original.description
+                require(draft?.items.isNullOrEmpty())
                 database.inbox().insertTask(InboxTask(
-                    taskId, title, description, title, description, record.createdAt, record.createdAt,
+                    taskId, title, description, original.title, original.description, record.createdAt, record.createdAt,
                 ))
                 database.inbox().insertIntent(InboxIntent(
                     taskId = taskId, kind = "CaptureInboxTask", title = title,
@@ -195,14 +228,17 @@ class RecordingStore(
             dao.markCommitted(id, taskId)
         }
         // A crash here is safe. Recovery cleans COMMITTED audio without transcribing twice.
-        deleteUnsafe(id)
+        if (!retained) deleteUnsafe(id)
         SavedRecording(taskId, target)
     }
 
     suspend fun delete(id: String) = lease.access { deleteUnsafe(id) }
-    private suspend fun deleteUnsafe(id: String) {
+    private fun deleteAudioUnsafe(id: String) {
         val file = audio(id)
         check(!file.exists() || file.delete()) { "Audio cleanup failed" }
+    }
+    private suspend fun deleteUnsafe(id: String) {
+        deleteAudioUnsafe(id)
         dao.delete(id)
     }
 

@@ -22,7 +22,7 @@ becoming closer does not silently move existing work.
 
 ## Capture and task work
 
-Recording shows elapsed time, recording state, Stop, Cancel and Type. Request microphone permission when needed. Prefer MAI online and installed Parakeet offline; explain a failure without exposing provider mechanics. Keep retry/export/delete for retained unsuccessful recordings. Commit transcript/task before cleaning up audio. Later cleanup never blocks editing or completion.
+The queue voice button starts recording after microphone permission. Show elapsed time, Stop, Cancel and Type. Stop produces a durable, editable transcript and optional task/checklist analysis before Save. Settings owns Automatic versus On device speech, Parakeet setup, separate online analysis and opt-in audio history. Default audio is temporary and is removed after transcription or failure. Keep retry/export/delete only for retained audio, out of the primary capture path. Draft text survives audio cleanup and remains available in Settings.
 
 Typed capture starts with one text field. Description and due editing remain available without requiring a metadata form. Save commits locally and Back preserves a draft. Task detail puts title, claim/completion, description and checklist first, followed by scheduling and collapsed original text/attribution.
 

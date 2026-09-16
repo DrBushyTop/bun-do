@@ -98,6 +98,11 @@ class AccountData internal constructor(
                     }
                 }
             }
+        }, analyze = if (identity == null) null else { text ->
+            val app = context.applicationContext as fi.bundo.BunDoApplication
+            app.withAccountToken(this@AccountData) { token ->
+                fi.bundo.speech.OnlineSpeech().analyze(token, checkNotNull(registrationId), text)
+            }
         }).also { controller = it }
     internal fun revoke() {
         lease.revoke()
@@ -335,7 +340,7 @@ class AccountStore(private val context: Context, private val name: String = "acc
                     reason = it.problem, captureContext = it.captureContext)
             } + data.database.shared().allDrafts().flatMap {
                 SharedSplitPreview.recovery(it, data.database.shared().workspace(it.scope)?.name)
-            }
+            } + data.database.recordings().all().flatMap { it.recoveryTexts() }
         }
     }
 
@@ -356,7 +361,8 @@ class AccountStore(private val context: Context, private val name: String = "acc
             try {
                 database.inbox().allTasks().map { RecoveryText("${prefix}task:${it.id}", it.title, it.description, it.createdAt) } +
                     database.inbox().allDrafts().filter { it.title.isNotBlank() || it.description.isNotBlank() }
-                        .map { RecoveryText("${prefix}draft:${it.key}", it.title, it.description, it.savedAt) }
+                        .map { RecoveryText("${prefix}draft:${it.key}", it.title, it.description, it.savedAt) } +
+                    database.recordings().all().flatMap { it.recoveryTexts(prefix) }
             } finally { database.close() }
         }
     }

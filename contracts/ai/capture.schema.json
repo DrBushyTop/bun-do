@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title", "description", "items", "language"],
+  "properties": {
+    "title": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "description": { "type": "string", "maxLength": 4000 },
+    "items": { "type": "array", "maxItems": 16, "items": { "type": "string", "minLength": 1, "maxLength": 160 } },
+    "language": { "type": "string", "enum": ["fi", "en", "mixed", "und"] }
+  }
+}

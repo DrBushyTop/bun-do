@@ -113,9 +113,9 @@ class LegacyRecordingUiTest {
     @Test fun finnishLargeTextRecoveryOpensExistingVoiceControlsWithoutCreatingTask() = fixture("fi", "light") { accounts ->
         compose.onNodeWithTag("legacy-recover").performScrollTo().performClick()
         compose.waitUntil(10_000) { runBlocking { accounts.active.value!!.database.recordings().all().size == 1 } }
-        // Both installed-model retry and missing-model installation use the existing voice menu.
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("voice-type").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithTag("voice-type").assertExists()
+        // Recovery opens the secondary settings/history flow, never the normal capture sheet.
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("voice-history").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("voice-history").assertExists()
         assertTrue(runBlocking { accounts.active.value!!.database.inbox().intents().isEmpty() })
         assertTrue(runBlocking { accounts.legacyAudio.preview(accounts.active.value!!).recordings.isEmpty() })
     }

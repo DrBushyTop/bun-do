@@ -140,7 +140,7 @@ fun AccountScreen(accounts: AccountStore, model: SignInModel, onHouseholds: () -
                     }
                     if (reminderDetails) ReminderSettingsSection(current)
                 }
-                LegacyRecordingsSection(accounts, current, onClose)
+                if (recoveryDetails) LegacyRecordingsSection(accounts, current, onClose)
             }
             TextButton(onClick = { recoveryDetails = !recoveryDetails }, modifier = Modifier.testTag("account-recovery-details")) {
                 Text(stringResource(R.string.account_recovery_details))

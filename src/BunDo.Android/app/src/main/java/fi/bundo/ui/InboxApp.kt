@@ -106,6 +106,8 @@ fun InboxApp(
 ) {
     var feedback by remember { mutableStateOf<HouseholdFeedback?>(null) }
     var settings by rememberSaveable { mutableStateOf(false) }
+    var voiceSettings by rememberSaveable { mutableStateOf(false) }
+    var voiceAutoStart by rememberSaveable { mutableStateOf(false) }
     var showVoice by rememberSaveable { mutableStateOf(false) }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     val queueScroll = rememberLazyListState()
@@ -115,6 +117,7 @@ fun InboxApp(
     val back: () -> Unit = {
         when {
             editor != null -> model.closeEditor(commit = false)
+            voiceSettings -> voiceSettings = false
             settings -> settings = false
             else -> selectedId = null
         }
@@ -137,6 +140,7 @@ fun InboxApp(
                             if (editor == null && !settings && (selected == null || wide) && queueTitle != null) queueTitle else stringResource(
                                 when {
                                     editor != null -> if (editor.key == InboxRepository.NEW_DRAFT) R.string.new_task else R.string.edit_task
+                                    voiceSettings -> R.string.voice_settings
                                     settings -> R.string.settings
                                     selected != null && !wide -> R.string.task_detail
                                     else -> R.string.inbox
@@ -180,7 +184,11 @@ fun InboxApp(
             Box(Modifier.fillMaxSize().padding(insets).imePadding()) {
                 when {
                     editor != null -> Editor(state, model, onSplit, Modifier.align(Alignment.TopCenter).widthIn(max = 640.dp).fillMaxWidth())
-                    settings -> Settings(appearance, onAppearance, Modifier.align(Alignment.TopCenter).widthIn(max = 640.dp).fillMaxWidth(), queueTitle == null)
+                    settings && voiceSettings && voice != null -> VoiceSettings(voice,
+                        onReview = { voiceAutoStart = false; showVoice = true },
+                        modifier = Modifier.align(Alignment.TopCenter).widthIn(max = 640.dp).fillMaxWidth())
+                    settings -> Settings(appearance, onAppearance, Modifier.align(Alignment.TopCenter).widthIn(max = 640.dp).fillMaxWidth(), queueTitle == null,
+                        onVoiceSettings = voice?.let { { it.closeReview(); it.clearMessage(); voiceSettings = true } })
                     selected != null && (!wide || queueContent != null) -> TaskDetail(
                         selected, { model.openEditor(selected.id) }, state, model::retry, Modifier.fillMaxSize(), queueTitle == null,
                         taskControls, canEdit && canEditTask(selected.id), { selectedId = it }, taskAttribution,
@@ -191,7 +199,7 @@ fun InboxApp(
                             state = if (queueTasks == null) state else state.copy(tasks = queueTasks),
                             onOpen = { selectedId = it },
                             onType = { model.openEditor() },
-                            onVoice = voice?.let { { voice.acknowledgeSaved(); showVoice = true } },
+                            onVoice = voice?.let { { voice.acknowledgeSaved(); voice.closeReview(); voiceAutoStart = true; showVoice = true } },
                             onRetry = model::retry,
                             scroll = queueScroll,
                             gutter = gutter,
@@ -214,10 +222,12 @@ fun InboxApp(
             VoiceSheet(
                 voice,
                 target = voiceTarget,
-                onDismiss = { showVoice = false },
+                autoStart = voiceAutoStart,
+                onSettings = { showVoice = false; settings = true; voiceSettings = true; voice.closeReview() },
+                onDismiss = { showVoice = false; voice.closeReview() },
                 onType = { showVoice = false; model.openEditor() },
                 onSaved = {
-                    showVoice = false; selectedId = it
+                    showVoice = false; settings = false; voiceSettings = false; selectedId = it
                     if (onTaskSaved != null) onTaskSaved(it, true) else feedback = HouseholdFeedback(System.nanoTime(), "file")
                 },
             )
@@ -444,9 +454,15 @@ private fun ErrorNotice(message: Int, retry: () -> Unit) {
 }
 
 @Composable
-private fun Settings(appearance: String, onAppearance: (String) -> Unit, modifier: Modifier, localOnly: Boolean) {
+private fun Settings(appearance: String, onAppearance: (String) -> Unit, modifier: Modifier, localOnly: Boolean, onVoiceSettings: (() -> Unit)? = null) {
     val language = AppCompatDelegate.getApplicationLocales().toLanguageTags()
     Column(modifier.verticalScroll(rememberScrollState()).padding(16.dp)) {
+        if (onVoiceSettings != null) {
+            TextButton(onClick = onVoiceSettings, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("voice-settings")) {
+                Text(stringResource(R.string.voice_settings))
+            }
+            Spacer(Modifier.height(16.dp))
+        }
         MotionPreference()
         Spacer(Modifier.height(16.dp))
         WorldPreference()

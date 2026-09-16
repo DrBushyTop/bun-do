@@ -172,33 +172,30 @@ containers substitute for that behavior.
 
 ## Components
 
-### Voice capture sheet
+### Voice capture and settings
 
-Voice capture extends the household notebook with a native Material bottom sheet,
-not a new visual identity. The scrollable column uses 24 dp horizontal and bottom
-padding with 12 dp spacing. Its heading uses headlineSmall; privacy and guidance
-use body roles. Full-width filled buttons carry Install, Record, and Stop and
-transcribe. Type, Cancel and recovery actions use text buttons with a minimum
-48 dp height. Type remains available throughout the flow.
+The queue voice button starts recording immediately after microphone permission.
+Keep the recording sheet focused on elapsed time, level, Stop and Cancel. Use a
+short provider label, not a setup manual. If speech is unavailable, offer voice
+settings and typing. Model downloads and history never occupy the capture sheet.
 
-Model checking, download, verification and local transcription each have explicit
-text and native progress indicators. Recording uses the error color for the
-elapsed-time label and microphone level, with a full-width Stop and transcribe
-button. Permission denial, silence and cancellation use localized messages;
-status messages have polite accessibility live-region semantics. Successful
-transcription commits locally before opening the task for review. Recording
-from a household fixes that household as the destination when recording starts.
-Retrying never redirects a recording into a different household or the local
-inbox. A failed save retains the recording; text and its committed marker share
-one database transaction.
+Stop transcribes, then optionally analyzes a household capture. Show progress and
+allow cancellation back to the durable transcript. The review contains editable
+title, description and one direct checklist item per line, with original transcript
+behind an explicit action. Save accepts the final text and items. No task appears
+in the queue before Save. Blank or invalid input explains why Save is unavailable.
+The recording destination and account remain fixed through processing and review.
 
-Saved recordings form a flat list separated by dividers. Each entry names its
-creation time, expiry and recovery reason, followed by retry, export and delete
-actions. The sheet explains retention and warns about the export destination
-before the Android file picker opens. Recovery actions disable during active
-work; committed recordings awaiting audio cleanup cannot be retried or exported.
+Settings has a named Voice and recordings entry. It contains Automatic versus
+On device speech selection, expandable Parakeet setup, a separate online-analysis
+switch, and an opt-in Keep recordings switch. Explain that local speech keeps
+audio on device while optional analysis sends transcript text. Defaults do not
+retain audio after transcription or failure. Drafts and recordings are collapsed
+until requested; retained audio has expiry, export and deletion, and text drafts
+can resume review. No recording-import entry belongs in the normal user journey.
 
-Online transcription uses the authenticated MAI path, with installed Parakeet
-as the offline fallback. The sheet explains the selected path and keeps retry,
-export, deletion and typing available when recognition cannot finish. Speech
-transcription never doubles as AI cleanup.
+Use native Material controls, existing color/type roles, 48 dp targets and a
+scrollable 640 dp maximum-width content column. Finnish/English and large-text
+layouts must keep Stop and Save reachable. Microphone permission is requested
+only when recording is requested. The native rendered verification belongs in
+the owning issue, not in this design contract.

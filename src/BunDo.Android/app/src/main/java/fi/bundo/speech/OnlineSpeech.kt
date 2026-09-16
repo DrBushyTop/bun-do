@@ -43,10 +43,28 @@ class OnlineSpeech(
         withTimeout(120_000) {
             require(pcm.size.toLong() in 2..RecordingStore.MAX_AUDIO_BYTES && pcm.size % 2 == 0)
             require(locale in setOf("fi-FI", "en-US"))
-            val url = URL("$base/speech/transcribe")
+            request(token, registration, pcm, "transcribe", "application/octet-stream", locale).getString("text").also {
+                if (InboxLimits.length(it) > InboxLimits.DESCRIPTION) throw SpeechFailure("TOO_LONG")
+            }
+        }
+
+    suspend fun analyze(token: String, registration: String, transcript: String): fi.bundo.data.VoiceDraft = withTimeout(110_000) {
+        require(transcript.isNotBlank() && InboxLimits.length(transcript) <= InboxLimits.DESCRIPTION)
+        val bytes = JSONObject().put("transcript", transcript).toString().toByteArray(Charsets.UTF_8)
+        try {
+            val result = request(token, registration, bytes, "analyze", "application/json", null)
+            val items = result.getJSONArray("items")
+            fi.bundo.data.VoiceDraft(transcript, result.getString("title"), result.getString("description"),
+                (0 until items.length()).map(items::getString)).also { require(it.valid) }
+        } finally { bytes.fill(0) }
+    }
+
+    private suspend fun request(token: String, registration: String, body: ByteArray, route: String,
+        contentType: String, locale: String?): JSONObject {
+            val url = URL("$base/speech/$route")
             require(url.protocol == "https" || BuildConfig.DEBUG && url.host in setOf("127.0.0.1", "localhost", "10.0.2.2"))
             val connection = connectionFactory(url)
-            coroutineScope {
+            return coroutineScope {
                 suspendCancellableCoroutine { continuation ->
                     // Disconnect wakes a blocked upload/read; the controller still fences any late result.
                     continuation.invokeOnCancellation { connection.disconnect() }
@@ -59,11 +77,11 @@ class OnlineSpeech(
                             connection.requestMethod = "POST"
                             connection.setRequestProperty("Authorization", "Bearer $token")
                             connection.setRequestProperty("X-BunDo-Registration", registration)
-                            connection.setRequestProperty("X-BunDo-Locale", locale)
-                            connection.setRequestProperty("Content-Type", "application/octet-stream")
+                            if (locale != null) connection.setRequestProperty("X-BunDo-Locale", locale)
+                            connection.setRequestProperty("Content-Type", contentType)
                             connection.doOutput = true
-                            connection.setFixedLengthStreamingMode(pcm.size)
-                            connection.outputStream.use { it.write(pcm) }
+                            connection.setFixedLengthStreamingMode(body.size)
+                            connection.outputStream.use { it.write(body) }
                             val status = connection.responseCode
                             if (status != 200) throw SpeechFailure(when (status) {
                                 401, 403 -> "SIGN_IN_REQUIRED"
@@ -79,10 +97,9 @@ class OnlineSpeech(
                                     count += read
                                 }
                                 check(count < buffer.size)
-                                try { JSONObject(String(buffer, 0, count, Charsets.UTF_8)).getString("text") }
+                                try { JSONObject(String(buffer, 0, count, Charsets.UTF_8)) }
                                 finally { buffer.fill(0) }
                             }
-                            if (InboxLimits.length(text) > InboxLimits.DESCRIPTION) throw SpeechFailure("TOO_LONG")
                             continuation.resume(text)
                         } catch (error: Exception) {
                             if (continuation.isActive) continuation.resumeWithException(

@@ -28,6 +28,41 @@ class InboxStorageTest {
         InboxDatabase::class.java,
     )
 
+    @Test fun voiceReviewMigrationPreservesLegacyRecoveryPolicy() {
+        val name = "migration-voice-${UUID.randomUUID()}.db"
+        names += name
+        migrations.createDatabase(name, 12).apply {
+            execSQL("INSERT INTO voice_recordings (id, createdAt, expiresAt, state, reason) VALUES ('legacy', 1, 9999999999999, 'FAILED', 'INTERRUPTED')")
+            close()
+        }
+        migrations.runMigrationsAndValidate(name, 13, true, InboxDatabase.MIGRATION_12_13).apply {
+            query("SELECT keepAudio, reviewRequired, review, reason FROM voice_recordings WHERE id = 'legacy'").use {
+                assertTrue(it.moveToFirst()); assertEquals(1, it.getInt(0)); assertEquals(0, it.getInt(1))
+                assertTrue(it.isNull(2)); assertEquals("INTERRUPTED", it.getString(3))
+            }
+            close()
+        }
+    }
+
+    @Test fun bothIntermediateVoiceSchemasUpgradeWithoutDeletingReviewText() {
+        for (contextPresent in listOf(false, true)) {
+            val name = "migration-voice-context-${UUID.randomUUID()}.db"
+            names += name
+            migrations.createDatabase(name, 13).apply {
+                execSQL("INSERT INTO voice_recordings (id, createdAt, expiresAt, state, reason, keepAudio, reviewRequired, review) VALUES ('draft', 1, 2, 'REVIEW', '', 0, 1, 'keep exact text')")
+                if (contextPresent) execSQL("ALTER TABLE voice_recordings ADD COLUMN captureContext TEXT")
+                close()
+            }
+            migrations.runMigrationsAndValidate(name, 14, true, InboxDatabase.MIGRATION_13_14).apply {
+                query("SELECT review, keepAudio, captureContext FROM voice_recordings WHERE id = 'draft'").use {
+                    assertTrue(it.moveToFirst()); assertEquals("keep exact text", it.getString(0))
+                    assertEquals(0, it.getInt(1)); assertTrue(it.isNull(2))
+                }
+                close()
+            }
+        }
+    }
+
     private fun open(name: String = "test-${UUID.randomUUID()}.db"): InboxDatabase {
         names += name
         return InboxDatabase.open(context, name).also { databases += it }

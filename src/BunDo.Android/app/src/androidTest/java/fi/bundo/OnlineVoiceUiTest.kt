@@ -86,7 +86,7 @@ class OnlineVoiceUiTest {
                 }
             } }
             compose.waitUntil(5_000) { controller.state.value.recordings.any { it.id == row.id } }
-            compose.onNodeWithText(translated.getString(R.string.retry)).performScrollTo().performClick()
+            compose.runOnUiThread { controller.retry(row.id) }
             compose.waitUntil(15_000) { !controller.state.value.busy && controller.state.value.message == "SAVED" && controller.state.value.saved == null }
             val actualId = when (recorded) {
                 "local" -> db.inbox().intents().single().taskId
@@ -136,17 +136,15 @@ class OnlineVoiceUiTest {
                 CompositionLocalProvider(LocalActivityResultRegistryOwner provides context,
                     LocalContext provides translated, LocalResources provides translated.resources, LocalConfiguration provides config,
                     LocalDensity provides Density(context.resources.displayMetrics.density, scale)) {
-                    BunDoTheme("light") { VoiceSheet(controller, {}, { typed = true }, {}) }
+                    BunDoTheme("light") { VoiceSheet(controller, {}, { typed = true }, {}, onSettings = {}) }
                 }
             } }
             compose.onNodeWithTag("record").assertExists().assertIsEnabled()
             if (failure) {
                 compose.onAllNodesWithText(translated.getString(R.string.voice_online_failed))[0].assertExists()
-                compose.onNodeWithText(translated.getString(R.string.voice_recovery)).performScrollTo().assertIsDisplayed()
-                compose.onNodeWithText(translated.getString(R.string.retry)).performScrollTo().assertIsEnabled()
+                compose.onNodeWithTag("voice-settings-link").assertExists()
             } else {
-                compose.onNodeWithText(translated.getString(R.string.voice_online_private)).assertIsDisplayed()
-                compose.onNodeWithTag("install-model").assertExists()
+                compose.onNodeWithTag("install-model").assertDoesNotExist()
             }
             compose.onNodeWithTag("voice-type").performScrollTo().performClick()
             assertTrue(typed)

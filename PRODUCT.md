@@ -20,7 +20,7 @@ Speak or type a task, make it actionable, share it, and finish it. Tasks and eve
 
 ## Operating context
 
-Users can claim, complete, reopen and reorder tasks offline. Finnish is the default UI language; English is supported throughout. UI language never translates task content. MAI is the selected online transcription path and installed Parakeet is the offline fallback. Transcription and later AI cleanup are separate steps.
+Users can claim, complete, reopen and reorder tasks offline. Finnish is the default UI language; English is supported throughout. UI language never translates task content. MAI is the selected online transcription path and installed Parakeet is the offline fallback. Transcription and optional capture analysis are separate stages of an editable review before Save.
 
 ## Capabilities and constraints
 
@@ -32,7 +32,7 @@ AI product quotas are absent initially. Review usage policy only after V2 using 
 
 Simple repeat generation and schedule changes need connectivity. Existing tasks remain usable offline. Shared statistics use server acceptance dates; a late offline completion counts when synced. The weekly streak has no penalties or neutral-week accounting.
 
-Audio sent online goes through the authenticated backend and stays out of logs and public storage. Preserve local recording recovery until text commits. Account switching never exposes another account's work. Recovery explains what happened and the available action, with technical diagnostics behind explicit details.
+Audio sent online goes through the authenticated backend and stays out of logs and public storage. Persist transcribed text before deleting temporary audio. Retaining recordings is opt-in; voice drafts remain recoverable. Account switching never exposes another account's work. Recovery explains what happened and the available action, with technical diagnostics behind explicit details.
 
 ## Brand commitments
 

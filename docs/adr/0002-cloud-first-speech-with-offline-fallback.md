@@ -33,3 +33,19 @@ explicit retry can incur another. Cancelling an upload does not promise that
 Azure stopped processing it.
 
 On September 13, 2026, the owner moved product AI length and usage-policy review until after V2. Start without product quotas and observe household usage before deciding whether limits are needed. Authentication, provider constraints, technical payload/memory/output bounds, timeouts and recoverable input remain required. The [usage-policy issue](https://github.com/DrBushyTop/bun-do/issues/37) is outside both release parents; earlier numeric admission proposals are superseded.
+
+## September 16 capture revision
+
+The owner replaced the setup-heavy voice sheet with tap-to-record, stop, editable
+review and Save. Settings owns speech selection, Parakeet installation and audio
+history. Local-only speech never uploads audio. The separate optional capture
+analysis may send household transcript text online, including locally transcribed
+text; explain that distinction in Settings.
+
+New audio is temporary by default. Retain it only when the user opts in before
+recording. Failed/canceled temporary audio is deleted, not offered for recovery;
+successful transcription is persisted as a review draft before audio deletion.
+After a crash, delete unretained incomplete audio. Existing retained recordings
+keep their expiry on upgrade. This replaces this ADR's earlier mandatory local
+audio recovery for new recordings. It does not permit audio in logs or automatic
+sharing of retained developer/test recordings.

@@ -10,6 +10,8 @@ namespace BunDo.Functions.AI;
 public interface ICleanupProvider
 {
     Task<CleanupProposal> GenerateAsync(string title, string? description, CancellationToken ct, JsonElement? captureContext = null);
+    Task<CleanupProposal> GenerateCaptureAsync(string transcript, CancellationToken ct) =>
+        throw new CleanupProviderException("PROVIDER_UNAVAILABLE");
     Task<CleanupProposal> GenerateSplitAsync(string title, string? description, string? instructions, CancellationToken ct) =>
         throw new CleanupProviderException("PROVIDER_UNAVAILABLE");
 }

@@ -11,7 +11,7 @@ Two people can speak or type a household task, turn it into actionable work, sha
 - Shared queue with any available task selectable, claim/unclaim, complete/reopen/cancel, and accessible reordering. New tasks normally join the end. Explicitly urgent or soon-due captures can start near the front, with placement explained before saving. Existing tasks never silently reshuffle.
 - Typed capture and editable title/description. Preserve original captured text separately.
 - Task detail shows creator, creation time, last modifier and modification time. Keep creation attribution through edits and distinguish pending local changes from accepted shared changes.
-- MAI transcription online through the authenticated backend, installed Parakeet offline, and typing when either speech path is unavailable. Preserve unsuccessful recordings for retry/export/delete under the existing local storage policy.
+- MAI transcription online through the authenticated backend, installed Parakeet offline, and typing when either speech path is unavailable. Tap-to-record opens an editable transcript/analysis preview before Save. Settings owns speech setup and opt-in recording history; temporary audio is deleted after transcription or failure.
 - Cloud cleanup using one configured model. Preserve human corrections, interpret relative dates at capture time and ask before applying ambiguous dates.
 - Manual and AI splitting into a root with direct checklist items. Preview AI output and commit accepted children atomically.
 - Due dates, snooze, basic approximate Android reminders, and simple daily/weekly repeats with one outstanding occurrence per repeat. Server generation may wait for connectivity; cached occurrences remain usable offline.

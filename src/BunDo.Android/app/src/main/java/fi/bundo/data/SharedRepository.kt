@@ -338,11 +338,34 @@ class SharedRepository(
 
     /** RecordingStore already holds this account lease and transaction. Keep text and its
      * committed-audio marker in that same transaction without reacquiring the lease mutex. */
-    internal suspend fun captureRecordingInTransaction(text: String, capturedAt: Long): String {
+    internal suspend fun captureRecordingInTransaction(text: String, capturedAt: Long, review: VoiceDraft? = null, captureContext: String? = null): String {
         check(database.inTransaction())
         lease.check()
-        val title = text.substring(0, text.offsetByCodePoints(0, minOf(InboxLimits.length(text), InboxLimits.TITLE)))
-        return commitInTransaction(EditorDraft(InboxRepository.NEW_DRAFT, title, if (title == text) "" else text), removeDraft = false, captureContext = SharedProtocol.context(java.time.Instant.ofEpochMilli(capturedAt)))
+        val original = VoiceDraft.from(text)
+        val id = commitInTransaction(EditorDraft(InboxRepository.NEW_DRAFT, original.title, original.description), removeDraft = false,
+            captureContext = captureContext ?: SharedProtocol.context(java.time.Instant.ofEpochMilli(capturedAt)))
+        // Keep verbatim capture provenance while applying the user's accepted review atomically.
+        if (review != null && (review.title != original.title || review.description != original.description))
+            commitInTransaction(EditorDraft(id, review.title, review.description), removeDraft = false)
+        if (!review?.items.isNullOrEmpty()) {
+            val items = review!!.items
+            require(SharedSplitPreview.valid(items))
+            val state = current()
+            val tasks = projected(state)
+            val task = checkNotNull(tasks[id])
+            val pending = dao.intents(scope).filter { SharedTaskActions.pending(it, state.revision) }
+            val action = SharedTaskActions.capture("SplitTask", task, pending,
+                JSONObject().put("taskId", id).put("items", JSONArray(items)),
+                JSONObject(checkNotNull(state.membership)).getString("me"), tasks, registration)
+            val sequence = state.nextSequence.toULong()
+            check(sequence < ULong.MAX_VALUE)
+            dao.saveIntent(SharedIntent(scope, sequence.toString(), id, "SplitTask", review.title,
+                items.joinToString("\n"), false, false, "0", "0", "0", null, SharedProtocol.context(), taskAction = action))
+            val next = state.copy(nextSequence = (sequence + 1u).toString(), journalVersion = state.journalVersion + 1)
+            dao.saveWorkspace(next)
+            rebuild(next)
+        }
+        return id
     }
 
     private suspend fun commitInTransaction(draft: EditorDraft, removeDraft: Boolean, captureContext: String? = null): String {

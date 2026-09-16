@@ -289,7 +289,7 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
             repository.act("CancelCleanup", checkNotNull(byId[draft.taskId]).toString())
             SharedSyncWorker.request(context, data)
         } },
-        onDictate = { latest -> run { repository.saveChecklistDraft(latest); dictatingSteps = true } }) }
+        onDictate = { latest -> run { repository.saveChecklistDraft(latest); data.voice.closeReview(); data.voice.acknowledgeSaved(); dictatingSteps = true } }) }
     if (dictatingSteps && checklistId != null && current?.blocked == null) VoiceSheet(data.voice,
         onDismiss = { dictatingSteps = false }, onType = { dictatingSteps = false },
         onSaved = { run { dictatingSteps = false; checklistDraft = repository.checklistDraft(checkNotNull(checklistId)) } },

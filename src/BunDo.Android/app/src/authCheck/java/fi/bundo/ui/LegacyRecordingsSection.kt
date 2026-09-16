@@ -5,6 +5,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -28,12 +32,14 @@ import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.Date
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LegacyRecordingsSection(accounts: AccountStore, data: AccountData, onSaved: () -> Unit) {
     val context = LocalContext.current
     val dateFormat = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT,
         LocalConfiguration.current.locales[0])
     val scope = rememberCoroutineScope()
+    var reviewVoice by rememberSaveable { mutableStateOf(false) }
     var preview by remember(data.lease.generation) { mutableStateOf<LegacyRecordings?>(null) }
     var busy by remember { mutableStateOf(false) }
     var failure by remember(data.lease.generation) { mutableStateOf(false) }
@@ -123,8 +129,24 @@ fun LegacyRecordingsSection(accounts: AccountStore, data: AccountData, onSaved: 
             } }) { Text(stringResource(R.string.voice_delete)) } },
             dismissButton = { TextButton(enabled = !busy, onClick = { deleting = null }) { Text(stringResource(R.string.back)) } })
     }
-    if (showVoice) VoiceSheet(data.voice, onDismiss = { showVoice = false }, onType = { showVoice = false }, onSaved = {
-        showVoice = false
-        scope.launch { data.selectHousehold(null); onSaved() }
-    })
+    if (showVoice && reviewVoice) VoiceSheet(data.voice,
+        onDismiss = { reviewVoice = false; data.voice.closeReview() },
+        onType = { reviewVoice = false; data.voice.closeReview() },
+        onSaved = {
+            reviewVoice = false; showVoice = false
+            scope.launch { data.selectHousehold(null); onSaved() }
+        })
+    if (showVoice && !reviewVoice) {
+        val voiceState by data.voice.state.collectAsStateWithLifecycle()
+        LaunchedEffect(voiceState.saved) {
+            voiceState.saved?.let {
+                data.voice.acknowledgeSaved()
+                if (it.target == null) { showVoice = false; data.selectHousehold(null); onSaved() }
+            }
+        }
+        ModalBottomSheet(onDismissRequest = { showVoice = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+            VoiceSettings(data.voice, { reviewVoice = true }, initialHistory = true)
+        }
+    }
 }
