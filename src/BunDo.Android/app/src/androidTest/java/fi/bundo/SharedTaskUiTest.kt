@@ -215,6 +215,9 @@ class SharedTaskUiTest {
         compose.onNodeWithTag("checklist-add").performScrollTo().performClick()
         compose.onNodeWithTag("split-instructions").performScrollTo().performTextInput("Separate paper and cardboard")
         compose.onNodeWithTag("split-generate").performScrollTo().performClick()
+        compose.waitUntil(5_000) {
+            compose.onAllNodes(hasTestTag("split-cancel") and isEnabled()).fetchSemanticsNodes().isNotEmpty()
+        }
         compose.onNodeWithTag("split-cancel").performScrollTo().assertIsEnabled()
         screenshot("split-en-pending")
         compose.onNodeWithTag("split-cancel").performClick()
