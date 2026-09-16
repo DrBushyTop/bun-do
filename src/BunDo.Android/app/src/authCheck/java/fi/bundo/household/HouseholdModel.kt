@@ -41,22 +41,29 @@ internal class HouseholdModel(private val account: AccountData, private val sign
 
     fun open(home: Household) { current = home; failure = ""; shareLink = null; refresh() }
     fun back() { current = null; shareLink = null; failure = "" }
-    fun select(home: Household) = run {
-        if (home.active && !home.deleted) account.selectHousehold(home.id, home.epoch, home.name)
+    fun select(home: Household, onSelected: () -> Unit = {}) = run {
+        if (home.active && !home.deleted) {
+            account.selectHousehold(home.id, home.epoch, home.name)
+            onSelected()
+        }
     }
     fun clearShare() { shareLink = null }
 
-    fun create(name: String, displayName: String) = run {
-        update(send(JSONObject().put("action", "create").put("workspaceId", createId).put("name", name).put("displayName", displayName)))
+    fun create(name: String, displayName: String, requestId: String = createId, onCreated: (Household) -> Unit = {}) = run {
+        update(send(JSONObject().put("action", "create").put("workspaceId", requestId).put("name", name).put("displayName", displayName)))
+        current?.let(onCreated)
         createId = UUID.randomUUID().toString()
     }
 
-    fun redeem(value: String, displayName: String) {
+    fun restore(id: String) { current = homes.find { it.id == id }; shareLink = null }
+
+    fun redeem(value: String, displayName: String, onRedeemed: (Household) -> Unit = {}) {
         val link = InvitationLink.parse(value)
         if (link == null) { failure = "INVALID_LINK"; return }
         run {
             update(send(JSONObject().put("action", "redeem").put("workspaceId", link.workspace)
                 .put("stateEpoch", link.epoch).put("invitationId", link.invitation).put("secret", link.secret).put("displayName", displayName)))
+            current?.let(onRedeemed)
         }
     }
 

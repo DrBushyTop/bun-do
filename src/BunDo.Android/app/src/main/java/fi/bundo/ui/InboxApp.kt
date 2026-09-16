@@ -103,6 +103,7 @@ fun InboxApp(
     queueList: (@Composable ((String) -> Unit) -> Unit)? = null,
     taskAttribution: (@Composable (String) -> Unit)? = null,
     onTaskSaved: ((String, Boolean) -> Unit)? = null,
+    onWelcome: (() -> Unit)? = null,
 ) {
     var feedback by remember { mutableStateOf<HouseholdFeedback?>(null) }
     var settings by rememberSaveable { mutableStateOf(false) }
@@ -188,7 +189,7 @@ fun InboxApp(
                         onReview = { voiceAutoStart = false; showVoice = true },
                         modifier = Modifier.align(Alignment.TopCenter).widthIn(max = 640.dp).fillMaxWidth())
                     settings -> Settings(appearance, onAppearance, Modifier.align(Alignment.TopCenter).widthIn(max = 640.dp).fillMaxWidth(), queueTitle == null,
-                        onVoiceSettings = voice?.let { { it.closeReview(); it.clearMessage(); voiceSettings = true } })
+                        onWelcome = onWelcome, onVoiceSettings = voice?.let { { it.closeReview(); it.clearMessage(); voiceSettings = true } })
                     selected != null && (!wide || queueContent != null) -> TaskDetail(
                         selected, { model.openEditor(selected.id) }, state, model::retry, Modifier.fillMaxSize(), queueTitle == null,
                         taskControls, canEdit && canEditTask(selected.id), { selectedId = it }, taskAttribution,
@@ -454,9 +455,15 @@ private fun ErrorNotice(message: Int, retry: () -> Unit) {
 }
 
 @Composable
-private fun Settings(appearance: String, onAppearance: (String) -> Unit, modifier: Modifier, localOnly: Boolean, onVoiceSettings: (() -> Unit)? = null) {
+private fun Settings(appearance: String, onAppearance: (String) -> Unit, modifier: Modifier, localOnly: Boolean, onVoiceSettings: (() -> Unit)? = null, onWelcome: (() -> Unit)? = null) {
     val language = AppCompatDelegate.getApplicationLocales().toLanguageTags()
     Column(modifier.verticalScroll(rememberScrollState()).padding(16.dp)) {
+        if (onWelcome != null) {
+            TextButton(onClick = onWelcome, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("welcome-settings")) {
+                Text(stringResource(R.string.welcome_setup))
+            }
+            Spacer(Modifier.height(16.dp))
+        }
         if (onVoiceSettings != null) {
             TextButton(onClick = onVoiceSettings, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("voice-settings")) {
                 Text(stringResource(R.string.voice_settings))

@@ -17,7 +17,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.material3.CircularProgressIndicator
 import fi.bundo.ui.AccountScreen
 import fi.bundo.ui.HouseholdScreen
-import fi.bundo.household.InvitationLink
 import fi.bundo.identity.SignInModel
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.luminance
@@ -33,7 +32,6 @@ import fi.bundo.ui.InboxViewModel
 import fi.bundo.ui.SharedWorkspaceScreen
 
 class MainActivity : AppCompatActivity() {
-    private var invitation by mutableStateOf<String?>(null)
 
     override fun onStart() {
         super.onStart()
@@ -44,7 +42,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun acceptInvitation(intent: Intent?) {
         val value = intent?.dataString ?: return
-        if (InvitationLink.parse(value) != null) invitation = value
+        (application as BunDoApplication).welcome.incoming(value)
         // Do not retain an invitation secret in the Activity intent or saved state.
         intent.data = null
     }
@@ -62,14 +60,19 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         val preferences = getSharedPreferences("appearance", MODE_PRIVATE)
         val accounts = (application as BunDoApplication).accounts
+        val welcome = (application as BunDoApplication).welcome
         setContent {
             val account by accounts.active.collectAsStateWithLifecycle()
-            var showAccount by rememberSaveable { mutableStateOf(invitation != null) }
-            var showHouseholds by rememberSaveable { mutableStateOf(invitation != null) }
-            androidx.compose.runtime.LaunchedEffect(invitation) {
-                if (invitation != null) { showAccount = true; showHouseholds = true }
-            }
+            val progress by welcome.state.collectAsStateWithLifecycle()
+            var showAccount by rememberSaveable { mutableStateOf(false) }
+            var showHouseholds by rememberSaveable { mutableStateOf(false) }
             val signIn: SignInModel = viewModel()
+            androidx.compose.runtime.LaunchedEffect(account?.identity, signIn.busy) {
+                if (!signIn.busy && account != null) welcome.bind(account?.identity)
+            }
+            androidx.compose.runtime.LaunchedEffect(progress.visible, progress.link) {
+                if (progress.visible && progress.link.isNotBlank()) { showAccount = false; showHouseholds = false }
+            }
             var appearance by remember { mutableStateOf(preferences.getString("theme", "system")!!) }
             fi.bundo.ui.HouseholdMotionProvider {
             BunDoTheme("light") {
@@ -82,12 +85,16 @@ class MainActivity : AppCompatActivity() {
                 }
                 if (showHouseholds && account?.identity != null) {
                     key(account!!.lease.generation) {
-                        HouseholdScreen(account!!, signIn, invitation, { invitation = null }) {
+                        HouseholdScreen(account!!, signIn, null, {}) {
                             showHouseholds = false
                         }
                     }
                 } else if (showAccount) {
                     AccountScreen(accounts, signIn, onHouseholds = { showHouseholds = true }) { showAccount = false }
+                } else if (progress.visible) {
+                    if (welcome.matches(account?.identity))
+                        fi.bundo.ui.WelcomeRoute(welcome, account, signIn, onAccountHelp = { showAccount = true })
+                    else CircularProgressIndicator()
                 } else if (account == null) {
                     CircularProgressIndicator()
                 } else key(account!!.lease.generation) {
@@ -97,7 +104,7 @@ class MainActivity : AppCompatActivity() {
                     SharedWorkspaceScreen(data, selected!!, appearance, {
                         preferences.edit { putString("theme", it) }
                         appearance = it
-                    }, { showAccount = true })
+                    }, { showAccount = true }, onWelcome = welcome::reopen)
                 } else {
                 val model: InboxViewModel = viewModel(key = data.lease.generation, factory = viewModelFactory {
                     initializer {
@@ -116,6 +123,7 @@ class MainActivity : AppCompatActivity() {
                     },
                     voice = data.voice,
                     onAccount = { showAccount = true },
+                    onWelcome = welcome::reopen,
                 )
                 }
                 }

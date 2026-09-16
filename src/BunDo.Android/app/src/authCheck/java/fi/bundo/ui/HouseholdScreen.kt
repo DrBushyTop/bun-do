@@ -204,7 +204,7 @@ fun HouseholdScreen(account: AccountData, signIn: SignInModel, incomingLink: Str
     }
 }
 
-private fun householdError(code: String): Int = when (code) {
+internal fun householdError(code: String): Int = when (code) {
     "STORAGE_FULL" -> R.string.household_storage_full
     "INVALID_LINK" -> R.string.household_invalid_link
     "INVITATION_UNAVAILABLE", "INVITATION_ALREADY_USED" -> R.string.household_invitation_unavailable

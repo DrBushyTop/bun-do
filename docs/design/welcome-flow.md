@@ -1,8 +1,8 @@
-# Welcome flow proposal
+# Welcome and family setup
 
-Status: proposal from the September 16, 2026 owner discussion, not an implemented
-flow or authorization to change Microsoft registrations. Keep it separate from
-the voice-capture slice. [Consent research](../research/microsoft-consent.md)
+The owner approved implementation on September 16, 2026.
+[Welcome users to local tasks or a shared family with Bun guidance](https://github.com/DrBushyTop/bun-do/issues/56)
+owns implementation and verification. This does not authorize changes to Microsoft registrations. [Consent research](../research/microsoft-consent.md)
 covers the registration question.
 
 ## A short path to a useful inbox
@@ -34,7 +34,7 @@ to the selected path, with "Use on this phone" still available.
 
 ## Bun does the guiding
 
-Commission new illustrations in the established Bun style, keeping the approved
+Use the new illustrations in the established Bun style, keeping the approved
 logo unchanged:
 
 - Welcome: Bun with a small notebook, ready to help.
@@ -45,7 +45,8 @@ Use one illustration per step, with no text baked into the bitmap. Avoid a
 carousel, technical setup diagrams or a long tutorial. The artwork is supporting
 content; it shrinks or disappears at large font sizes before controls lose space.
 Keep the evergreen/paper palette, native buttons and quiet humor. Static artwork
-must work without motion. These assets are requested, not yet generated.
+must work without motion. The generated assets and exact prompt are recorded in
+[illustration provenance](../../assets/illustrations/ARTWORK.md).
 
 ## Keep setup out of the way
 
@@ -61,6 +62,13 @@ joining a family. Offer explicit selection later, outside the first-run steps.
 Existing installations should not be blocked by a new welcome wizard after an
 upgrade. Detect existing work without modifying it and offer setup from Settings.
 Persist new users' selected path so interruption does not restart the introduction.
-Keep invitation secrets out of analytics and logs. Finnish and English copy, Back,
-sign-in cancellation, invitation expiry, owner approval, upgrade preservation and
-large text need native verification before this becomes a shipping contract.
+Setup lives in an encrypted, atomically written file under Android no-backup storage.
+The app owns ordered writes, so dismissal and rotation do not cancel them. The
+create request ID is saved before contacting the backend; a lost reply can be
+recovered by listing the signed-in account's families. Invitation links leave the
+Activity intent immediately and never enter saved-instance state. Switching
+accounts clears private setup fields; anonymous text never moves automatically.
+
+Use existing-installation evidence before opening the account database to avoid
+showing first-run Welcome after an upgrade. Keep invitation secrets out of analytics
+and logs. Native and live verification evidence belongs in the owning issue.

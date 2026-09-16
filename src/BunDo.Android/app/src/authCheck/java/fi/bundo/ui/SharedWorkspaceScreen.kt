@@ -46,7 +46,7 @@ import org.json.JSONObject
 
 @Composable
 fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearance: String,
-    onAppearance: (String) -> Unit, onAccount: () -> Unit) {
+    onAppearance: (String) -> Unit, onAccount: () -> Unit, onWelcome: (() -> Unit)? = null) {
     val resources = LocalResources.current
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
@@ -165,7 +165,7 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
         owner.lifecycle.addObserver(observer)
         onDispose { owner.lifecycle.removeObserver(observer); if (!data.lease.active) model.hide() }
     }
-    InboxApp(state, model, appearance, onAppearance, voice = data.voice, voiceTarget = VoiceTarget(selected.scope), onAccount = onAccount, queueTitle = selected.name,
+    InboxApp(state, model, appearance, onAppearance, voice = data.voice, voiceTarget = VoiceTarget(selected.scope), onAccount = onAccount, onWelcome = onWelcome, queueTitle = selected.name,
         queueNavigation = { SharedHouseholdNavigation(destination) { destination = it } },
         queueContent = if (destination != "queue") ({ onOpen ->
             SharedProgressScreen(current?.progress?.takeIf { current?.blocked == null && recovery == null },

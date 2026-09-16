@@ -10,6 +10,12 @@ import fi.bundo.identity.requestToken
 import kotlinx.coroutines.CancellationException
 
 class BunDoApplication : Application() {
+    internal val welcome by lazy { fi.bundo.data.WelcomeStore(this) }
+    override fun onCreate() {
+        super.onCreate()
+        // Detect upgrades before any worker or screen opens the account database.
+        welcome
+    }
     val accounts by lazy { AccountStore(this) }
     internal val tokens by lazy { SharedTokens(createTokenProvider(this)) }
     internal suspend fun <T> withAccountToken(data: AccountData, operation: suspend (String) -> T): T {

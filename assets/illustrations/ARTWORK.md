@@ -58,3 +58,17 @@ Use case: illustration-story. Asset type: illustration for an optional household
 ### Dojo garden
 
 Use case: illustration-story. Asset type: wide background behind the top of the Bun Do household task app. Create an original calm Japanese-inspired martial-arts dojo courtyard, secular and domestic rather than a shrine or temple. Low timber practice hall with open sliding wooden screens at LEFT, a swept stone path through a spare moss garden in the lower half, a maple branch and a low bench with a teapot at RIGHT. The architecture is modest, functional, no ornate roofs. A small dignified white rabbit martial-arts master, compact body, long upright ears, calm narrow eye, ivory gi and tied dark evergreen belt, a tiny restrained ochre three-point crown, quietly sweeping the courtyard with a straw broom near the RIGHT side. The gentle joke is that a king still sweeps his own floor. The top 30 percent is pale warm ivory sky/paper with no detail behind app controls. Landscape composition, main scene within the middle and lower half, clear readable silhouette, lots of breathing room. Ink-and-wash editorial cartoon, confident fine evergreen brush contours, flat soft sage and sand, tiny muted brick-red accent, modest washi texture. Adult-friendly and slightly wry, not nursery illustration, not magical fantasy, not a realistic painting. No text, no calligraphy, no lettering, no UI, no logos, no watermark, no religious symbols, no torii, no Buddha, no swords, no combat, no cherry blossom shower, no decorative sparkle. The character is not a replacement for the app logo.
+
+## Welcome guidance
+
+Generated September 16, 2026 with Azure Foundry, deployment `gpt-image-2-1`,
+through `foundry-imagegen` and Azure CLI authentication. High quality, 1536 × 1024.
+The existing `pet_royal.webp` scene supplied the drawing and character reference;
+the original logo and existing illustrations were not changed.
+
+[`welcome/source.png`](welcome/source.png) is a new triptych: Bun with a notebook,
+Bun opening a garden gate, and Bun with a koala sharing a grocery basket. The exact
+generation prompt is in [`welcome/prompt.txt`](welcome/prompt.txt) and embedded in
+the source and native derivatives. Each native WebP crops a 512 × 700 panel at
+y=140, with x=0, 512 or 1024, encoded at quality 84. These static pictures contain
+no user data or baked-in labels. Compose omits them at large font sizes.

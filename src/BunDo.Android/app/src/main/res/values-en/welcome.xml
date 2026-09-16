@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="welcome_title">Welcome to Bun Do</string>
+    <string name="welcome_body">A little help with everyday things.</string>
+    <string name="welcome_local">Use on this phone</string>
+    <string name="welcome_local_body">Your tasks stay on this phone. You can add a family later.</string>
+    <string name="welcome_family">With my family</string>
+    <string name="welcome_family_title">Everyday things, together</string>
+    <string name="welcome_family_body">Make a place for your family\'s tasks, or join someone who invited you.</string>
+    <string name="welcome_create">Create a family</string>
+    <string name="welcome_join">I have an invitation</string>
+    <string name="welcome_create_title">A place for your family</string>
+    <string name="welcome_create_body">Give it a name that feels like home.</string>
+    <string name="welcome_join_title">Come on in</string>
+    <string name="welcome_join_body">Paste your invitation and tell your family what to call you.</string>
+    <string name="welcome_family_name">Family name</string>
+    <string name="welcome_default_name">Our home</string>
+    <string name="welcome_sign_in_title">Bring your family together</string>
+    <string name="welcome_sign_in_body">Use a personal Microsoft account to create or join a family. Your local tasks stay separate.</string>
+    <string name="welcome_sign_in">Continue with Microsoft</string>
+    <string name="welcome_sign_in_help">Help with sign-in</string>
+    <string name="welcome_ready_title">Make yourselves at home</string>
+    <string name="welcome_ready_body">Your family\'s shared task list is ready. Start with one everyday thing.</string>
+    <string name="welcome_start">Go to our tasks</string>
+    <string name="welcome_invite">Invite someone</string>
+    <string name="welcome_wait_title">One small check</string>
+    <string name="welcome_wait_body">Ask the person who invited you to let you in. Match this code with them:</string>
+    <string name="welcome_wait_hint">Your family\'s tasks will appear after approval. You can leave this screen and come back from Settings.</string>
+    <string name="welcome_invitation_title">Your invitation</string>
+    <string name="welcome_invitation_unavailable">This invitation is no longer waiting for approval. Ask your family for a new link.</string>
+    <string name="welcome_check">Check again</string>
+    <string name="welcome_new_invitation">Use a new invitation</string>
+    <string name="welcome_approval">Let %1$s in?</string>
+    <string name="welcome_later">Back to my tasks</string>
+    <string name="welcome_setup">Family setup</string>
+    <string name="welcome_save_failed">Setup could not be saved on this phone. Free some space, then try again.</string>
+</resources>

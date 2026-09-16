@@ -26,6 +26,7 @@ The browser's canned suggestions are not evidence that either integration ships.
 
 | Slice | Blocked by |
 | --- | --- |
+| [Welcome users to local tasks or a shared family with Bun guidance](https://github.com/DrBushyTop/bun-do/issues/56) | None |
 | [Simplify voice capture with editable task analysis and opt-in audio history](https://github.com/DrBushyTop/bun-do/issues/55) | None |
 | [Accept and retry typed task commands in an executable sync model](https://github.com/DrBushyTop/bun-do/issues/15) | None |
 | [Capture and edit typed tasks offline in the native Android shell](https://github.com/DrBushyTop/bun-do/issues/16) | None |

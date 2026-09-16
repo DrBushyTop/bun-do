@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="welcome_title">Tervetuloa Bun Dohon</string>
+    <string name="welcome_body">Pieni apu arjen askareisiin.</string>
+    <string name="welcome_local">Käytä tällä puhelimella</string>
+    <string name="welcome_local_body">Tehtäväsi pysyvät tällä puhelimella. Voit lisätä perheen myöhemmin.</string>
+    <string name="welcome_family">Yhdessä perheen kanssa</string>
+    <string name="welcome_family_title">Arki sujuu yhdessä</string>
+    <string name="welcome_family_body">Luo paikka perheesi tehtäville tai liity mukaan kutsulla.</string>
+    <string name="welcome_create">Luo perhe</string>
+    <string name="welcome_join">Minulla on kutsu</string>
+    <string name="welcome_create_title">Paikka perheellenne</string>
+    <string name="welcome_create_body">Anna perheellenne kotoisa nimi.</string>
+    <string name="welcome_join_title">Tule mukaan</string>
+    <string name="welcome_join_body">Liitä kutsusi ja kerro, millä nimellä perheesi tuntee sinut.</string>
+    <string name="welcome_family_name">Perheen nimi</string>
+    <string name="welcome_default_name">Meidän koti</string>
+    <string name="welcome_sign_in_title">Kokoa perheesi yhteen</string>
+    <string name="welcome_sign_in_body">Perheen luomiseen ja liittymiseen tarvitaan henkilökohtainen Microsoft-tili. Paikalliset tehtäväsi pysyvät erillään.</string>
+    <string name="welcome_sign_in">Jatka Microsoft-tilillä</string>
+    <string name="welcome_sign_in_help">Apua kirjautumiseen</string>
+    <string name="welcome_ready_title">Tervetuloa kotiin</string>
+    <string name="welcome_ready_body">Perheen yhteinen tehtävälista on valmis. Aloittakaa yhdestä arjen askareesta.</string>
+    <string name="welcome_start">Perheen tehtäviin</string>
+    <string name="welcome_invite">Kutsu joku mukaan</string>
+    <string name="welcome_wait_title">Vielä pieni tarkistus</string>
+    <string name="welcome_wait_body">Pyydä kutsun lähettäjää päästämään sinut mukaan. Verratkaa tätä koodia:</string>
+    <string name="welcome_wait_hint">Perheen tehtävät näkyvät hyväksymisen jälkeen. Voit poistua ja palata asetuksista.</string>
+    <string name="welcome_invitation_title">Sinun kutsusi</string>
+    <string name="welcome_invitation_unavailable">Tämä kutsu ei enää odota hyväksyntää. Pyydä perheeltäsi uusi linkki.</string>
+    <string name="welcome_check">Tarkista uudelleen</string>
+    <string name="welcome_new_invitation">Käytä uutta kutsua</string>
+    <string name="welcome_approval">Päästetäänkö %1$s mukaan?</string>
+    <string name="welcome_later">Takaisin tehtäviini</string>
+    <string name="welcome_setup">Perheen käyttöönotto</string>
+    <string name="welcome_save_failed">Käyttöönottoa ei voitu tallentaa puhelimelle. Vapauta tilaa ja yritä uudelleen.</string>
+</resources>

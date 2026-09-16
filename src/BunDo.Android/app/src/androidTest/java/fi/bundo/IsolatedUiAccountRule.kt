@@ -14,6 +14,8 @@ class IsolatedUiAccountRule : TestRule {
         override fun evaluate() {
             val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as BunDoApplication
             val accounts = app.accounts
+            val previousWelcome = app.welcome.state.value
+            app.welcome.dismiss()
             val previousIdentity = accounts.active.value?.identity
             val previousRegistration = accounts.active.value?.registrationId
             val previousRemoval = accounts.credentialsNeedRemoval
@@ -32,6 +34,8 @@ class IsolatedUiAccountRule : TestRule {
                         accounts.authentication.accept(accounts.authentication.beginSignIn(), previousIdentity)
                         accounts.unlock(previousIdentity, checkNotNull(previousRegistration))
                     } else if (!previousRemoval) accounts.credentialsRemoved()
+                    app.welcome.update { previousWelcome }
+                    app.welcome.awaitSaved()
                 }
             }
         }

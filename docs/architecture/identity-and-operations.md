@@ -20,6 +20,11 @@ new account; v1 has no automatic account linking.
 
 First sign-in and workspace creation/joining require connectivity. Before sign-in, a separate local inbox supports typed capture and installed local speech. After authenticated workspace selection, the user explicitly imports selected inbox drafts as new task commands. Never attach anonymous drafts to an account automatically. Model download is optional during onboarding; typing works immediately. Installing the model requires connectivity, storage preflight, checksum validation and atomic activation.
 
+The [welcome flow](../design/welcome-flow.md) offers local use or family setup.
+Both create and join use the existing personal Microsoft sign-in. Existing installs
+retain their inbox entry point, with family setup available in Settings. Private
+setup data is encrypted in no-backup storage, not Activity saved state.
+
 Every workspace has exactly one owner and at most ten active members, including the owner. An authenticated creator becomes its owner. Owners issue invitations through the app and share the link themselves. The backend does not send invitation email in v1.
 
 An invitation contains a random 256-bit secret, expires after 24 hours, and permits one joining identity. Store only its cryptographic hash. Redemption requires authentication and atomically binds the invitation to that subject. It creates a pending join, not membership. The candidate and owner see the same random confirmation code; the owner checks it with the intended person and approves that candidate in the app. This explicit confirmation avoids relying on an unspecified verified-email token claim. Redemptions by another identity fail; same-identity retries return the pending/result state. Expiry, cancellation and approval all serialize with workspace changes. Never log links or codes. Limit outstanding invitations to ten and redemption attempts to ten per identity per hour.
