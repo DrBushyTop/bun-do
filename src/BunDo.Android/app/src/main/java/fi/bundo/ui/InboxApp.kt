@@ -104,6 +104,8 @@ fun InboxApp(
     taskAttribution: (@Composable (String) -> Unit)? = null,
     onTaskSaved: ((String, Boolean) -> Unit)? = null,
     onWelcome: (() -> Unit)? = null,
+    queueTopBar: (@Composable (@Composable () -> Unit) -> Unit)? = null,
+    queueSideNavigation: (@Composable () -> Unit)? = null,
 ) {
     var feedback by remember { mutableStateOf<HouseholdFeedback?>(null) }
     var settings by rememberSaveable { mutableStateOf(false) }
@@ -127,12 +129,17 @@ fun InboxApp(
     BoxWithConstraints(Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }) {
         val wide = maxWidth >= 840.dp
         val short = maxHeight < 480.dp
+        val sideNavigation = short && maxWidth >= 600.dp && queueSideNavigation != null && editor == null && !settings && selected == null
         val gutter = if (maxWidth < 600.dp) 16.dp else 24.dp
         Scaffold(
             snackbarHost = snackbarHost,
-            bottomBar = { if (editor == null && !settings && selected == null) queueNavigation?.invoke() },
+            bottomBar = { if (editor == null && !settings && selected == null && !sideNavigation) queueNavigation?.invoke() },
             topBar = {
+                val integrated = queueTopBar != null && editor == null && !settings && selected == null && queueContent == null
+                val bar: @Composable () -> Unit = {
                 TopAppBar(
+                    colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
+                        containerColor = if (integrated) Color.Transparent else MaterialTheme.colorScheme.surface),
                     title = {
                         if (editor == null && !settings && selected == null) Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(painterResource(R.drawable.bun_do), null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.primary)
@@ -180,9 +187,13 @@ fun InboxApp(
                         }
                     },
                 )
+                }
+                if (integrated) queueTopBar!!.invoke(bar) else bar()
             },
         ) { insets ->
-            Box(Modifier.fillMaxSize().padding(insets).imePadding()) {
+            Row(Modifier.fillMaxSize().padding(insets).imePadding()) {
+                if (sideNavigation) queueSideNavigation?.invoke()
+                Box(Modifier.weight(1f).fillMaxSize()) {
                 when {
                     editor != null -> Editor(state, model, onSplit, Modifier.align(Alignment.TopCenter).widthIn(max = 640.dp).fillMaxWidth())
                     settings && voiceSettings && voice != null -> VoiceSettings(voice,
@@ -216,6 +227,7 @@ fun InboxApp(
                             TaskDetail(selected, { model.openEditor(selected.id) }, state, model::retry, Modifier.weight(1f), queueTitle == null, taskControls, canEdit && canEditTask(selected.id), { selectedId = it }, taskAttribution)
                         }
                     }
+                }
                 }
             }
         }
@@ -333,7 +345,7 @@ private fun Queue(
                 }
             }
         }
-        Row(Modifier.padding(gutter).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+        Row(Modifier.padding(horizontal = gutter, vertical = if (compactNotice) 8.dp else gutter).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ActionIllustration(feedback)
             OutlinedButton(

@@ -41,8 +41,10 @@ internal fun SharedQueue(
     onOpen: (String) -> Unit, onAction: (SharedTaskAction) -> Unit, onFullQueue: () -> Unit,
     toolbar: @Composable () -> Unit,
     notices: @Composable () -> Unit,
+    onReorder: (Boolean) -> Unit = {},
 ) {
     val resources = LocalResources.current
+    val compact = shortWorldWindow()
     val context = LocalContext.current
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -52,6 +54,9 @@ internal fun SharedQueue(
     var filter by rememberSaveable { mutableStateOf("all") }
     var menu by remember { mutableStateOf(false) }
     var reorder by rememberSaveable { mutableStateOf(false) }
+    val reportReorder by rememberUpdatedState(onReorder)
+    LaunchedEffect(reorder) { reportReorder(reorder) }
+    DisposableEffect(Unit) { onDispose { reportReorder(false) } }
     var dragId by remember { mutableStateOf<String?>(null) }
     var basis by remember { mutableStateOf<List<String>>(emptyList()) }
     var preview by remember { mutableStateOf<List<String>?>(null) }
@@ -103,7 +108,6 @@ internal fun SharedQueue(
             true
         } else false
     }) {
-        if (!reorder) HouseholdWorld()
         // Outside the scrolling list so controls remain reachable during a long reorder.
         Column(Modifier.padding(horizontal = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -127,14 +131,18 @@ internal fun SharedQueue(
                 } else TextButton(onClick = ::finishMode, modifier = Modifier.testTag("reorder-done")) { Text(stringResource(R.string.reorder_done)) }
             }
             if (reorder) {
-                Text(stringResource(R.string.reorder_help), style = MaterialTheme.typography.bodySmall)
+                if (!compact) Text(stringResource(R.string.reorder_help), style = MaterialTheme.typography.bodySmall)
                 if (dragId != null) TextButton(onClick = ::cancelDrag, modifier = Modifier.testTag("reorder-cancel")) { Text(cancel) }
-            } else toolbar()
+            } else if (!compact) toolbar()
             if (announcement.isNotEmpty()) Text(announcement,
                 Modifier.semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodySmall)
         }
         LazyColumn(state = list, modifier = Modifier.weight(1f).testTag("queue"),
             contentPadding = PaddingValues(bottom = 24.dp)) {
+            if (compact && !reorder) item { toolbar() }
+            if (compact && reorder) item {
+                Text(stringResource(R.string.reorder_help), Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodySmall)
+            }
             item { notices() }
             if (shown.isEmpty()) item {
                 Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {

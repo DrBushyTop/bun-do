@@ -41,12 +41,20 @@ private fun worldPreference(): Pair<Boolean, (Boolean) -> Unit> {
     return visible to { value -> preferences.edit { putBoolean("world", value) } }
 }
 
-/** Decoration only. No sample quests, progress or inferred household mood. */
+@Composable
+internal fun shortWorldWindow(): Boolean =
+    with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() } < 600.dp
+
+@Composable
+internal fun worldVisible(): Boolean {
+    val configuration = LocalConfiguration.current
+    return worldPreference().first && !shortWorldWindow() && configuration.fontScale < 1.6f
+}
+
+/** Static decoration on the journey detail. The queue owns its integrated scene separately. */
 @Composable
 internal fun HouseholdWorld() {
-    val configuration = LocalConfiguration.current
-    val height = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }
-    if (!worldPreference().first || height < 600.dp || configuration.fontScale >= 1.6f) return
+    if (!worldVisible()) return
     val paper = MaterialTheme.colorScheme.surface
     Image(painterResource(R.drawable.dojo_garden), null,
         contentScale = ContentScale.Crop, alignment = Alignment.BottomCenter,

@@ -63,7 +63,10 @@ internal fun GuidedAdventureScreen(creation: GuidedCreation?, remote: JSONObject
                     FilterChip(phase.stars == stars, { update(phase.copy(stars = stars)) }, label = { Text(stars.toString()) }, modifier = Modifier.semantics { contentDescription = label }) } }
                 OutlinedTextField(phase.minutes.takeIf { it > 0 }?.toString().orEmpty(), { update(phase.copy(minutes = it.toIntOrNull() ?: 0)) },
                     label = { Text(stringResource(R.string.adventure_minutes)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                TextButton(onClick = { draft = draft!!.copy(phases = draft!!.phases.filterIndexed { i, _ -> i != index }) },
+                TextButton(onClick = {
+                    keyboard?.hide(); focus.clearFocus(force = true)
+                    draft = draft!!.copy(phases = draft!!.phases.filterIndexed { i, _ -> i != index })
+                },
                     modifier = Modifier.testTag("guided-remove-$index")) { Text(stringResource(R.string.guided_remove)) }
                 HorizontalDivider()
             }

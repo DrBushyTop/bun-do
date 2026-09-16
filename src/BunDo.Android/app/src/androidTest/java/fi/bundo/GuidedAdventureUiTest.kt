@@ -63,7 +63,13 @@ class GuidedAdventureUiTest {
         compose.onAllNodesWithContentDescription("Estimated difficulty: 1 of 3 stars").assertCountEquals(2)
         screenshot("guided-en-review")
         compose.onNodeWithTag("guided-task-1").performScrollTo().performTextReplacement("Sort just the letters")
+        compose.runOnUiThread {
+            androidx.core.view.WindowCompat.getInsetsController(compose.activity.window, compose.activity.window.decorView)
+                .hide(androidx.core.view.WindowInsetsCompat.Type.ime())
+        }
+        android.os.SystemClock.sleep(350) // Let the native keyboard finish resizing before the coordinate click.
         compose.onNodeWithTag("guided-remove-0").performScrollTo().performClick()
+        compose.onNodeWithTag("guided-task-1").assertDoesNotExist()
         compose.onNodeWithTag("guided-approve").performScrollTo().performClick()
         assertEquals(1, approved!!.phases.size); assertEquals("Sort just the letters", approved!!.phases.single().taskTitle)
     }

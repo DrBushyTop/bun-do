@@ -36,4 +36,9 @@
     <string name="adventure_dismiss">Palaa ehdotuksiin</string>
     <string name="adventure_task_sync">Tehtävän tiedot tulevat näkyviin synkronoinnin jälkeen.</string>
     <string name="artwork_retry">Yritä kuvitusta uudelleen</string>
+    <string name="adventure_complete_short">Seikkailu valmis</string>
+    <plurals name="adventure_signpost_progress">
+        <item quantity="one">%1$d / %2$d päätehtävä</item>
+        <item quantity="other">%1$d / %2$d päätehtävää</item>
+    </plurals>
 </resources>

@@ -70,6 +70,30 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
     var views by remember { mutableStateOf(false) }
     var tools by rememberSaveable { mutableStateOf(false) }
     var destination by rememberSaveable(selected.scope) { mutableStateOf("queue") }
+    var reordering by remember(selected.scope) { mutableStateOf(false) }
+    var joy by remember(selected.scope) { mutableStateOf(false) }
+    var seenCompletions by remember(selected.scope) { mutableStateOf<ULong?>(null) }
+    val latestCompletion = current?.progress?.let(::JSONObject)?.optJSONArray("activity")?.let { events ->
+        (0 until events.length()).map(events::getJSONObject).filter { it.optString("action") == "CompleteTask" }
+            .maxOfOrNull { it.getString("revision").toULong() } ?: 0uL
+    }
+    LaunchedEffect(latestCompletion) {
+        val previous = seenCompletions
+        seenCompletions = latestCompletion
+        joy = false
+        if (previous != null && latestCompletion != null && latestCompletion > previous &&
+            destination == "queue" && owner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) &&
+            current?.blocked == null && recovery == null) {
+            joy = true
+            kotlinx.coroutines.delay(1800)
+            joy = false
+        }
+    }
+    DisposableEffect(owner) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_STOP) joy = false }
+        owner.lifecycle.addObserver(observer)
+        onDispose { owner.lifecycle.removeObserver(observer) }
+    }
     var journeyBusy by remember(data.lease.generation, selected.scope) { mutableStateOf(false) }
     var journeyFailed by remember(data.lease.generation, selected.scope) { mutableStateOf(false) }
     fun journey(enable: Boolean) {
@@ -223,7 +247,12 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
     }
     CompositionLocalProvider(LocalAdventureArtwork provides artworkLoader) {
     InboxApp(state, model, appearance, onAppearance, voice = data.voice, voiceTarget = VoiceTarget(selected.scope), onAccount = onAccount, onWelcome = onWelcome, queueTitle = selected.name,
+        queueTopBar = { bar -> HouseholdScene(
+            if (joy) "joy" else if (current?.blocked != null || recovery != null || current == null) "dojo" else sceneActivity(canonical.values.map(::JSONObject), now),
+            !reordering, adventure?.takeIf { current?.blocked == null && recovery == null },
+            { destination = "adventure" }, { repository.acknowledgeAdventure(it, true) }, bar) },
         queueNavigation = { SharedHouseholdNavigation(if (destination in listOf("journey", "adventure", "creator")) "together" else destination) { destination = it } },
+        queueSideNavigation = { SharedHouseholdNavigation(if (destination in listOf("journey", "adventure", "creator")) "together" else destination, rail = true) { destination = it } },
         queueContent = if (destination != "queue") ({ onOpen ->
             val progress = current?.progress?.takeIf { current?.blocked == null && recovery == null }
             if (destination == "creator") GuidedAdventureScreen(creation, adventure?.creation, adventureBusy, adventureFailed, byId,
@@ -286,6 +315,7 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
         } },
         queueList = { onOpen -> SharedQueue(queueRows, taskStates, membership,
             !busy && current?.blocked == null && recovery == null, onOpen, ::act,
+            onReorder = { reordering = it },
             onFullQueue = { history = false; deleted = false; snoozed = false; dueOnly = false },
             toolbar = {
                 Row(Modifier.fillMaxWidth()) {

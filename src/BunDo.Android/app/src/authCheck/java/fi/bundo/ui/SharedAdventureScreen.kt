@@ -223,8 +223,14 @@ private fun AdventureEditor(active: AdventureChoice, tasks: Map<String, JSONObje
 @Composable
 private fun AdventureBow(id: String, acknowledge: suspend (String) -> Boolean) {
     val motion = LocalHouseholdMotion.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
     val angle = remember(id) { Animatable(0f) }
-    LaunchedEffect(id) { if (acknowledge(id) && motion.enabled) { angle.animateTo(12f, tween(180)); angle.animateTo(0f, tween(180)) } }
+    LaunchedEffect(id, motion.enabled) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            angle.snapTo(0f)
+            if (acknowledge(id) && motion.enabled) { angle.animateTo(12f, tween(180)); angle.animateTo(0f, tween(180)) }
+        }
+    }
     Icon(painterResource(R.drawable.bun_do), null, tint = MaterialTheme.colorScheme.primary,
         modifier = Modifier.size(40.dp).graphicsLayer { rotationZ = angle.value })
 }

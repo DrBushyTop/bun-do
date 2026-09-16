@@ -36,4 +36,9 @@
     <string name="adventure_dismiss">Back to suggestions</string>
     <string name="adventure_task_sync">Task controls will be available after sync.</string>
     <string name="artwork_retry">Retry artwork</string>
+    <string name="adventure_complete_short">Adventure complete</string>
+    <plurals name="adventure_signpost_progress">
+        <item quantity="one">%1$d / %2$d main task</item>
+        <item quantity="other">%1$d / %2$d main tasks</item>
+    </plurals>
 </resources>

@@ -255,3 +255,12 @@ The API checks membership, epoch, installation and the current choice before
 serving an image. Android keeps a bounded, account-private cache. Initial
 fallback artwork can become a catalog image, but assigned images do not rotate
 when an adventure is edited. Suggestion expiry does not delete library images.
+
+## Native scene behavior
+
+The queue shares one header illustration with the wordmark and adventure entry.
+Hiding the illustration never hides that entry. Canonical open roots determine
+rest and paperwork, independent of queue filters and pending offline edits.
+New accepted completion events can prompt a brief joy scene while the queue is in
+the foreground. Returning to the app does not replay previously seen events.
+The signpost and adventure bow keep separate persistent acknowledgements.

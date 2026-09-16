@@ -119,7 +119,7 @@ class SharedTaskUiTest {
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().assertExists()
     }
 
-    @Test fun staticGardenCanBeHiddenAndNeverCompetesWithReordering() {
+    @Test fun gardenCanBeHiddenWhileAdventureAccessRemainsDuringReordering() {
         val preferences = compose.activity.getSharedPreferences("appearance", 0)
         val previous = preferences.getBoolean("world", true)
         preferences.edit().putBoolean("world", true).commit()
@@ -127,10 +127,11 @@ class SharedTaskUiTest {
             fixture("en", "light", fontScale = 1f)
             compose.onNodeWithTag("household-world").assertIsDisplayed()
             compose.onNodeWithTag("voice").assertTextContains("Speak a task", substring = true)
-            compose.onNodeWithText("Adventure").assertDoesNotExist()
+            compose.onNodeWithTag("adventure-signpost").assertIsDisplayed()
             screenshot("walkthrough-en-garden.png")
             compose.onNodeWithTag("queue-reorder").performClick()
             compose.onNodeWithTag("household-world").assertDoesNotExist()
+            compose.onNodeWithTag("adventure-signpost").assertIsDisplayed()
             compose.onNodeWithTag("reorder-done").performClick()
             compose.onNodeWithTag("settings").performClick()
             compose.onNodeWithTag("show-world").performScrollTo().performClick()

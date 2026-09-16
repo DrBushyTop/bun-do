@@ -62,6 +62,11 @@ class RepeatUiTest {
         compose.onNodeWithTag("repeat-weekly").performScrollTo().performClick()
         compose.onNodeWithTag("repeat-day-5").performScrollTo().performClick()
         compose.onNodeWithTag("repeat-title").performScrollTo().performTextReplacement("Friday milk")
+        compose.runOnUiThread {
+            androidx.core.view.WindowCompat.getInsetsController(compose.activity.window, compose.activity.window.decorView)
+                .hide(androidx.core.view.WindowInsetsCompat.Type.ime())
+        }
+        android.os.SystemClock.sleep(350)
         compose.onNodeWithTag("repeat-save").performScrollTo().performClick()
         compose.waitUntil(5_000) { saved != null }
         val value = JSONObject(saved!!)
