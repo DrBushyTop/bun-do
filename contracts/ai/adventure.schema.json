@@ -1,0 +1,56 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "proposals"
+  ],
+  "properties": {
+    "proposals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "flavor",
+          "phases"
+        ],
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "flavor": {
+            "type": "string"
+          },
+          "phases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "rootId",
+                "name",
+                "stars",
+                "minutes"
+              ],
+              "properties": {
+                "rootId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "stars": {
+                  "type": "integer"
+                },
+                "minutes": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

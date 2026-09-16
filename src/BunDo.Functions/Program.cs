@@ -59,6 +59,10 @@ else
 
 if (builder.Configuration["AI:Enabled"] == "true")
 {
+    builder.Services.AddSingleton<BunDo.Functions.Adventures.IAdventureProvider>(_ =>
+        new BunDo.Functions.Adventures.FoundryAdventureProvider(new HttpClient(),
+            new ManagedIdentityCredential(ManagedIdentityId.FromUserAssignedClientId(builder.Configuration["AZURE_CLIENT_ID"]!)),
+            new Uri(builder.Configuration["AI:Endpoint"]!), builder.Configuration["AI:LunaDeployment"]!));
     builder.Services.AddSingleton<BunDo.Functions.AI.ICleanupProvider>(_ =>
         new BunDo.Functions.AI.FoundryCleanupProvider(new HttpClient(),
             new ManagedIdentityCredential(ManagedIdentityId.FromUserAssignedClientId(builder.Configuration["AZURE_CLIENT_ID"]!)),

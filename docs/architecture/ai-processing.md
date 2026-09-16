@@ -67,3 +67,47 @@ Keep authentication, provider constraints, bounded request/output sizes, memory 
 ## Verification
 
 Exercise representative Finnish, English and mixed-language tasks on the actual configured endpoint, including refusal, malformed output, ambiguity, human edits during inference, cancellation, duplicate delivery and interrupted requests. Use results to refine prompts; a fixed synthetic corpus count or an unused model deployment is not a release gate.
+
+## Shared adventure suggestions
+
+The [Bun world design](../design/bun-world-and-quests.md) defines the product
+behavior. Automatic suggestions reference existing open root tasks only. The
+explicit guided creator is a separate flow and cannot reuse automatic refresh
+as authority to create tasks.
+
+An authenticated online adventure visit may request a shared batch. Both
+members receive the same two alternatives. A persisted lease coordinates
+inference; a failed or interrupted attempt requires explicit retry. A client
+sends the batch identity it observed, including null for the initial request.
+An old refresh or retry cannot replace a newer batch. Empty input does not call
+the provider, and a later online visit checks for newly captured work.
+
+A ready batch expires 24 hours after publication. Read operations expose expiry
+without generating or accepting anything. Refresh happens only during an online
+visit, never on a background timer. Source edits during inference invalidate the
+result. Technical request bounds select a subset of whole root records rather
+than truncating descriptions or manufacturing extra tasks. Normal task sync does
+not wait for adventure generation.
+
+Acceptance consumes the batch and persists one shared adventure. Retrying that
+same acceptance returns the existing choice; another choice cannot replace it.
+Dismissal or leaving does not make the consumed batch acceptable again. Accepted
+adventures have no expiry. Edits use the adventure version, not task versions,
+and never issue task commands. Newly added references must identify available
+roots in the same household. Existing unavailable references can remain visible
+until explicitly removed or replaced. Leaving needs confirmation; dismissal
+checks current completion. A concurrent task reopen can invalidate dismissal.
+
+Adventure reads return a workspace/epoch/revision-fenced view of current roots
+and their current checklists. Deleted, cancelled and missing roots remain in
+the denominator but expose no task content and never count as complete. Empty
+adventures are not complete. These operations advance the household revision
+without task effects, so they neither grant journey credit nor alter task order,
+claims, deadlines or lifecycle.
+
+Only the current bounded batch and accepted adventure are retained. Consumed
+batches discard their alternatives. Generation uses the existing managed-identity
+Responses transport and strict structured output; task content, prompts and
+output text remain out of diagnostics. Each proposal carries a bundled dojo
+artwork key. The private artwork catalog, guided creator and native presentation
+have separate implementation slices in the parent issue.

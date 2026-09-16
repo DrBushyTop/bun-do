@@ -88,8 +88,10 @@ evidence.
 The first implementation slice is
 [Persist the shared Bun journey from canonical first completions](https://github.com/DrBushyTop/bun-do/issues/57).
 [Show Bun's shared journey with explicit online start and offline progress](https://github.com/DrBushyTop/bun-do/issues/58)
-adds its native readout. Integrated world scenes, AI adventures and private
-reusable artwork remain in the parent issue.
+adds its native readout.
+[Generate and persist shared adventures from existing household tasks](https://github.com/DrBushyTop/bun-do/issues/59)
+adds the shared proposal and acceptance backend. Native adventures, integrated
+world scenes, guided creation and private reusable artwork remain in the parent issue.
 
 ## AI usage policy after V2
 

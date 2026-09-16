@@ -49,7 +49,7 @@ public sealed record WorkspaceState(
     int TaskCount = 0,
     ulong PrunedThrough = 0,
     ImmutableDictionary<Guid, SnapshotPin>? SnapshotPins = null, ImmutableArray<string>? RootOrder = null, string TimeZoneId = "Europe/Helsinki", ImmutableDictionary<string, RepeatSchedule>? Repeats = null,
-    ImmutableArray<HouseholdActivity>? RecentActivity = null, JourneyStart? Journey = null);
+    ImmutableArray<HouseholdActivity>? RecentActivity = null, JourneyStart? Journey = null, AdventureBoard? Adventures = null);
 
 /// <summary>The transaction seam; a failed compare-and-swap must have no effects.</summary>
 public interface IWorkspaceStore
