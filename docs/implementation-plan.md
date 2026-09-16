@@ -74,12 +74,15 @@ These are deferred discovery/implementation tickets. Reassess concrete needs and
 | Explicit AI placement, optional escalation and worker recovery | [Evaluate optional AI placement, escalation and worker recovery](https://github.com/DrBushyTop/bun-do/issues/49) |
 | Workspace undelete, restore drills and extended compatibility | [Add workspace recovery and extended upgrade operations in V2](https://github.com/DrBushyTop/bun-do/issues/33) |
 
-## Post-core/V3 exploration
+## Independent post-release work
 
 [Shared Bun world and optional household quests](https://github.com/DrBushyTop/bun-do/issues/54)
-records the owner's later-stage visual exploration. Follow the
-[design and implementation sketch](design/bun-world-and-quests.md). It does not
-block V1 or commit to XP, autonomous agents or additional AI integrations.
+owns the [confirmed Bun world and adventure design](design/bun-world-and-quests.md).
+On September 16, the owner confirmed that V1 is released and this work may ship
+independently without waiting for V2 or V3. It adds AI adventure suggestions,
+guided task creation and reusable generated artwork, without XP or autonomous
+agents. The prototype remains the interaction reference, not implementation
+evidence.
 
 ## AI usage policy after V2
 

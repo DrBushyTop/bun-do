@@ -37,3 +37,13 @@ The first completed state of a root task. Reopening and completing it again does
 
 **Weekly streak**:
 Consecutive weeks with at least one shared first-completion credit. The current unfinished week gives the household time to continue the run.
+
+**Adventure**:
+A shared household outcome or work session that groups main tasks, with progress based on their current completion states. Its Finnish name is Seikkailu; a main task is a root task, including a checklist container.
+_Avoid_: Trip or retki as the feature name.
+
+**Adventure suggestion**:
+An unaccepted proposed adventure, distinct from the household's accepted adventure. Suggestions can expire without ending accepted work.
+
+**Bun journey**:
+The household's persistent trip through authored locations, advanced by new first-completion credits. It is separate from an adventure's reversible task progress and Bun's current activity.

@@ -94,9 +94,10 @@ their absence from the browser study does not defer them.
 
 The owner adopted the bundled static dojo garden for V1 on September 15, 2026. It can be hidden in Settings and yields its space to tasks during reorder, on short screens and with large text. It has no quest entry, sampled progress or inferred mood.
 
-The interactive [Bun world and quests study](bun-world-and-quests.md) is post-core/V3
-exploration. It does not add a release blocker, XP system or autonomous agent
-to V1.
+The interactive [Bun world and adventure design](bun-world-and-quests.md) was
+confirmed on September 16, after the owner declared V1 released. It may ship
+independently without waiting for V2 or V3. It adds no retroactive V1 blocker,
+XP system or autonomous agent.
 
 ## Prototype feature ownership and source
 
