@@ -103,6 +103,9 @@ Back history, useful task groups, voice-led planning and AI ideas from task hist
 [Style the front-page adventure signpost with a quiet Bun progress trail](https://github.com/DrBushyTop/bun-do/issues/65)
 owns the prototype-aligned adventure entry and optional active-progress motion.
 
+[Condense activity into compact icon-led event rows](https://github.com/DrBushyTop/bun-do/issues/66)
+owns the denser activity feed and accessible event details.
+
 ## AI usage policy after V2
 
 [Decide whether AI usage limits are needed after V2](https://github.com/DrBushyTop/bun-do/issues/37) is blocked by V2 completion and belongs to neither release parent. Start without product usage quotas, daily/monthly budgets or per-user fairness allowances. Observe actual usage before deciding whether limits are needed. Technical I/O, memory, output and timeout bounds, authentication and provider constraints remain. No token-limit implementation gates AI enablement.

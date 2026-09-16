@@ -16,7 +16,6 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import fi.bundo.R
-import fi.bundo.data.nullableString
 import org.json.JSONObject
 import java.time.Instant
 import java.time.LocalDate
@@ -27,15 +26,19 @@ import java.time.format.FormatStyle
 @Composable
 internal fun SharedProgressScreen(progress: String?, activity: Boolean, tasks: Map<String, JSONObject>, membership: JSONObject?,
     onRefresh: () -> Unit, onOpen: (String) -> Unit, onJourney: (() -> Unit)? = null, onAdventure: (() -> Unit)? = null) {
+    if (activity) {
+        SharedActivityScreen(progress, tasks, membership, onRefresh, onOpen)
+        return
+    }
     val snapshot = progress?.let(::JSONObject)
     val locale = LocalConfiguration.current.locales[0]
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(stringResource(if (activity) R.string.progress_activity else R.string.progress_together),
+        Text(stringResource(R.string.progress_together),
             style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
         TextButton(onClick = onRefresh, modifier = Modifier.testTag("progress-refresh")) { Text(stringResource(R.string.household_refresh)) }
-        if (!activity && onJourney != null) OutlinedButton(onClick = onJourney,
+        if (onJourney != null) OutlinedButton(onClick = onJourney,
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("journey-open")) { Text(stringResource(R.string.journey_open)) }
-        if (!activity && onAdventure != null) OutlinedButton(onClick = onAdventure,
+        if (onAdventure != null) OutlinedButton(onClick = onAdventure,
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("adventure-open")) { Text(stringResource(R.string.adventure_open)) }
         if (snapshot == null) {
             Text(stringResource(R.string.progress_unavailable))
@@ -46,23 +49,7 @@ internal fun SharedProgressScreen(progress: String?, activity: Boolean, tasks: M
         val dateTime = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT).withLocale(locale).withZone(zone)
         Text(stringResource(R.string.progress_as_of, dateTime.format(Instant.parse(snapshot.getString("asOf")))),
             style = MaterialTheme.typography.bodySmall)
-        if (activity) {
-            val events = snapshot.getJSONArray("activity")
-            if (events.length() == 0) Text(stringResource(R.string.progress_activity_empty))
-            for (index in 0 until events.length()) {
-                val event = events.getJSONObject(index)
-                val actor = event.nullableString("actorId")?.let { memberName(membership, it) } ?: stringResource(R.string.app_name)
-                val title = tasks[event.getString("taskId")]?.optString("title")
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(stringResource(activityLabel(event.getString("action")), actor))
-                    if (title != null) TextButton(onClick = { onOpen(event.getString("taskId")) },
-                        contentPadding = PaddingValues(vertical = 8.dp), modifier = Modifier.testTag("activity-task-${event.getString("taskId")}")) { Text(title) }
-                    else Text(stringResource(R.string.progress_task_unavailable), style = MaterialTheme.typography.bodyMedium)
-                    Text(dateTime.format(Instant.parse(event.getString("acceptedAt"))), style = MaterialTheme.typography.bodySmall)
-                }
-                HorizontalDivider()
-            }
-        } else {
+        run {
             var month by rememberSaveable { mutableStateOf(false) }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 FilterChip(selected = !month, onClick = { month = false }, modifier = Modifier.testTag("progress-week"),
@@ -103,7 +90,7 @@ internal fun SharedProgressScreen(progress: String?, activity: Boolean, tasks: M
     }
 }
 
-private fun activityLabel(action: String) = when (action) {
+internal fun activityLabel(action: String) = when (action) {
     "CreateTask" -> R.string.activity_created
     "CompleteTask" -> R.string.activity_completed
     "CancelTask" -> R.string.activity_cancelled

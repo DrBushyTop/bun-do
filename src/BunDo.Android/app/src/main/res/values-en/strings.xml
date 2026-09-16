@@ -132,6 +132,8 @@
     <string name="progress_milestone">Milestone reached: %1$d.</string>
     <string name="progress_next_milestone">Next milestone: %1$d.</string>
     <string name="progress_counting_explanation">Each root task counts once. Offline completions count when the server accepts them during sync. Weeks start on Monday. Statistics time zone: %1$s.</string>
+    <string name="activity_show_details">Show event details</string>
+    <string name="activity_hide_details">Hide event details</string>
     <string name="activity_created">%1$s added a task</string>
     <string name="activity_completed">%1$s marked complete</string>
     <string name="activity_cancelled">%1$s cancelled a task</string>

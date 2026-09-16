@@ -133,6 +133,8 @@
     <string name="progress_milestone">Etappi saavutettu: %1$d.</string>
     <string name="progress_next_milestone">Seuraava etappi: %1$d.</string>
     <string name="progress_counting_explanation">Jokainen päätehtävä lasketaan kerran. Ilman verkkoyhteyttä tehdyt valmistumiset lasketaan, kun palvelin hyväksyy ne synkronoinnissa. Viikko alkaa maanantaina. Tilastojen aikavyöhyke: %1$s.</string>
+    <string name="activity_show_details">Näytä tapahtuman tiedot</string>
+    <string name="activity_hide_details">Piilota tapahtuman tiedot</string>
     <string name="activity_created">%1$s lisäsi tehtävän</string>
     <string name="activity_completed">%1$s merkitsi valmiiksi</string>
     <string name="activity_cancelled">%1$s perui tehtävän</string>
