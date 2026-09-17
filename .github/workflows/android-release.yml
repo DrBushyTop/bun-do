@@ -77,6 +77,13 @@ jobs:
           git rev-parse HEAD > release/COMMIT.txt
           (cd release && sha256sum *.apk > SHA256SUMS)
           tar -czf "release/bun-do-$VERSION-inventory.tar.gz" -C release dependency-inventory LICENSES.md COMMIT.txt signature.txt
+      - name: Preserve verified package for publication recovery
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: android-release-package
+          path: release/
+          if-no-files-found: error
+          retention-days: 14
       - name: Publish prerelease
         env:
           GH_TOKEN: ${{ github.token }}

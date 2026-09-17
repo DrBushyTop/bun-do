@@ -33,6 +33,15 @@ the release's `COMMIT.txt`. The GitHub Android release workflow runs only on
 to replace an existing tag. Its run number supplies an increasing Android
 version code. Fork pull requests have no signing step or signing secrets.
 
+The workflow saves `android-release-package` after signature and checksum
+verification, before uploading GitHub release assets. This artifact remains
+available for 14 days if publication fails. Download it from that workflow run,
+check `SHA256SUMS` and the certificate above, and confirm `COMMIT.txt` matches the
+run's commit before retrying publication. Inspect the existing release and tag
+first. Do not overwrite a published package or rebuild under an existing tag.
+The artifact contains the signed APK and public verification files, never the
+keystore or passwords.
+
 Configure these repository secrets from a private key store:
 
 - `BUNDO_KEYSTORE_BASE64`: base64-encoded release keystore.
