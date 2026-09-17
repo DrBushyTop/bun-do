@@ -47,7 +47,10 @@ class VoiceFlowUiTest {
     @Test fun adventureCanUseRecordingWithoutCreatingTasksFinnishLargeText() { flow("fi", 2f, guided = true) }
     @Test fun adventureReceivesRecordingAfterRecreationDuringTransfer() { flow("en", 1f, guided = true, restoreDuringUse = true) }
 
-    private fun flow(language: String, scale: Float, guided: Boolean = false, restoreDuringUse: Boolean = false) = runBlocking {
+    @Test fun threePhaseRevisionHasOneScrollerAndFixedSaveEnglish() { flow("en", 1f, revision = true) }
+    @Test fun threePhaseRevisionHasOneScrollerAndFixedSaveFinnishLargeDark() { flow("fi", 2f, revision = true) }
+
+    private fun flow(language: String, scale: Float, guided: Boolean = false, restoreDuringUse: Boolean = false, revision: Boolean = false) = runBlocking {
         val context = compose.activity
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         instrumentation.uiAutomation.grantRuntimePermission(context.packageName, Manifest.permission.RECORD_AUDIO)
@@ -75,7 +78,21 @@ class VoiceFlowUiTest {
                             output.write(byteArrayOf(0, 1)); progress(4, .6f)
                             check(stop.await(30, TimeUnit.SECONDS))
                         }
-                    } }, analyze = { VoiceDraft(it, if (language == "fi") "Ostoslista" else "Shopping list", items = listOf("maitoa", "6 munaa", "ruisleipää")) })
+                    } }, analyze = { VoiceDraft(it, if (language == "fi") "Järjestä varasto" else "Organize the shed",
+                        items = if (revision) emptyList() else listOf("maitoa", "6 munaa", "ruisleipää")) },
+                    revise = { draft, instruction ->
+                        if (instruction == "Add detailed phases") draft.copy(
+                            description = (if (language == "fi") "Pidä usein tarvittavat työkalut helposti saatavilla. Siirrä korjattavat tavarat sivuun ennen kuin laitat muut tavarat takaisin. "
+                                else "Keep the tools you use most often easy to reach. Set aside broken items for repair before putting everything back. ").repeat(28),
+                            items = (1..16).map { index ->
+                            if (language == "fi") "Lajittele hyllyn $index tavarat. Pyyhi pinnat ja jätä tilaa laatikoille, joita tarvitset seuraavalla kerralla. Vie muut tavarat kierrätykseen."
+                            else "Sort shelf $index. Wipe the surfaces and leave room for the boxes you will need next time. Set aside anything that can be recycled."
+                        }) else {
+                        assertEquals("Add three phases", instruction)
+                        draft.copy(items = if (language == "fi") listOf("Kerää tavarat lattialta", "Lajittele tavarat hyllyille", "Vie tarpeettomat kierrätykseen")
+                            else listOf("Clear the floor", "Sort everything onto shelves", "Recycle what you no longer need"))
+                        }
+                    })
             }
             compose.waitUntil(10_000) { controller.state.value.loaded }
             compose.runOnUiThread { controller.configure(localOnly = false, keepAudio = false, analyze = true) }
@@ -86,7 +103,7 @@ class VoiceFlowUiTest {
                 CompositionLocalProvider(LocalActivityResultRegistryOwner provides context, LocalContext provides translated,
                     LocalResources provides translated.resources, LocalConfiguration provides config,
                     LocalDensity provides Density(context.resources.displayMetrics.density, scale)) {
-                    BunDoTheme("light") {
+                    BunDoTheme(if (revision && language == "fi") "dark" else "light") {
                         if (settings) Scaffold { padding -> VoiceSettings(controller, {}, Modifier.padding(padding)) }
                         else if (guided) Scaffold { padding -> androidx.compose.foundation.layout.Box(Modifier.padding(padding)) {
                             GuidedAdventureScreen(null, null, false, false, emptyMap(), true,
@@ -113,15 +130,62 @@ class VoiceFlowUiTest {
             compose.onNodeWithTag("stop-recording").performClick()
             compose.waitUntil(10_000) { controller.state.value.draft != null && !controller.state.value.busy }
             assertTrue(db.shared().intents(workspace.scope).isEmpty())
+            if (revision) {
+                compose.onNodeWithTag("voice-review-revise").assertIsDisplayed().performClick()
+                compose.onNodeWithTag("voice-revision-instruction").performTextReplacement("Add three phases")
+                compose.onNodeWithTag("voice-panel-confirm").performClick()
+                compose.waitUntil(10_000) { controller.state.value.revision != null && !controller.state.value.busy }
+                assertTrue(db.shared().intents(workspace.scope).isEmpty())
+                // The native keyboard/window dismissal can outlast Compose idling.
+                compose.waitUntil(5_000) { compose.onNodeWithTag("voice-revision-accept").isDisplayed() }
+                compose.onNodeWithTag("voice-revision-accept").assertIsDisplayed()
+                compose.onNodeWithText(translated.getString(R.string.voice_revision_after)).assertExists()
+                screenshot("task-revision-preview-$language")
+                compose.onNodeWithTag("voice-revision-accept").performClick()
+                compose.waitUntil(10_000) { controller.state.value.revision == null && !controller.state.value.busy }
+                assertEquals(3, controller.state.value.draft!!.items.size)
+                compose.onNodeWithText(controller.state.value.draft!!.title).assertIsDisplayed()
+                compose.onNodeWithTag("voice-draft-step-0").assertIsDisplayed()
+                assertTrue(db.shared().intents(workspace.scope).isEmpty())
+                compose.onAllNodes(SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange))
+                    .assertCountEquals(1)
+                val footer = compose.onNodeWithTag("voice-review-save").getUnclippedBoundsInRoot()
+                compose.onNodeWithTag("task-artwork").assertIsDisplayed()
+                screenshot("task-revision-accepted-$language")
+                // Three short phases fit. A second accepted revision deliberately overflows
+                // both phone and tablet so this is a real scroll, not a no-op screenshot.
+                compose.runOnUiThread { controller.reviseReview(controller.state.value.reviewId!!, "Add detailed phases") }
+                compose.waitUntil(10_000) { controller.state.value.revision != null && !controller.state.value.busy }
+                compose.onNodeWithTag("voice-revision-accept").performClick()
+                compose.waitUntil(10_000) { controller.state.value.revision == null && !controller.state.value.busy }
+                assertEquals(16, controller.state.value.draft!!.items.size)
+                compose.onNodeWithTag("task-artwork").assertIsDisplayed()
+                screenshot("task-revision-overflow-$language")
+                compose.onNodeWithTag("voice-draft-step-15").performScrollTo().assertIsDisplayed()
+                compose.onNodeWithTag("task-artwork").assertIsNotDisplayed()
+                assertEquals(footer, compose.onNodeWithTag("voice-review-save").getUnclippedBoundsInRoot())
+                compose.onNodeWithTag("voice-review-edit").assertIsDisplayed()
+                screenshot("task-revision-scrolled-$language")
+                compose.onNodeWithTag("voice-review-save").assertIsDisplayed().performClick()
+                compose.waitUntil(10_000) { saved != null }
+                assertEquals(listOf("CreateTask", "EditTask", "SplitTask"), db.shared().intents(workspace.scope).map { it.kind })
+                return@runBlocking
+            }
+            compose.onNodeWithTag("voice-review-edit").assertIsDisplayed().performClick()
             compose.onNodeWithTag("voice-review-title").performScrollTo().performTextReplacement(if (language == "fi") "Kauppalista" else "Groceries")
-            compose.onNodeWithTag("voice-review-items").performScrollTo().performTextReplacement("kauramaitoa\n6 munaa")
+            compose.onNodeWithTag("voice-review-items").performScrollTo().performTextReplacement("kauramaitoa")
+            compose.onNodeWithTag("voice-review-items").performTextInput("\n")
+            compose.onNodeWithTag("voice-review-items").assertTextContains("kauramaitoa\n")
+            compose.onNodeWithTag("voice-review-items").performTextInput("6 munaa")
+            compose.onNodeWithTag("voice-review-items").assertTextContains("kauramaitoa\n6 munaa")
+            compose.onNodeWithTag("voice-panel-confirm").performClick()
             screenshot("review-$language")
             if (restoreDuringUse) {
                 val blocked = CompletableDeferred<Unit>()
                 launch(Dispatchers.IO) { lease.access { blocked.complete(Unit); releaseTransfer.await() } }
                 blocked.await()
             }
-            compose.onNodeWithTag("voice-review-save").performScrollTo().performClick()
+            compose.onNodeWithTag("voice-review-save").performClick()
             if (restoration != null) {
                 compose.waitUntil(10_000) { controller.state.value.phase == "SAVING" }
                 restoration.emulateSavedInstanceStateRestore()

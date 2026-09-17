@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,6 +31,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Home
@@ -65,6 +67,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.painterResource
@@ -84,6 +88,8 @@ import fi.bundo.data.InboxRepository
 import fi.bundo.data.InboxTask
 import fi.bundo.speech.VoiceController
 
+enum class TaskDetailSection { CONTENT, PRIMARY, STEPS, SCHEDULE, MORE }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InboxApp(
@@ -99,7 +105,7 @@ fun InboxApp(
     canEdit: Boolean = true,
     queueTasks: List<InboxTask>? = null,
     rowSummary: (@Composable (String) -> Unit)? = null,
-    taskControls: (@Composable (String, (String) -> Unit) -> Unit)? = null,
+    taskControls: (@Composable (String, TaskDetailSection, (String) -> Unit, () -> Unit) -> Unit)? = null,
     canEditTask: (String) -> Boolean = { true },
     snackbarHost: @Composable () -> Unit = {},
     onSplit: (() -> Unit)? = null,
@@ -123,6 +129,7 @@ fun InboxApp(
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     val queueScroll = rememberLazyListState()
     val queueState = rememberSaveableStateHolder()
+    var taskFooterHeight by remember { mutableStateOf(0.dp) }
     val selected = state.tasks.find { it.id == selectedId }
     val editor = state.editor
     val back: () -> Unit = {
@@ -141,7 +148,7 @@ fun InboxApp(
         val sideNavigation = short && maxWidth >= 600.dp && queueSideNavigation != null && editor == null && !settings && selected == null
         val gutter = if (maxWidth < 600.dp) 16.dp else 24.dp
         Scaffold(
-            snackbarHost = snackbarHost,
+            snackbarHost = { Box(Modifier.padding(bottom = if (selected != null && editor == null && !settings) taskFooterHeight else 0.dp)) { snackbarHost() } },
             bottomBar = { if (editor == null && !settings && selected == null && !sideNavigation) queueNavigation?.invoke() },
             topBar = {
                 val integrated = queueTopBar != null && editor == null && !settings && selected == null && queueContent == null
@@ -192,7 +199,7 @@ fun InboxApp(
                     },
                 )
                 }
-                if (integrated) queueTopBar!!.invoke(bar) else bar()
+                if (selected == null || editor != null || settings) { if (integrated) queueTopBar!!.invoke(bar) else bar() }
             },
         ) { insets ->
             Row(Modifier.fillMaxSize().padding(insets).imePadding()) {
@@ -207,7 +214,7 @@ fun InboxApp(
                         onWelcome = onWelcome, onAccount = onAccount, onReminders = onReminders, onRecovery = onRecovery, onVoiceSettings = voice?.let { { it.closeReview(); it.clearMessage(); voiceSettings = true } })
                     selected != null && (!wide || queueContent != null) -> TaskDetail(
                         selected, { model.openEditor(selected.id) }, state, model::retry, Modifier.fillMaxSize(), queueTitle == null,
-                        taskControls, canEdit && canEditTask(selected.id), { selectedId = it }, taskAttribution,
+                        taskControls, canEdit && canEditTask(selected.id), { selectedId = it }, taskAttribution, back, { taskFooterHeight = it },
                     )
                     queueContent != null -> queueContent { selectedId = it }
                     else -> Row(Modifier.fillMaxSize()) {
@@ -228,7 +235,7 @@ fun InboxApp(
                             modifier = if (wide && selected != null) Modifier.width(360.dp) else Modifier.weight(1f),
                         )
                         if (wide && selected != null) {
-                            TaskDetail(selected, { model.openEditor(selected.id) }, state, model::retry, Modifier.weight(1f), queueTitle == null, taskControls, canEdit && canEditTask(selected.id), { selectedId = it }, taskAttribution)
+                            TaskDetail(selected, { model.openEditor(selected.id) }, state, model::retry, Modifier.weight(1f), queueTitle == null, taskControls, canEdit && canEditTask(selected.id), { selectedId = it }, taskAttribution, back, { taskFooterHeight = it })
                         }
                     }
                 }
@@ -329,13 +336,15 @@ private fun Queue(
                 items(state.tasks, key = { it.id }) { task ->
                     val draft = state.drafts.any { it.key == task.id }
                     val clickLabel = stringResource(R.string.task_row_action)
-                    Column(
+                    Row(
                         Modifier.fillMaxWidth()
                             .clickable(role = Role.Button, onClickLabel = clickLabel) { onOpen(task.id) }
                             .padding(horizontal = gutter, vertical = 12.dp)
                             .heightIn(min = 48.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
+                        TaskCue(task.title)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(task.title, style = MaterialTheme.typography.titleMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
                         summary?.invoke(task.id)
                         if (task.description.isNotEmpty()) {
@@ -344,6 +353,7 @@ private fun Queue(
                         if (draft) {
                             Text(stringResource(R.string.draft_available), style = MaterialTheme.typography.labelMedium)
                         }
+                    }
                     }
                     HorizontalDivider(Modifier.padding(horizontal = gutter), color = MaterialTheme.colorScheme.outlineVariant)
                 }
@@ -430,36 +440,90 @@ private fun FieldCount(value: String, limit: Int) {
 }
 
 @Composable
-private fun TaskDetail(
+internal fun TaskDetail(
     task: InboxTask, onEdit: () -> Unit, state: InboxUiState, onRetry: () -> Unit, modifier: Modifier, localOnly: Boolean,
-    controls: (@Composable (String, (String) -> Unit) -> Unit)? = null,
+    controls: (@Composable (String, TaskDetailSection, (String) -> Unit, () -> Unit) -> Unit)? = null,
     editable: Boolean = true,
     onOpenTask: (String) -> Unit = {},
     attribution: (@Composable (String) -> Unit)? = null,
+    onBack: () -> Unit = {},
+    onFooterHeight: (androidx.compose.ui.unit.Dp) -> Unit = {},
 ) {
-    var original by rememberSaveable(task.id) { mutableStateOf(false) }
-    Column(
-        modifier.verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        if (state.writeFailed) ErrorNotice(R.string.open_failed, onRetry)
-        IllustratedTaskHeader(task.title) { attribution?.invoke(task.id) }
-        if (localOnly) Text(stringResource(R.string.local_only), style = MaterialTheme.typography.labelLarge)
-        Text(task.description.ifEmpty { stringResource(R.string.no_description) }, style = MaterialTheme.typography.bodyLarge)
-        Button(onClick = onEdit, enabled = editable && !state.working, modifier = Modifier.heightIn(min = 48.dp).testTag("edit")) {
-            Text(stringResource(R.string.edit_task))
+    var menu by remember(task.id) { mutableStateOf(false) }
+    var panel by rememberSaveable(task.id) { mutableStateOf("") }
+    val scroll = rememberScrollState()
+    val density = LocalDensity.current
+    LaunchedEffect(task.id) { scroll.scrollTo(0) }
+    Column(modifier.fillMaxHeight()) {
+        Column(Modifier.weight(1f).verticalScroll(scroll).testTag("task-detail-content")) {
+            TaskArtwork(task.title) {
+                Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.surface) {
+                        IconButton(onClick = onBack, modifier = Modifier.testTag("back")) {
+                            Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.back))
+                        }
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Box {
+                        Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.surface) {
+                            IconButton(onClick = { menu = true }, modifier = Modifier.testTag("task-menu")) {
+                                Icon(Icons.Outlined.MoreVert, stringResource(R.string.task_actions_menu))
+                            }
+                        }
+                        androidx.compose.material3.DropdownMenu(menu, { menu = false }) {
+                            if (controls != null) for ((key, label) in listOf("steps" to R.string.task_steps_menu,
+                                "schedule" to R.string.task_schedule_menu, "more" to R.string.task_more_menu)) {
+                                androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(label)) },
+                                    modifier = Modifier.testTag("task-menu-$key"), onClick = { menu = false; panel = key })
+                            }
+                            androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.original_text)) },
+                                modifier = Modifier.testTag("task-menu-original"), onClick = { menu = false; panel = "original" })
+                        }
+                    }
+                }
+            }
+            Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().align(Alignment.CenterHorizontally).padding(horizontal = 24.dp).padding(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                if (state.writeFailed) ErrorNotice(R.string.open_failed, onRetry)
+                Text(task.title, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.semantics { heading() })
+                if (localOnly) Text(stringResource(R.string.local_only), style = MaterialTheme.typography.labelLarge)
+                if (task.description.isNotEmpty()) Text(task.description, style = MaterialTheme.typography.bodyLarge)
+                controls?.invoke(task.id, TaskDetailSection.CONTENT, onOpenTask, {})
+            }
         }
-        controls?.invoke(task.id, onOpenTask)
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        TextButton(onClick = { original = !original }, modifier = Modifier.heightIn(min = 48.dp)) {
-            Text(stringResource(if (original) R.string.hide_original else R.string.show_original))
-        }
-        if (original) {
-            Text(stringResource(R.string.original_text), style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
-            Text(task.originalTitle, style = MaterialTheme.typography.bodyLarge)
-            if (task.originalDescription.isNotEmpty()) Text(task.originalDescription, style = MaterialTheme.typography.bodyLarge)
+        HorizontalDivider()
+        BoxWithConstraints(Modifier.fillMaxWidth().onSizeChanged { onFooterHeight(with(density) { it.height.toDp() }) }) {
+            val edit: @Composable (Modifier) -> Unit = { buttonModifier ->
+                OutlinedButton(onClick = onEdit, enabled = editable && !state.working,
+                    modifier = buttonModifier.heightIn(min = 48.dp).testTag("edit")) { Text(stringResource(R.string.edit_task)) }
+            }
+            if (maxWidth < 480.dp && density.fontScale > 1.3f) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    edit(Modifier.fillMaxWidth())
+                    controls?.invoke(task.id, TaskDetailSection.PRIMARY, onOpenTask, {})
+                }
+            } else Row(Modifier.widthIn(max = 720.dp).fillMaxWidth().align(Alignment.Center).padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                edit(Modifier)
+                Box(Modifier.weight(1f)) { controls?.invoke(task.id, TaskDetailSection.PRIMARY, onOpenTask, {}) }
+            }
         }
     }
+    if (panel.isNotEmpty()) androidx.compose.material3.AlertDialog(onDismissRequest = { panel = "" },
+        title = { Text(stringResource(when (panel) {
+            "steps" -> R.string.task_steps_menu; "schedule" -> R.string.task_schedule_menu
+            "more" -> R.string.task_more_menu; else -> R.string.original_text
+        })) }, text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                if (panel == "original") {
+                    Text(task.originalTitle)
+                    if (task.originalDescription.isNotEmpty()) Text(task.originalDescription)
+                    attribution?.invoke(task.id)
+                } else controls?.invoke(task.id, when (panel) {
+                    "steps" -> TaskDetailSection.STEPS; "schedule" -> TaskDetailSection.SCHEDULE; else -> TaskDetailSection.MORE
+                }, onOpenTask, { panel = "" })
+            }
+        }, confirmButton = { TextButton(onClick = { panel = "" }, modifier = Modifier.testTag("task-panel-close")) { Text(stringResource(R.string.back)) } })
 }
 
 @Composable

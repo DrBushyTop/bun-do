@@ -31,10 +31,13 @@ class VoiceReviewTest {
             return store.begin(target = if (shared) VoiceTarget(workspace.scope) else null,
                 keepAudio = keep, reviewRequired = true).id.also { store.output(it).use { out -> out.write(byteArrayOf(0, 1)) } }
         }
-        fun start(analyze: (suspend (String) -> VoiceDraft)? = null, text: String = "Shopping list: milk, 6 eggs, rye bread"): VoiceController {
+        fun start(analyze: (suspend (String) -> VoiceDraft)? = null, text: String = "Shopping list: milk, 6 eggs, rye bread",
+            revise: (suspend (VoiceDraft, String) -> VoiceDraft)? = null,
+            recorder: () -> RecordingInput = ::LocalRecorder,
+            connected: () -> Boolean = { true }): VoiceController {
             instrumentation.runOnMainSync {
                 controller = VoiceController(context, store, ModelInstaller(File(root, "models"), loadSpeechManifest(context)),
-                    online = { text }, connected = { true }, analyze = analyze)
+                    online = { text }, connected = connected, analyze = analyze, revise = revise, recorderFactory = recorder)
             }
             await { controller!!.state.value.loaded }
             instrumentation.runOnMainSync { controller!!.configure(localOnly = false, keepAudio = false, analyze = true) }
@@ -271,6 +274,107 @@ class VoiceReviewTest {
             assertEquals("REVIEW", f.db.recordings().get(id)!!.state)
         }
     }
+    @Test fun oneRevisionAddsThreeStepsAndAcceptanceIsSeparateFromTaskSave() = runBlocking {
+        Fixture().use { f ->
+            val controller = f.start(revise = { current, instruction ->
+                assertEquals("My edited title", current.title)
+                assertEquals("Keep this note", current.description)
+                assertEquals("Add three phases", instruction)
+                assertEquals(listOf("Existing"), current.items)
+                current.copy(items = current.items + listOf("Prepare", "Work", "Check"), transcript = "Do not adopt this")
+            })
+            val id = f.recording(shared = true)
+            instrumentation.runOnMainSync { controller.retry(id) }; await { !controller.state.value.busy }
+            val before = controller.state.value.draft!!.copy(title = "My edited title", description = "Keep this note", items = listOf("Existing", ""))
+            instrumentation.runOnMainSync { controller.editReview(id, before); controller.reviseReview(id, "Add three phases") }
+            await { !controller.state.value.busy }
+            assertEquals(4, controller.state.value.revision!!.after.items.size)
+            assertEquals(before.items, VoiceDraft.parse(f.db.recordings().get(id)!!.review!!).items)
+            assertTrue(f.db.shared().intents(f.workspace.scope).isEmpty())
+            instrumentation.runOnMainSync { controller.rejectRevision() }
+            assertEquals(before.items, controller.state.value.draft!!.items)
+            instrumentation.runOnMainSync { controller.reviseReview(id, "Add three phases") }; await { !controller.state.value.busy }
+            instrumentation.runOnMainSync { controller.acceptRevision() }; await { !controller.state.value.busy }
+            val accepted = controller.state.value.draft!!
+            assertEquals(before.transcript, accepted.transcript)
+            assertEquals(4, accepted.items.size)
+            assertEquals(accepted, VoiceDraft.parse(f.db.recordings().get(id)!!.review!!))
+            assertTrue(f.db.shared().intents(f.workspace.scope).isEmpty())
+            instrumentation.runOnMainSync { controller.closeReview(); controller.openReview(id) }; await { !controller.state.value.busy }
+            assertEquals(accepted, controller.state.value.draft)
+            instrumentation.runOnMainSync { controller.saveReview(id, accepted) }; await { !controller.state.value.busy }
+            assertEquals(listOf("CreateTask", "EditTask", "SplitTask"), f.db.shared().intents(f.workspace.scope).map { it.kind })
+        }
+    }
+
+    @Test fun failedOrCancelledRevisionPreservesDraftAndInstructionAndFencesLateResults() = runBlocking {
+        for (failure in listOf("fail", "cancel", "close", "revoke")) Fixture().use { f ->
+            val started = CompletableDeferred<Unit>(); val finish = CompletableDeferred<Unit>()
+            val controller = f.start(revise = { draft, _ ->
+                started.complete(Unit)
+                if (failure == "fail") error("fixture")
+                withContext(NonCancellable) { finish.await() }
+                draft.copy(title = "Unwanted late title")
+            })
+            val id = f.recording(shared = true)
+            instrumentation.runOnMainSync { controller.retry(id) }; await { !controller.state.value.busy }
+            val original = controller.state.value.draft!!
+            instrumentation.runOnMainSync { controller.reviseReview(id, "Add three phases") }
+            withTimeout(10_000) { started.await() }
+            instrumentation.runOnMainSync {
+                when (failure) { "cancel" -> controller.cancel(); "close" -> controller.closeReview(); "revoke" -> f.lease.revoke() }
+            }
+            finish.complete(Unit); await { !controller.state.value.busy }
+            assertNull(controller.state.value.revision)
+            val retained = VoiceDraft.parse(f.db.recordings().get(id)!!.review!!)
+            assertEquals(original.title, retained.title)
+            assertEquals("Add three phases", retained.revisionInstruction)
+            assertTrue(f.db.shared().intents(f.workspace.scope).isEmpty())
+        }
+    }
+
+    @Test fun spokenRevisionUsesExistingDraftAndDoesNotRetainInstructionAudio() = runBlocking {
+        Fixture().use { f ->
+            val stop = java.util.concurrent.CountDownLatch(1)
+            val controller = f.start(text = "Add three phases", revise = { draft, instruction ->
+                assertEquals("Add three phases", instruction)
+                draft.copy(items = listOf("First", "Second", "Third"))
+            }, recorder = { object : RecordingInput {
+                override fun stop() { stop.countDown() }
+                override fun record(output: java.io.OutputStream, progress: (Int, Float) -> Unit) {
+                    output.write(byteArrayOf(0, 1)); progress(1, .5f)
+                    check(stop.await(10, TimeUnit.SECONDS))
+                }
+            } })
+            val id = f.recording(shared = true)
+            f.store.review(id, VoiceDraft("Original source", "Organize the shed"))
+            instrumentation.runOnMainSync { controller.openReview(id) }; await { !controller.state.value.busy }
+            instrumentation.runOnMainSync { controller.recordRevision(id); controller.stop() }
+            await { !controller.state.value.busy }
+            assertEquals(listOf("First", "Second", "Third"), controller.state.value.revision!!.after.items)
+            assertEquals("Original source", controller.state.value.revision!!.after.transcript)
+            assertEquals(listOf(id), f.db.recordings().all().map { it.id })
+            assertTrue(f.db.shared().intents(f.workspace.scope).isEmpty())
+        }
+    }
+
+    @Test fun offlineRevisionNeverCallsProviderOrChangesTheDraft() = runBlocking {
+        Fixture().use { f ->
+            var calls = 0
+            val controller = f.start(revise = { draft, _ -> calls++; draft }, connected = { false })
+            val id = f.recording(shared = true)
+            val original = VoiceDraft("Original", "Organize the shed")
+            f.store.review(id, original)
+            instrumentation.runOnMainSync { controller.openReview(id) }; await { !controller.state.value.busy }
+            instrumentation.runOnMainSync { controller.reviseReview(id, "Add three phases") }
+            assertEquals("REVISION_OFFLINE", controller.state.value.message)
+            assertEquals(0, calls)
+            assertEquals(original, controller.state.value.draft)
+            assertEquals(original, VoiceDraft.parse(f.db.recordings().get(id)!!.review!!))
+            assertTrue(f.db.shared().intents(f.workspace.scope).isEmpty())
+        }
+    }
+
     private fun await(condition: () -> Boolean) {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20)
         while (!condition()) { check(System.nanoTime() < deadline) { "Controller timeout" }; Thread.sleep(20) }

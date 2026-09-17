@@ -86,8 +86,10 @@ class InboxUiTest {
         compose.waitUntil(10_000) {
             compose.onAllNodes(androidx.compose.ui.test.hasTestTag("title")).fetchSemanticsNodes().isEmpty()
         }
-        compose.onNodeWithText("Järjestä varaston hyllyt").assertIsDisplayed()
-        compose.onNodeWithText("Keep this English description").performScrollTo().assertIsDisplayed()
+        compose.onNode(androidx.compose.ui.test.hasText("Järjestä varaston hyllyt") and
+            androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.hasTestTag("task-detail-content"))).assertIsDisplayed()
+        compose.onNode(androidx.compose.ui.test.hasText("Keep this English description") and
+            androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.hasTestTag("task-detail-content"))).performScrollTo().assertIsDisplayed()
     }
 
     @Test fun returningFromSettingsKeepsQueueScrollPosition() {

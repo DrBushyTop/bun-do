@@ -33,6 +33,8 @@ import kotlin.coroutines.coroutineContext
 
 data class ReviewUse(val id: String, val target: fi.bundo.data.VoiceTarget?, val draft: VoiceDraft)
 
+data class DraftRevision(val id: String, val before: VoiceDraft, val after: VoiceDraft)
+
 data class VoiceState(
     val loaded: Boolean = false,
     val modelReady: Boolean = false,
@@ -53,6 +55,9 @@ data class VoiceState(
     val keepAudio: Boolean = false,
     val analyze: Boolean = true,
     val analysisConfigured: Boolean = false,
+    val revisionConfigured: Boolean = false,
+    val recordingRevision: Boolean = false,
+    val revision: DraftRevision? = null,
 
 ) {
     val busy: Boolean get() = phase != "IDLE"
@@ -68,11 +73,12 @@ class VoiceController(
     private val connected: () -> Boolean = { speechNetworkAvailable(context) },
     private val recorderFactory: () -> RecordingInput = ::LocalRecorder,
     private val analyze: (suspend (String) -> VoiceDraft)? = null,
+    private val revise: (suspend (VoiceDraft, String) -> VoiceDraft)? = null,
     private val preferences: VoicePreferences = VoicePreferences(context),
     private val transcribe: (File, ByteArray) -> String = LocalSpeech()::transcribe,
 ) : AutoCloseable {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val mutable = MutableStateFlow(VoiceState(onlineConfigured = online != null, analysisConfigured = analyze != null, localOnly = preferences.localOnly, keepAudio = preferences.keepAudio, analyze = preferences.analyze))
+    private val mutable = MutableStateFlow(VoiceState(onlineConfigured = online != null, analysisConfigured = analyze != null, revisionConfigured = revise != null, localOnly = preferences.localOnly, keepAudio = preferences.keepAudio, analyze = preferences.analyze))
     val state = mutable.asStateFlow()
     private var work: Job? = null
     private var reviewWrite: Job? = null
@@ -124,18 +130,21 @@ class VoiceController(
         mutable.update { it.copy(localOnly = localOnly, keepAudio = keepAudio, analyze = analyze) }
     }
     fun clearMessage() { mutable.update { it.copy(message = "") } }
-    fun closeReview() { mutable.update { it.copy(reviewId = null, draft = null, reviewUse = null) } }
+    fun closeReview() {
+        if (state.value.recordingRevision || state.value.phase == "REVISING") cancel()
+        mutable.update { it.copy(reviewId = null, reviewTarget = null, draft = null, reviewUse = null, revision = null) }
+    }
     fun openReview(id: String) = start("LOADING") {
         reviewWrite?.join()
         val row = withContext(Dispatchers.IO) { checkNotNull(store.get(id)) }
         check(row.state == "REVIEW")
-        mutable.update { it.copy(reviewId = id, reviewTarget = row.workspaceScope?.let { scope -> fi.bundo.data.VoiceTarget(scope) }, draft = VoiceDraft.parse(checkNotNull(row.review))) }
+        mutable.update { it.copy(reviewId = id, reviewTarget = row.workspaceScope?.let { scope -> fi.bundo.data.VoiceTarget(scope) }, draft = VoiceDraft.parse(checkNotNull(row.review)), revision = null) }
     }
     /** Enqueue on Main before returning to Compose. The app-owned ordered chain
      * survives dismissal/rotation; a later snapshot can never write before an older one. */
     fun editReview(id: String, draft: VoiceDraft) {
-        if (state.value.reviewId != id || state.value.busy) return
-        mutable.update { it.copy(draft = draft) }
+        if (state.value.reviewId != id || state.value.busy || InboxLimits.length(draft.revisionInstruction) > InboxLimits.DESCRIPTION) return
+        mutable.update { it.copy(draft = draft, revision = null) }
         val previous = reviewWrite
         reviewWrite = scope.launch {
             previous?.join()
@@ -145,6 +154,7 @@ class VoiceController(
         }
     }
     fun saveReview(id: String, draft: VoiceDraft) = start("SAVING") {
+        check(state.value.reviewId == id && state.value.revision == null)
         reviewWrite?.join()
         withContext(Dispatchers.IO) {
             store.review(id, draft)
@@ -154,7 +164,7 @@ class VoiceController(
         }
     }
     fun useReview(id: String, draft: VoiceDraft) = start("SAVING") {
-        check(state.value.reviewId == id)
+        check(state.value.reviewId == id && state.value.revision == null)
         reviewWrite?.join()
         val row = withContext(Dispatchers.IO) { store.prepareReviewUse(id, draft) }
         mutable.update { it.copy(draft = draft, reviewUse = ReviewUse(id, row.workspaceScope?.let { scope -> fi.bundo.data.VoiceTarget(scope) }, draft)) }
@@ -163,6 +173,61 @@ class VoiceController(
         val result = checkNotNull(state.value.reviewUse).also { check(it.id == id) }
         withContext(Dispatchers.IO) { store.useReview(id, result.draft) }
         closeReview()
+    }
+
+    /** Both typed and spoken instructions use the exact current edited draft, never the initial AI text. */
+    fun reviseReview(id: String, instruction: String) {
+        val current = state.value.draft ?: return
+        if (!canRevise(id, current)) return
+        if (instruction.isBlank() || InboxLimits.length(instruction) > InboxLimits.DESCRIPTION) return
+        start("REVISING") { proposeRevision(id, current, instruction.trim()) }
+    }
+
+    private fun canRevise(id: String, current: VoiceDraft): Boolean {
+        if (state.value.busy || state.value.reviewId != id || !current.normalized().valid || state.value.reviewTarget == null || revise == null) return false
+        if (!connected()) { mutable.update { it.copy(message = "REVISION_OFFLINE") }; return false }
+        return true
+    }
+
+    fun recordRevision(id: String) {
+        val current = state.value.draft ?: return
+        if (canRevise(id, current)) recordInternal(state.value.reviewTarget, review = true, revision = id to current)
+    }
+
+    private suspend fun proposeRevision(id: String, before: VoiceDraft, instruction: String) {
+        reviewWrite?.join()
+        coroutineContext.ensureActive()
+        check(state.value.reviewId == id && state.value.draft == before)
+        val retained = before.copy(revisionInstruction = instruction)
+        withContext(Dispatchers.IO) { store.review(id, retained) }
+        coroutineContext.ensureActive()
+        check(state.value.reviewId == id)
+        mutable.update { it.copy(draft = retained, revision = null, phase = "REVISING") }
+        val result = try {
+            checkNotNull(revise).invoke(before.normalized(), instruction).copy(transcript = before.transcript, revisionInstruction = instruction)
+                .also { require(it.valid) }
+        } catch (error: Exception) {
+            coroutineContext.ensureActive()
+            if (error is SpeechFailure && error.code == "SIGN_IN_REQUIRED") throw error
+            throw SpeechFailure("REVISION_FAILED")
+        }
+        coroutineContext.ensureActive()
+        store.checkActive()
+        check(state.value.reviewId == id && state.value.draft == retained)
+        mutable.update { it.copy(revision = DraftRevision(id, retained, result)) }
+    }
+
+    fun rejectRevision() { mutable.update { it.copy(revision = null) } }
+
+    fun acceptRevision() {
+        val proposal = state.value.revision ?: return
+        if (state.value.reviewId != proposal.id || state.value.draft != proposal.before) return
+        start("SAVING") {
+            reviewWrite?.join()
+            withContext(Dispatchers.IO) { store.review(proposal.id, proposal.after) }
+            coroutineContext.ensureActive()
+            if (state.value.reviewId == proposal.id) mutable.update { it.copy(draft = proposal.after, revision = null) }
+        }
     }
 
     fun permissionDenied() { mutable.update { it.copy(message = "PERMISSION") } }
@@ -184,17 +249,20 @@ class VoiceController(
         mutable.update { it.copy(modelReady = true, message = "INSTALLED") }
     }
 
-    fun record(target: fi.bundo.data.VoiceTarget? = null, review: Boolean = false) {
+    fun record(target: fi.bundo.data.VoiceTarget? = null, review: Boolean = false) = recordInternal(target, review)
+
+    private fun recordInternal(target: fi.bundo.data.VoiceTarget?, review: Boolean, revision: Pair<String, VoiceDraft>? = null) {
         if (state.value.busy) return
         if (!state.value.modelReady && (online == null || state.value.localOnly || !connected())) {
             mutable.update { it.copy(message = "OFFLINE_MODEL_REQUIRED") }
             return
         }
-        closeReview()
-        val keepAudio = state.value.keepAudio
+        if (revision == null) closeReview() else mutable.update { it.copy(revision = null) }
+        val keepAudio = revision == null && state.value.keepAudio
         stopReason = ""
         stopRequested = false
         start("RECORDING") {
+            mutable.update { it.copy(recordingRevision = revision != null) }
             val row = withContext(Dispatchers.IO) { store.begin(target = target, keepAudio = keepAudio, reviewRequired = review || target?.taskId != null) }
             val input = recorderFactory()
             recorder = input
@@ -211,7 +279,7 @@ class VoiceController(
                 if (stopReason.isNotEmpty()) {
                     withContext(Dispatchers.IO) { store.failed(row.id, stopReason) }
                     mutable.update { it.copy(message = stopReason) }
-                } else recognize(row.id)
+                } else recognize(row.id, revision = revision)
             } catch (error: Exception) {
                 recorder = null
                 withContext(Dispatchers.IO) { store.failed(row.id, "RECORDING_FAILED") }
@@ -263,7 +331,7 @@ class VoiceController(
         mutable.update { it.copy(message = "EXPORTED") }
     }
 
-    private suspend fun recognize(id: String, offlineOnly: Boolean = false) {
+    private suspend fun recognize(id: String, offlineOnly: Boolean = false, revision: Pair<String, VoiceDraft>? = null) {
         activeRecording = id
         mutable.update { it.copy(phase = "TRANSCRIBING", level = 0f) }
         try {
@@ -294,7 +362,10 @@ class VoiceController(
                     InboxLimits.length(text) > InboxLimits.DESCRIPTION -> store.failed(id, "TOO_LONG")
                     else -> {
                         val row = checkNotNull(store.get(id))
-                        if (row.reviewRequired && row.checklistTaskId == null) {
+                        if (revision != null) {
+                            try { proposeRevision(revision.first, revision.second, text.trim()) }
+                            finally { withContext(kotlinx.coroutines.NonCancellable) { store.delete(id) } }
+                        } else if (row.reviewRequired && row.checklistTaskId == null) {
                             var draft = VoiceDraft.from(text.trim())
                             store.review(id, draft) // Persist text before analysis, and remove unretained audio.
                             mutable.update { it.copy(reviewId = id, reviewTarget = row.workspaceScope?.let { scope -> fi.bundo.data.VoiceTarget(scope) }, draft = draft) }
@@ -354,7 +425,7 @@ class VoiceController(
             catch (error: SpeechFailure) { mutable.update { it.copy(message = error.code) } }
             catch (_: Exception) { mutable.update { it.copy(message = "FAILED") } }
             catch (_: LinkageError) { mutable.update { it.copy(message = "FAILED") } }
-            finally { mutable.update { it.copy(phase = "IDLE", level = 0f) } }
+            finally { mutable.update { it.copy(phase = "IDLE", level = 0f, recordingRevision = false) } }
         }
     }
 

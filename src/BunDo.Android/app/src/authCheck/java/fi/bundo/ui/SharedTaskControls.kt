@@ -77,7 +77,8 @@ internal fun SharedTaskSummary(task: JSONObject, membership: JSONObject?) {
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
 internal fun SharedTaskControls(task: JSONObject, ordered: List<JSONObject>, membership: JSONObject?,
-    enabled: Boolean, failed: Boolean, onAction: (SharedTaskAction) -> Unit) {
+    enabled: Boolean, failed: Boolean, onAction: (SharedTaskAction) -> Unit,
+    section: TaskDetailSection = TaskDetailSection.MORE) {
     val id = task.getString("id")
     val open = task.optString("lifecycle", "OPEN") == "OPEN"
     val me = membership?.optString("me")
@@ -94,35 +95,37 @@ internal fun SharedTaskControls(task: JSONObject, ordered: List<JSONObject>, mem
     val index = active.indexOf(id)
     val canAct = enabled && me != null
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SharedTaskSummary(task, membership)
-        if (failed) Text(stringResource(R.string.task_changed_retry), color = MaterialTheme.colorScheme.error)
-        if (!task.isNull("deletion")) {
-            Text(stringResource(R.string.task_restore_explanation))
+        if (section == TaskDetailSection.CONTENT) SharedTaskSummary(task, membership)
+        if (section == TaskDetailSection.CONTENT && failed) Text(stringResource(R.string.task_changed_retry), color = MaterialTheme.colorScheme.error)
+        if (!task.isNull("deletion") && section == TaskDetailSection.PRIMARY) {
             OutlinedButton(enabled = canAct && !task.getJSONObject("deletion").optBoolean("purging") &&
                 (parentId == null || tasks[parentId]?.isNull("deletion") == true),
                 modifier = Modifier.testTag("task-restore"),
                 onClick = { onAction(SharedTaskAction("RestoreTask", task.toString())) }) { Text(stringResource(R.string.task_restore)) }
             if (task.getJSONObject("deletion").optBoolean("purging")) Text(stringResource(R.string.task_purging))
-        } else {
-            if (snoozed) Text(stringResource(R.string.task_snoozed))
-            if (isChecklist) Text(stringResource(if (task.optBoolean("emptyChecklist")) R.string.checklist_empty else R.string.checklist_derived))
+        } else if (task.isNull("deletion")) {
+            if (section == TaskDetailSection.CONTENT && snoozed) Text(stringResource(R.string.task_snoozed))
+            if (section == TaskDetailSection.CONTENT && isChecklist && task.optBoolean("emptyChecklist")) Text(stringResource(if (task.optBoolean("emptyChecklist")) R.string.checklist_empty else R.string.checklist_derived))
             if (open && !isChecklist) {
-                Button(enabled = canAct && !snoozed, modifier = Modifier.testTag("task-complete"), onClick = {
+                if (section == TaskDetailSection.PRIMARY) Button(enabled = canAct && !snoozed, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("task-complete"), onClick = {
                     val action = SharedTaskAction("CompleteTask", task.toString(), claimant?.takeIf { it != me })
                     if (claimant != null && claimant != me) confirmation = action else onAction(action)
                 }) { Text(stringResource(R.string.task_complete)) }
+                if (section == TaskDetailSection.MORE) {
                 if (claimant == null) OutlinedButton(enabled = canAct && !snoozed, modifier = Modifier.testTag("task-claim"),
                     onClick = { onAction(SharedTaskAction("ClaimTask", task.toString())) }) { Text(stringResource(R.string.task_claim)) }
                 else if (claimant == me || membership?.optString("ownerId") == me) OutlinedButton(enabled = canAct,
                     modifier = Modifier.testTag("task-unclaim"),
                     onClick = { onAction(SharedTaskAction("UnclaimTask", task.toString())) }) { Text(stringResource(R.string.task_unclaim)) }
             }
-            if (!open && (!isChecklist || !task.isNull("cancellationGroupId"))) OutlinedButton(enabled = canAct,
+            }
+            if (section == TaskDetailSection.PRIMARY && !open && (!isChecklist || !task.isNull("cancellationGroupId"))) OutlinedButton(enabled = canAct,
                 modifier = Modifier.testTag("task-reopen"),
                 onClick = { onAction(SharedTaskAction("ReopenTask", task.toString())) }) { Text(stringResource(R.string.task_reopen)) }
-            SharedCleanupControls(task, canAct, onAction)
+            if (section == TaskDetailSection.STEPS) SharedCleanupControls(task, canAct, onAction)
             if (open) {
-                SharedSnoozePresets(task, membership, canAct, onAction)
+                if (section == TaskDetailSection.SCHEDULE) SharedSnoozePresets(task, membership, canAct, onAction)
+                if (section == TaskDetailSection.MORE) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(enabled = canAct && index > 0, modifier = Modifier.testTag("task-earlier"), onClick = {
                         onAction(SharedTaskAction("MoveTask", task.toString(), after = active.getOrNull(index - 2), before = active[index - 1]))
@@ -133,14 +136,15 @@ internal fun SharedTaskControls(task: JSONObject, ordered: List<JSONObject>, mem
                 }
                 OutlinedButton(enabled = canAct, modifier = Modifier.testTag("task-cancel"),
                     onClick = { onAction(SharedTaskAction("CancelTask", task.toString())) }) { Text(stringResource(R.string.task_cancel)) }
-                if (task.isNull("snoozedUntil")) OutlinedButton(enabled = canAct, modifier = Modifier.testTag("task-snooze"),
+                }
+                if (section == TaskDetailSection.SCHEDULE && task.isNull("snoozedUntil")) OutlinedButton(enabled = canAct, modifier = Modifier.testTag("task-snooze"),
                     onClick = { onAction(SharedTaskAction("SetSnooze", task.toString(), until = Instant.now().plusSeconds(3600).toString())) }) {
                     Text(stringResource(R.string.task_snooze_hour))
                 }
             }
-            if (!task.isNull("snoozedUntil")) OutlinedButton(enabled = canAct, modifier = Modifier.testTag("task-unsnooze"),
+            if (section == TaskDetailSection.SCHEDULE && !task.isNull("snoozedUntil")) OutlinedButton(enabled = canAct, modifier = Modifier.testTag("task-unsnooze"),
                 onClick = { onAction(SharedTaskAction("ClearSnooze", task.toString())) }) { Text(stringResource(R.string.task_unsnooze)) }
-            OutlinedButton(enabled = canAct, modifier = Modifier.testTag("task-delete"),
+            if (section == TaskDetailSection.MORE) OutlinedButton(enabled = canAct, modifier = Modifier.testTag("task-delete"),
                 onClick = { onAction(SharedTaskAction("DeleteTask", task.toString())) }) { Text(stringResource(R.string.task_delete)) }
         }
     }

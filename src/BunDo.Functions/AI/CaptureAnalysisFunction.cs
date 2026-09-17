@@ -35,7 +35,9 @@ public sealed class CaptureAnalysisFunction(AccessTokens tokens, IServiceProvide
             !await registrations.IsActiveAsync(auth.Identity!, registration, ct))
             return Failure("SIGN_IN_REQUIRED", 403);
         if (request.ContentType != "application/json") return Failure("INVALID_INPUT", 400);
-        const int maximum = 32 * 1024;
+        // The current draft plus instruction can contain 10,720 Unicode code points.
+        // Allow their JSON-escaped UTF-16 representation without an unbounded body.
+        const int maximum = 128 * 1024;
         if (request.ContentLength > maximum) return Failure("TOO_LONG", 413);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(90));
@@ -51,17 +53,29 @@ public sealed class CaptureAnalysisFunction(AccessTokens tokens, IServiceProvide
             }
             if (count > maximum) return Failure("TOO_LONG", 413);
             string transcript;
+            CleanupProposal? current = null;
             try
             {
                 using var body = JsonDocument.Parse(buffer.AsMemory(0, count));
-                transcript = body.RootElement.GetProperty("transcript").GetString()!;
+                var root = body.RootElement;
+                transcript = root.GetProperty("transcript").GetString()!;
+                if (root.TryGetProperty("currentDraft", out var draft))
+                {
+                    current = new CleanupProposal(draft.GetProperty("title").GetString()!,
+                        draft.GetProperty("description").GetString(), "und", true,
+                        Items: draft.GetProperty("items").EnumerateArray().Select(item => item.GetString()!).ToArray());
+                    if (!TaskCleanup.Valid(current) || current.Description is null || current.Items is not { Length: <= 16 } ||
+                        current.Items.Length > 0 && !TaskSplit.Valid(current)) return Failure("INVALID_INPUT", 400);
+                }
                 if (string.IsNullOrWhiteSpace(transcript) || transcript.EnumerateRunes().Count() > 4000)
                     return Failure("INVALID_INPUT", 400);
             }
             catch (Exception error) when (error is JsonException or InvalidOperationException or KeyNotFoundException)
             { return Failure("INVALID_INPUT", 400); }
             Activity.Current?.SetTag("operation.stage", "capture.provider");
-            var proposal = await provider.GenerateCaptureAsync(transcript, timeout.Token);
+            var proposal = current is null
+                ? await provider.GenerateCaptureAsync(transcript, timeout.Token)
+                : await provider.ReviseCaptureAsync(current.Title, current.Description!, current.Items!, transcript, timeout.Token);
             timeout.Token.ThrowIfCancellationRequested();
             if (!await registrations.IsActiveAsync(auth.Identity!, registration, timeout.Token))
                 return Failure("SIGN_IN_REQUIRED", 403);

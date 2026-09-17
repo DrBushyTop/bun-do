@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-12T15:11:22.104010+00:00",
+  "generatedAt": "2026-09-17T20:18:17.092987+00:00",
   "title": "Bun Do design direction",
   "extensions": {
     "breakpoints": [
@@ -15,14 +15,22 @@
       {
         "name": "compact-notice-height",
         "value": "480dp"
+      },
+      {
+        "name": "review-short-height",
+        "value": "480dp"
+      },
+      {
+        "name": "review-side-scene-width",
+        "value": "600dp"
       }
     ],
     "shadows": [],
     "motion": [],
     "typographyMeta": {
       "headlineSmall": {
-        "displayName": "Task or empty-queue heading",
-        "purpose": "Full task title and empty queue heading."
+        "displayName": "Capture review or empty-queue heading",
+        "purpose": "Full draft title in capture review and empty queue heading. Task detail uses the Material headlineMedium default."
       },
       "titleMedium": {
         "displayName": "Queue title",
@@ -42,8 +50,8 @@
     {
       "name": "Text action",
       "kind": "button",
-      "description": "Documentation preview of the original-text disclosure.",
-      "html": "<button class=\"ds-text\">Show original text</button>",
+      "description": "Documentation preview of a quiet Material text action. Original transcript now opens from the final review-menu entry rather than an inline disclosure.",
+      "html": "<button class=\"ds-text\">Back</button>",
       "css": ".ds-text{background:transparent;color:#245B48;font:500 14px/20px sans-serif;min-height:48px;border:0;border-radius:24px;padding:12px 16px}.ds-text:hover,.ds-text:active{background:#BCEBD2}.ds-text:focus-visible{outline:2px solid #245B48;outline-offset:2px}"
     },
     {
@@ -56,9 +64,9 @@
     {
       "name": "Queue row",
       "kind": "custom",
-      "description": "Documentation preview of a synthetic task. The full row opens task detail.",
-      "html": "<button class=\"ds-row\"><strong>Järjestä varasto</strong><span>Vie rikkinäinen lamppu kierrätykseen.</span></button>",
-      "css": ".ds-row{display:grid;gap:4px;background:#F8F9F4;color:#191D19;text-align:left;min-height:48px;border:0;border-bottom:1px solid #C4CCC1;padding:12px 16px}.ds-row strong{font:500 16px/24px sans-serif}.ds-row span{font:400 14px/20px sans-serif}.ds-row:hover,.ds-row:active{background:#ECEFE8}.ds-row:focus-visible{outline:2px solid #245B48;outline-offset:2px}",
+      "description": "Documentation preview of an icon-led task row. The colored cue is decorative; no task thumbnail or description excerpt appears. Native Compose renders the shipped row.",
+      "html": "<button class=\"ds-row\"><span class=\"ds-cue\" aria-hidden=\"true\"><svg width=\"26\" height=\"26\" viewBox=\"0 0 24 24\" fill=\"none\"><path d=\"M10,6h11M10,12h11M10,18h11M2,5l2,2 3,-4M2,11l2,2 3,-4M2,17l2,2 3,-4\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></span><strong>Lähetä viesti</strong></button>",
+      "css": ".ds-row{display:flex;align-items:center;gap:12px;background:#F8F9F4;color:#191D19;text-align:left;min-height:48px;border:0;border-bottom:1px solid #C4CCC1;padding:12px 16px}.ds-row strong{font:500 16px/24px sans-serif}.ds-cue{display:flex;padding:10px;border-radius:12px;background:#BCEBD2;color:#082116;flex-shrink:0}.ds-row:hover,.ds-row:active{background:#ECEFE8}.ds-row:focus-visible{outline:2px solid #245B48;outline-offset:2px}",
       "refersTo": "task-row"
     },
     {
@@ -67,6 +75,21 @@
       "description": "Documentation preview of the neutral, permanent local-storage limitation.",
       "html": "<section class=\"ds-local\"><strong>Only on this phone</strong><p>Tasks stay on this phone. They are not backed up or shared yet.</p></section>",
       "css": ".ds-local{background:#F2F4EE;color:#191D19;padding:12px 16px}.ds-local strong{font:500 14px/20px sans-serif}.ds-local p{color:#444C44;font:400 14px/20px sans-serif;margin:4px 0 0}"
+    },
+    {
+      "name": "Draft revision preview",
+      "kind": "custom",
+      "description": "Read-first capture review keeps Close, manual Edit and its menu above one scroller, with Accept changes and Keep current below it. This excerpt documents accessible change labels, not the Android layout or artwork.",
+      "html": "<section class=\"ds-revision\"><h3>Description</h3><strong>Current</strong><p class=\"ds-before\"><s>Organize the shelf.</s></p><strong>Proposed</strong><p class=\"ds-after\">Organize the shelf and label the boxes.</p></section>",
+      "css": ".ds-revision{background:#F8F9F4;color:#191D19;padding:24px;font:400 16px/24px sans-serif}.ds-revision h3{font:500 16px/24px sans-serif;margin:0 0 16px}.ds-revision strong{font:500 14px/20px sans-serif}.ds-revision p{margin:8px 0 16px;white-space:pre-wrap}.ds-revision .ds-before{color:#444C44;font:400 14px/20px sans-serif}.ds-revision .ds-after{color:#245B48}"
+    },
+    {
+      "name": "Task scene",
+      "kind": "custom",
+      "refersTo": "task-scene",
+      "description": "Compose crops cached account artwork or the bundled dojo garden into the 220dp scene. A paper overlay fades from 60% at the top to 5% at 28%, transparent at 62%, and opaque at the bottom. No task-open image generation. This swatch shows the overlay only, not replacement artwork. Review alone uses 160dp beside content in short wide windows and 96dp above it in short narrow windows.",
+      "html": "<div class=\"ds-scene\" role=\"img\" aria-label=\"Paper fade overlay swatch, artwork omitted\"></div>",
+      "css": ".ds-scene{height:220px;width:100%;background:linear-gradient(to bottom,rgba(248,249,244,.6) 0%,rgba(248,249,244,.05) 28%,rgba(248,249,244,0) 62%,#F8F9F4 100%)}"
     }
   ],
   "narrative": {
