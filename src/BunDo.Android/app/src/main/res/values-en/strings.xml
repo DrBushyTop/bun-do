@@ -33,10 +33,7 @@
     <string name="english">English</string>
     <string name="system_default">Use system setting</string>
     <string name="original_text">Original text</string>
-    <string name="show_original">Show original text</string>
-    <string name="hide_original">Hide original text</string>
     <string name="task_row_action">Open task</string>
-    <string name="no_description">No description</string>
     <plurals name="task_count">
         <item quantity="one">%d task</item>
         <item quantity="other">%d tasks</item>
@@ -72,7 +69,6 @@
     <string name="task_deleted_view">Deleted tasks</string>
     <string name="task_deleted_empty">No deleted tasks to restore.</string>
     <string name="task_deleted_retention">Deleted tasks remain restorable for at least 120 days.</string>
-    <string name="task_restore_explanation">Restore keeps the previous task status and snooze, without a claim.</string>
     <string name="task_purging">This task is being permanently removed and can no longer be restored.</string>
     <string name="task_deleted_conflict">The task was deleted. Your text is saved here and can be copied to a new task.</string>
     <string name="checklist_add">Add steps</string>
@@ -158,7 +154,6 @@
     <string name="voice_analyzing">Preparing your task…</string>
     <string name="voice_use_transcript">Use transcript</string>
     <string name="voice_review_items">Checklist, optional</string>
-    <string name="voice_review_items_hint">One item per line. Remove any you do not need.</string>
     <string name="voice_original">Original transcript</string>
     <string name="voice_review_invalid">Check the title and items. Up to 16 distinct items, each 160 characters.</string>
     <string name="voice_discard_draft">Delete draft</string>
