@@ -62,7 +62,7 @@ public sealed class CaptureAnalysisTests : IDisposable
     }
     [Fact] public async Task Bounds_chunked_input_and_transcript_characters() {
         var provider = new Provider();
-        Assert.Equal(413, (await Run(Request(new string('x', 32769)), provider)).StatusCode);
+        Assert.Equal(413, (await Run(Request(new string('x', 128 * 1024 + 1)), provider)).StatusCode);
         Assert.Equal(400, (await Run(Request(JsonSerializer.Serialize(new { transcript = new string('x', 4001) })), provider)).StatusCode);
         Assert.Equal(0, provider.Calls);
     }
@@ -86,6 +86,44 @@ public sealed class CaptureAnalysisTests : IDisposable
         var provider = new Provider { BeforeReturn = canceled.Cancel };
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Run(request, provider));
         Assert.Equal(1, provider.Calls);
+    }
+    [Fact] public async Task Revision_passes_current_edits_and_returns_multiple_steps_without_writes() {
+        var provider = new Provider();
+        var input = new { transcript = "Add three phases, keep my notes", currentDraft = new {
+            title = "Manual title", description = "Private notes", items = new[] { "Existing phase" },
+        } };
+        using var activity = new Activity("revision").Start();
+        var result = await Run(Request(JsonSerializer.Serialize(input)), provider);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Equal(("Manual title", "Private notes", "Add three phases, keep my notes"), provider.Revision);
+        Assert.Equal(new[] { "Existing phase" }, provider.CurrentItems);
+        Assert.Equal(4, JsonSerializer.SerializeToElement(result.Value).GetProperty("items").GetArrayLength());
+        Assert.DoesNotContain("Private notes", JsonSerializer.Serialize(activity.TagObjects));
+        Assert.DoesNotContain("Manual title", JsonSerializer.Serialize(activity.TagObjects));
+        Assert.Equal(1, provider.Calls);
+    }
+    [Theory]
+    [InlineData("null")] [InlineData("[]")]
+    [InlineData("{\"title\":null,\"description\":\"\",\"items\":[]}")]
+    [InlineData("{\"title\":\"Task\",\"description\":null,\"items\":[]}")]
+    [InlineData("{\"title\":\"Task\",\"description\":\"\",\"items\":[null]}")]
+    [InlineData("{\"title\":\"Task\",\"description\":\"\",\"items\":[\"same\",\"SAME\"]}")]
+    public async Task Revision_rejects_malformed_current_drafts(string draft) {
+        var provider = new Provider();
+        Assert.Equal(400, (await Run(Request("{\"transcript\":\"Add steps\",\"currentDraft\":" + draft + "}"), provider)).StatusCode);
+        Assert.Equal(0, provider.Calls);
+    }
+    [Fact] public async Task Revision_accepts_maximum_unicode_draft_and_instruction() {
+        var input = new { transcript = string.Concat(Enumerable.Repeat("🌱", 4000)), currentDraft = new {
+            title = string.Concat(Enumerable.Repeat("🌱", 160)), description = string.Concat(Enumerable.Repeat("🌱", 4000)),
+            items = Enumerable.Range(0, 16).Select(i => i.ToString("00") + string.Concat(Enumerable.Repeat("🌱", 158))).ToArray(),
+        } };
+        Assert.Equal(200, (await Run(Request(JsonSerializer.Serialize(input)), new Provider())).StatusCode);
+    }
+    [Fact] public async Task Revision_rechecks_registration_after_provider_returns() {
+        var registrations = new Registrations(registration);
+        var request = Request(JsonSerializer.Serialize(new { transcript = "Add three steps", currentDraft = new { title = "Task", description = "", items = Array.Empty<string>() } }));
+        Assert.Equal(403, (await Run(request, new Provider { BeforeReturn = () => registrations.Active = false }, registrations)).StatusCode);
     }
     private static byte[] Response(object value) => JsonSerializer.SerializeToUtf8Bytes(new {
         status = "completed", output = new[] { new { type = "message", content = new[] { new { type = "output_text", text = JsonSerializer.Serialize(value) } } } },
@@ -113,6 +151,12 @@ public sealed class CaptureAnalysisTests : IDisposable
     }
     private sealed class Provider : ICleanupProvider {
         public int Calls; public Action? BeforeReturn;
+        public (string, string, string)? Revision;
+        public string[]? CurrentItems;
+        public Task<CleanupProposal> ReviseCaptureAsync(string title, string description, string[] items, string instruction, CancellationToken ct) {
+            Calls++; Revision = (title, description, instruction); CurrentItems = items; BeforeReturn?.Invoke();
+            return Task.FromResult(new CleanupProposal(title, description, "en", true, Items: [..items.Take(1), "Prepare", "Do", "Check"]));
+        }
         public Task<CleanupProposal> GenerateAsync(string title, string? description, CancellationToken ct, JsonElement? captureContext = null) => throw new NotSupportedException();
         public Task<CleanupProposal> GenerateCaptureAsync(string transcript, CancellationToken ct) {
             Calls++; BeforeReturn?.Invoke();

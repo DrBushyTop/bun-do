@@ -103,6 +103,11 @@ class AccountData internal constructor(
             app.withAccountToken(this@AccountData) { token ->
                 fi.bundo.speech.OnlineSpeech().analyze(token, checkNotNull(registrationId), text)
             }
+        }, revise = if (identity == null) null else { draft, instruction ->
+            val app = context.applicationContext as fi.bundo.BunDoApplication
+            app.withAccountToken(this@AccountData) { token ->
+                fi.bundo.speech.OnlineSpeech().analyze(token, checkNotNull(registrationId), instruction, draft)
+            }
         }).also { controller = it }
     internal fun revoke() {
         lease.revoke()

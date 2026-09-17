@@ -173,7 +173,7 @@ class SharedTaskUiTest {
         compose.waitUntil(10_000) { compose.onAllNodesWithTag("activity-task-$id").fetchSemanticsNodes().isNotEmpty() }
         screenshot("progress-native-activity-large")
         compose.onNodeWithTag("activity-task-$id").performScrollTo().performClick()
-        compose.onNodeWithTag("task-complete").performScrollTo().assertExists()
+        compose.onNodeWithTag("task-complete").assertExists()
         compose.onNodeWithTag("back").performClick()
         compose.onNodeWithTag("household-together").performClick()
         screenshot("progress-native-together-large")
@@ -241,12 +241,16 @@ class SharedTaskUiTest {
             dao.saveProjection(SharedProjection(state.scope, task.getString("id"), task.toString()))
         }
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
+        menu("original")
         compose.onNodeWithTag("task-creation").performScrollTo().assertTextContains("Alice", substring = true)
         compose.onNodeWithTag("task-last-change").performScrollTo().assertExists()
         screenshot("details-fi-attribution")
+        menu("schedule")
         compose.onNodeWithTag("snooze-tomorrow").performScrollTo().performClick()
         compose.waitUntil(5_000) { runBlocking { data.database.shared().intents(state.scope).any { it.kind == "SetSnooze" } } }
+        menu("more")
         compose.onNodeWithTag("task-claim").performScrollTo().assertIsNotEnabled()
+        menu("original")
         compose.onNodeWithTag("task-last-change").performScrollTo().assertExists()
         screenshot("details-fi-snoozed")
     }
@@ -260,6 +264,7 @@ class SharedTaskUiTest {
         val repository = SharedRepository(data.database, data.lease, state.scope, data.registrationId!!)
         runBlocking { repository.commit(repository.draft(id).copy(description = "Offline edit")) }
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
+        menu("original")
         compose.waitUntil(5_000) { compose.onAllNodesWithTag("task-last-change").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("task-last-change").assertTextContains("Local change, Alice", substring = true)
         runBlocking {
@@ -275,6 +280,7 @@ class SharedTaskUiTest {
     @Test fun englishSplitInstructionsCanBeQueuedAndCancelledWithoutChangingParent() {
         val (data, state) = fixture("en", "light")
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
+        menu("steps")
         compose.onNodeWithTag("checklist-add").performScrollTo().performClick()
         compose.onNodeWithTag("split-instructions").performScrollTo().performTextInput("Separate paper and cardboard")
         compose.onNodeWithTag("split-generate").performScrollTo().performClick()
@@ -303,6 +309,7 @@ class SharedTaskUiTest {
             dao.saveProjection(SharedProjection(state.scope, task.getString("id"), task.toString()))
         }
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
+        menu("steps")
         compose.onNodeWithTag("checklist-add").performScrollTo().performClick()
         compose.onNodeWithTag("split-review").performScrollTo().performClick()
         compose.onNodeWithTag("split-item-0").performScrollTo().performTextReplacement("Kerää paperit keittiöstä")
@@ -328,6 +335,7 @@ class SharedTaskUiTest {
                 .put("rows", JSONArray().put(JSONObject().put("text", "Private generated step").put("originalText", "Private generated step").put("selected", true))).toString()))
         }
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
+        menu("steps")
         compose.onNodeWithTag("checklist-add").performScrollTo().performClick()
         compose.onNodeWithTag("split-item-0").assertExists()
         if (dictating) {
@@ -358,12 +366,14 @@ class SharedTaskUiTest {
     @Test fun cleanupPendingAndCancelStayUsableAtLargeFinnishText() {
         fixture("fi", "light", fontScale = 2f)
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
+        menu("steps")
         compose.onNodeWithTag("cleanup-request").performScrollTo().performClick()
         compose.waitUntil(5000) { compose.onAllNodes(hasTestTag("cleanup-cancel") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("cleanup-cancel").performScrollTo().assertIsEnabled()
         screenshot("cleanup-fi-pending")
         compose.onNodeWithTag("cleanup-cancel").performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithTag("cleanup-request").fetchSemanticsNodes().isNotEmpty() }
+        menu("steps")
         compose.onNodeWithTag("cleanup-request").performScrollTo().assertIsEnabled()
     }
 
@@ -379,6 +389,7 @@ class SharedTaskUiTest {
             dao.saveProjection(SharedProjection(state.scope, task.getString("id"), task.toString()))
         }
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
+        menu("steps")
         compose.onNodeWithTag("cleanup-compare").performScrollTo().performClick()
         compose.onNodeWithTag("cleanup-apply").performScrollTo().assertIsEnabled()
         screenshot("cleanup-en-compare")
@@ -391,6 +402,7 @@ class SharedTaskUiTest {
     @Test fun finnishChecklistPreviewProgressAndChildNavigationAtLargeText() {
         val (data, state) = fixture("fi", "light", fontScale = 2f)
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
+        menu("steps")
         compose.onNodeWithTag("checklist-add").performScrollTo().performClick()
         compose.onNodeWithTag("checklist-draft").performTextInput("Kerää paperit\nVie keräykseen")
         compose.runOnIdle {
@@ -419,19 +431,21 @@ class SharedTaskUiTest {
     @Test fun finnishClaimCompleteAndReopenKeepDetailsOpenAndHistoryReachable() {
         val (data, state) = fixture("fi", "light")
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
+        menu("more")
         compose.onNodeWithTag("task-claim").performScrollTo().performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Alice tekee tätä").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Alice tekee tätä").performScrollTo().assertIsDisplayed()
         screenshot("tasks-fi-light.png")
-        compose.onNodeWithTag("task-complete").performScrollTo().performClick()
+        compose.onNodeWithTag("task-complete").performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithTag("task-reopen").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithTag("task-reopen").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("task-reopen").assertIsDisplayed()
         compose.onNodeWithTag("back").performClick()
         compose.onNodeWithTag("queue-views").performClick()
         compose.onNodeWithTag("task-history-view").performClick()
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
         compose.onNodeWithTag("task-reopen").performClick()
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("task-claim").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(10_000) { runBlocking { data.database.shared().intents(state.scope).any { it.kind == "ReopenTask" } } }
+        menu("more")
         compose.onNodeWithTag("task-claim").performScrollTo().assertIsDisplayed()
         assertEquals(listOf("ClaimTask", "CompleteTask", "ReopenTask"),
             runBlocking { data.database.shared().intents(state.scope).map { it.kind } })
@@ -440,7 +454,7 @@ class SharedTaskUiTest {
     @Test fun englishConfirmationRejectsAChangedClaimAndMoveButtonsNeedNoDragging() {
         val (data, state) = fixture("en", "light", claimed = true)
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
-        compose.onNodeWithTag("task-complete").performScrollTo().performClick()
+        compose.onNodeWithTag("task-complete").performClick()
         compose.onNodeWithText("Bob is working on this task. Mark it complete anyway?").assertIsDisplayed()
         screenshot("tasks-en-light-confirm.png")
         runBlocking {
@@ -454,21 +468,25 @@ class SharedTaskUiTest {
         compose.onNodeWithTag("task-confirm-complete").performClick()
         compose.onNodeWithText("The task changed or the action did not finish. Check its current state and try again.").assertIsDisplayed()
         assertTrue(runBlocking { data.database.shared().intents(state.scope).isEmpty() })
+        menu("more")
         compose.onNodeWithTag("task-later").performScrollTo().performClick()
         compose.waitUntil(10_000) { runBlocking { data.database.shared().intents(state.scope).size == 1 } }
         assertEquals("MoveTask", runBlocking { data.database.shared().intents(state.scope).single().kind })
+        menu("more")
         compose.onNodeWithTag("task-later").assertIsNotEnabled()
     }
 
     @Test fun englishDeleteUndoAndRecoveryView() {
         val (data, state) = fixture("en", "light")
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
+        menu("more")
         compose.onNodeWithTag("task-delete").performScrollTo().performClick()
         compose.onNodeWithText("Undo").performClick()
         compose.waitUntil(10_000) { runBlocking { data.database.shared().intents(state.scope).size == 2 } }
+        menu("more")
         compose.onNodeWithTag("task-delete").performScrollTo().performClick()
         compose.waitUntil(10_000) { runBlocking { data.database.shared().intents(state.scope).size == 3 } }
-        compose.onNodeWithTag("edit").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("edit").assertIsNotEnabled()
         compose.onNodeWithTag("back").performClick()
         compose.onNodeWithText("Vie paperit kierrätykseen").assertDoesNotExist()
         compose.onNodeWithTag("queue-views").performClick()
@@ -476,7 +494,7 @@ class SharedTaskUiTest {
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().assertIsDisplayed()
         screenshot("deletion-recovery-en.png")
         compose.onNodeWithText("Vie paperit kierrätykseen").performClick()
-        compose.onNodeWithTag("task-restore").performScrollTo().performClick()
+        compose.onNodeWithTag("task-restore").performClick()
         compose.waitUntil(10_000) { runBlocking { data.database.shared().intents(state.scope).size == 4 } }
         assertEquals(listOf("DeleteTask", "RestoreTask", "DeleteTask", "RestoreTask"),
             runBlocking { data.database.shared().intents(state.scope).map { it.kind } })
@@ -485,9 +503,10 @@ class SharedTaskUiTest {
     @Test fun finnishDeletedDetailsRemainReadable() {
         fixture("fi", "light", fontScale = 2.0f)
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
+        menu("more")
         compose.onNodeWithTag("task-delete").performScrollTo().performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithTag("task-restore").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithTag("task-restore").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("task-restore").assertIsDisplayed()
         screenshot("deletion-detail-fi.png")
     }
 
@@ -562,10 +581,11 @@ class SharedTaskUiTest {
         compose.waitUntil(5000) { compose.onAllNodesWithText("Varaa pyörän huolto").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("queue").performScrollToNode(hasText("Varaa pyörän huolto"))
         compose.onNodeWithText("Varaa pyörän huolto").performClick()
-        compose.onNodeWithTag("task-creation").assertExists()
+        compose.onNodeWithTag("task-artwork").assertIsDisplayed()
+        compose.onNodeWithTag("task-creation").assertDoesNotExist()
         compose.onNodeWithTag("task-last-change").assertDoesNotExist()
         screenshot("finish-fi-large-art.png")
-        compose.onNodeWithTag("edit").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("edit").assertIsDisplayed()
         compose.onNodeWithTag("back").performClick()
         compose.onNodeWithTag("settings").performClick()
         compose.onNodeWithTag("decorative-motion").performClick()
@@ -669,6 +689,13 @@ class SharedTaskUiTest {
             if (android.os.Build.VERSION.SDK_INT >= 33 && !notificationsGranted) shell("pm revoke $talkBack $notificationPermission")
             android.os.SystemClock.sleep(500)
         }
+    }
+
+    private fun menu(section: String) {
+        if (compose.onAllNodesWithTag("task-panel-close").fetchSemanticsNodes().isNotEmpty())
+            compose.onNodeWithTag("task-panel-close").performClick()
+        compose.onNodeWithTag("task-menu").performScrollTo().performClick()
+        compose.onNodeWithTag("task-menu-$section").performClick()
     }
 
     private fun screenshot(name: String) {

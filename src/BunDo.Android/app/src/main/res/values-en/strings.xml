@@ -33,10 +33,7 @@
     <string name="english">English</string>
     <string name="system_default">Use system setting</string>
     <string name="original_text">Original text</string>
-    <string name="show_original">Show original text</string>
-    <string name="hide_original">Hide original text</string>
     <string name="task_row_action">Open task</string>
-    <string name="no_description">No description</string>
     <plurals name="task_count">
         <item quantity="one">%d task</item>
         <item quantity="other">%d tasks</item>
@@ -72,7 +69,6 @@
     <string name="task_deleted_view">Deleted tasks</string>
     <string name="task_deleted_empty">No deleted tasks to restore.</string>
     <string name="task_deleted_retention">Deleted tasks remain restorable for at least 120 days.</string>
-    <string name="task_restore_explanation">Restore keeps the previous task status and snooze, without a claim.</string>
     <string name="task_purging">This task is being permanently removed and can no longer be restored.</string>
     <string name="task_deleted_conflict">The task was deleted. Your text is saved here and can be copied to a new task.</string>
     <string name="checklist_add">Add steps</string>
@@ -158,7 +154,6 @@
     <string name="voice_analyzing">Preparing your task…</string>
     <string name="voice_use_transcript">Use transcript</string>
     <string name="voice_review_items">Checklist, optional</string>
-    <string name="voice_review_items_hint">One item per line. Remove any you do not need.</string>
     <string name="voice_original">Original transcript</string>
     <string name="voice_review_invalid">Check the title and items. Up to 16 distinct items, each 160 characters.</string>
     <string name="voice_discard_draft">Delete draft</string>
@@ -183,4 +178,24 @@
     <string name="voice_recording_local">On-device speech. Audio stays here.</string>
     <string name="voice_recording_online">Online speech. Audio goes to Microsoft Azure; offline speech is used if needed.</string>
     <string name="voice_draft_failed">Could not save your draft. Keep this view open and try saving again.</string>
+    <string name="task_actions_menu">Task options</string>
+    <string name="task_steps_menu">Steps and AI</string>
+    <string name="task_schedule_menu">Schedule and repeat</string>
+    <string name="task_more_menu">Manage task</string>
+    <string name="voice_revision_preview">Review changes</string>
+    <string name="voice_revision_unchanged">No changes suggested.</string>
+    <string name="voice_revision_accept">Accept changes</string>
+    <string name="voice_revision_keep">Keep current draft</string>
+    <string name="voice_revision_action">Revise with AI</string>
+    <string name="voice_add_task">Save task</string>
+    <string name="voice_discard_confirm">Discard this draft? This cannot be undone.</string>
+    <string name="voice_revision_question">What would you like to change?</string>
+    <string name="voice_revision_hint">Say or type your changes. You can add several steps at once.</string>
+    <string name="voice_revision_instruction">Your changes</string>
+    <string name="voice_revision_offline">Connect to the internet to revise with AI. Your draft is saved.</string>
+    <string name="voice_revising">Preparing changes…</string>
+    <string name="voice_revision_failed">The revision did not finish. Your draft and instructions are saved. Try again.</string>
+    <string name="voice_revision_before">Current</string>
+    <string name="voice_revision_after">Proposed</string>
+    <string name="voice_revision_removed">Removed</string>
 </resources>

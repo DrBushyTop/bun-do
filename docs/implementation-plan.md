@@ -112,6 +112,11 @@ application to the remaining audited menus. The owner approved option B for
 all seven prototype screens and authorized native implementation without
 another design-selection round.
 
+[Implement read-first task details and voice draft revision](https://github.com/DrBushyTop/bun-do/issues/71)
+owns the approved task option A, taller faded task scenes, secondary action menus
+and multi-step AI revisions of capture drafts. The browser study in issue 70 is
+the selection reference, not shipped-app evidence.
+
 ## AI usage policy after V2
 
 [Decide whether AI usage limits are needed after V2](https://github.com/DrBushyTop/bun-do/issues/37) is blocked by V2 completion and belongs to neither release parent. Start without product usage quotas, daily/monthly budgets or per-user fairness allowances. Observe actual usage before deciding whether limits are needed. Technical I/O, memory, output and timeout bounds, authentication and provider constraints remain. No token-limit implementation gates AI enablement.

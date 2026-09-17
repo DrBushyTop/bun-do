@@ -83,6 +83,19 @@ components:
     backgroundColor: "{colors.light-surface}"
     textColor: "{colors.light-onSurface}"
     typography: "{typography.titleMedium}"
+  task-scene:
+    backgroundColor: "{colors.light-surface}"
+    height: "220dp"
+    width: "100%"
+  voice-review-content:
+    textColor: "{colors.light-onSurface}"
+    padding: "24dp"
+  queue-task-cue:
+    backgroundColor: "{colors.light-primaryContainer}"
+    textColor: "{colors.light-onPrimaryContainer}"
+    rounded: "12dp"
+    size: "46dp"
+    padding: "10dp"
 ---
 # Bun Do design direction
 
@@ -159,11 +172,14 @@ Concurrent queue changes cancel a stale drag. Swipe completion is unavailable
 while reordering. The same completion confirmation protects the row action,
 swipe and task detail.
 
-Details show a full title, compact creation/change attribution, description and
-editing before the task controls. Selected royal Bun illustrations are local,
-optional header artwork with a continuous paper fade. The approved uncrowned
-logo remains a separate unchanged vector. Artwork provenance lives in
-`assets/illustrations/ARTWORK.md`.
+Details open read-first with a faded adventure scene, full title, description
+and direct checklist items. One content scroller sits above persistent Edit and
+Complete controls. Checklist roots derive completion from their children;
+Reopen and Restore replace Complete when applicable. Group secondary actions
+under steps/AI, scheduling and other task actions. Original text and
+creation/change attribution occupy the last menu entry, not the reading header.
+The approved uncrowned logo remains a separate unchanged vector. Artwork
+provenance lives in `assets/illustrations/ARTWORK.md`.
 
 Editors and settings scroll within a 640 dp maximum width. Screen gutters are
 16 dp below 600 dp and 24 dp otherwise. At 840 dp, a selected task may share the
@@ -171,6 +187,25 @@ screen with a 360 dp queue. Large text wraps and scrolls; no fixed-height text
 containers substitute for that behavior.
 
 ## Components
+
+### Task scenes and queue cues
+
+Task detail and capture review share cropped adventure artwork with a continuous
+fade into the paper background. The scene is decorative and has no accessibility
+label. Use account-scoped cached adventure artwork when available and the bundled
+dojo garden otherwise. Opening either view never requests image generation;
+changing accounts must not retain the previous account's image.
+
+Queue cues remain local outlined icons in colored, rounded containers, not task
+thumbnails. Primary roles cover the generic task cue, secondary roles cover
+shopping and pets, and tertiary roles cover storage and cycling. The cue is
+presentation only; it adds no task classification or repeated category label.
+
+Reading columns and persistent action rows cap at 720 dp. Task detail uses
+Material headlineMedium for its full title; capture review uses headlineSmall.
+The task footer stacks at widths below 480 dp when font scale exceeds 1.3.
+Otherwise Edit and the applicable task action sit side by side. Text grows and
+scrolls rather than clipping to a fixed number of lines.
 
 ### Voice capture and settings
 
@@ -180,11 +215,29 @@ short provider label, not a setup manual. If speech is unavailable, offer voice
 settings and typing. Model downloads and history never occupy the capture sheet.
 
 Stop transcribes, then optionally analyzes a household capture. Show progress and
-allow cancellation back to the durable transcript. The review contains editable
-title, description and one direct checklist item per line, with original transcript
-behind an explicit action. Save accepts the final text and items. No task appears
-in the queue before Save. Blank or invalid input explains why Save is unavailable.
-The recording destination and account remain fixed through processing and review.
+allow cancellation back to the durable transcript. Review opens with the scene,
+title, description and numbered direct steps, not a field form. Close, manual Edit
+and the options menu sit in a fixed header outside the single content scroller.
+Manual Edit opens title, description and one direct checklist item per line.
+The menu places original transcript last, after Discard draft.
+
+Keep Save and the revision action outside the scroller. A typed or spoken
+revision starts from the current edited draft and may add several direct steps.
+Preview changed title, description and steps before accepting. Label the old and
+new values Current and Proposed in the selected UI language. Strikethrough and
+color supplement those labels; an empty proposed value explicitly says Removed.
+Accept changes updates the draft and returns its content to the top. It does not
+save a task. Keep current, cancellation and failure preserve the draft and source
+transcript. Save creates the task from the accepted text and items. Blank or
+invalid input explains why Save is unavailable. The recording destination and
+account remain fixed through processing and review.
+
+Review caps at 840 dp. Below 480 dp available height, a width of at least 600 dp
+puts the reading content beside a 160 dp high scene. A narrower short window
+uses a 96 dp scene above the text. Normal-height review uses the shared full-width
+scene. Short-height action rows place their two actions side by side; taller
+windows stack them. These are capture-review adaptations, not smaller defaults
+for task-detail artwork.
 
 Settings has a named Voice and recordings entry. It contains Automatic versus
 On device speech selection, expandable Parakeet setup, a separate online-analysis
@@ -194,9 +247,9 @@ retain audio after transcription or failure. Drafts and recordings are collapsed
 until requested; retained audio has expiry, export and deletion, and text drafts
 can resume review. No recording-import entry belongs in the normal user journey.
 
-Use native Material controls, existing color/type roles, 48 dp targets and a
-scrollable 640 dp maximum-width content column. Finnish/English and large-text
-layouts must keep Stop and Save reachable. Microphone permission is requested
+Use native Material controls, existing color/type roles and 48 dp targets.
+Voice settings retains its scrollable 640 dp maximum-width column.
+Finnish/English and large-text layouts must keep Stop and Save reachable. Microphone permission is requested
 only when recording is requested. The native rendered verification belongs in
 the owning issue, not in this design contract.
 

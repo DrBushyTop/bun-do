@@ -24,14 +24,29 @@ becoming closer does not silently move existing work.
 
 The queue voice button starts recording after microphone permission. Show elapsed time, Stop, Cancel and Type. Stop produces a durable, editable transcript and optional task/checklist analysis before Save. Settings owns Automatic versus On device speech, Parakeet setup, separate online analysis and opt-in audio history. Default audio is temporary and is removed after transcription or failure. Keep retry/export/delete only for retained audio, out of the primary capture path. Draft text survives audio cleanup and remains available in Settings.
 
-Typed capture starts with one text field. Description and due editing remain available without requiring a metadata form. Save commits locally and Back preserves a draft. Task detail puts title, claim/completion, description and checklist first, followed by scheduling and collapsed original text/attribution.
+Typed capture starts with one text field. Description and due editing remain available without requiring a metadata form. Save commits locally and Back preserves a draft. Task detail opens read-first with the selected taller, faded adventure scene,
+then title, description and direct steps. A single content scroller sits above
+persistent Edit and Complete controls. Checklist completion remains derived from
+its children. Scheduling, repeats, AI and other management actions live in the
+options menu. Original text and attribution are its last entry.
 
-Creation and last-change attribution are directly discoverable in detail,
-with actor names and exact localized timestamps. Only original capture text
-needs disclosure. Pending local modification times must not masquerade as
+Creation and last-change attribution remain available with original text,
+with actor names and exact localized timestamps. Pending local modification times must not masquerade as
 server-accepted history. Keep this metadata quieter than the task actions.
 
 An actionable task can be completed without a claim. Roots containing items derive completion from those items. Keep Edit, Split, Snooze, Cancel, Delete and applicable Reopen/Restore actions discoverable. No separate Clarify, dependency, area or notes workflow is required in v1.
+
+Capture review uses the same read-first layout. A voice or typed AI revision
+works from the current edited draft and can add several direct steps in one
+request. Keep the instruction recoverable, preview all proposed changes, and
+require acceptance. Accept changes updates the draft only; Save creates the
+task. Cancellation, failure and rejection preserve the current draft and source
+transcript. No revision starts offline. The content scroll resets to the top
+after acceptance without moving the persistent save controls.
+
+Task scenes reuse account-scoped cached adventure artwork where available and
+bundled artwork otherwise. Opening a task never generates an image. Queue rows
+use colored icon cues, not task thumbnails. Artwork does not determine task data.
 
 Manual and AI split preview editable direct checklist items. Stale acceptance retains the draft and explains that the task changed. AI cleanup preserves human corrections and original text; ambiguous dates require an explicit choice.
 

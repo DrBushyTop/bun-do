@@ -34,10 +34,7 @@
     <string name="english">English</string>
     <string name="system_default">Järjestelmän mukaan</string>
     <string name="original_text">Alkuperäinen teksti</string>
-    <string name="show_original">Näytä alkuperäinen teksti</string>
-    <string name="hide_original">Piilota alkuperäinen teksti</string>
     <string name="task_row_action">Avaa tehtävä</string>
-    <string name="no_description">Ei kuvausta</string>
     <plurals name="task_count">
         <item quantity="one">%d tehtävä</item>
         <item quantity="other">%d tehtävää</item>
@@ -73,7 +70,6 @@
     <string name="task_deleted_view">Poistetut tehtävät</string>
     <string name="task_deleted_empty">Ei palautettavia tehtäviä.</string>
     <string name="task_deleted_retention">Poistetut tehtävät voi palauttaa vähintään 120 päivän ajan.</string>
-    <string name="task_restore_explanation">Palautus säilyttää aiemman tilan ja lykkäyksen mutta poistaa varauksen.</string>
     <string name="task_purging">Tehtävää poistetaan pysyvästi, eikä sitä voi enää palauttaa.</string>
     <string name="task_deleted_conflict">Tehtävä poistettiin. Tekstisi on tallessa tässä, ja sen voi kopioida uuteen tehtävään.</string>
     <string name="checklist_add">Lisää vaiheita</string>
@@ -159,7 +155,6 @@
     <string name="voice_analyzing">Muotoillaan tehtävää…</string>
     <string name="voice_use_transcript">Käytä litterointia</string>
     <string name="voice_review_items">Vaiheet, valinnainen</string>
-    <string name="voice_review_items_hint">Yksi kohta riville. Poista tarpeettomat.</string>
     <string name="voice_original">Alkuperäinen litterointi</string>
     <string name="voice_review_invalid">Tarkista nimi ja vaiheet. Enintään 16 erilaista kohtaa, kussakin 160 merkkiä.</string>
     <string name="voice_discard_draft">Poista luonnos</string>
@@ -184,4 +179,24 @@
     <string name="voice_recording_local">Puheentunnistus laitteella. Ääni pysyy täällä.</string>
     <string name="voice_recording_online">Puhe verkossa. Ääni lähetetään Microsoft Azureen. Tarvittaessa käytetään laitteen puhemallia.</string>
     <string name="voice_draft_failed">Luonnoksen tallennus ei onnistunut. Pidä tämä näkymä auki ja yritä tallennusta uudelleen.</string>
+    <string name="task_actions_menu">Tehtävän valinnat</string>
+    <string name="task_steps_menu">Vaiheet ja tekoäly</string>
+    <string name="task_schedule_menu">Ajankohta ja toisto</string>
+    <string name="task_more_menu">Hallitse tehtävää</string>
+    <string name="voice_revision_preview">Tarkista muutokset</string>
+    <string name="voice_revision_unchanged">Muutosehdotuksia ei tullut.</string>
+    <string name="voice_revision_accept">Hyväksy muutokset</string>
+    <string name="voice_revision_keep">Säilytä nykyinen luonnos</string>
+    <string name="voice_revision_action">Muokkaa tekoälyllä</string>
+    <string name="voice_add_task">Tallenna tehtävä</string>
+    <string name="voice_discard_confirm">Hylätäänkö luonnos? Tätä ei voi perua.</string>
+    <string name="voice_revision_question">Mitä haluat muuttaa?</string>
+    <string name="voice_revision_hint">Sano tai kirjoita muutokset. Voit lisätä monta vaihetta kerralla.</string>
+    <string name="voice_revision_instruction">Toivomasi muutokset</string>
+    <string name="voice_revision_offline">Yhdistä internetiin, jotta voit muokata tekoälyllä. Luonnos on tallessa.</string>
+    <string name="voice_revising">Valmistellaan muutoksia…</string>
+    <string name="voice_revision_failed">Muutosehdotus ei valmistunut. Luonnos ja ohje ovat tallessa. Yritä uudelleen.</string>
+    <string name="voice_revision_before">Nykyinen</string>
+    <string name="voice_revision_after">Ehdotus</string>
+    <string name="voice_revision_removed">Poistetaan</string>
 </resources>

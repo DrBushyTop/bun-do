@@ -48,13 +48,20 @@ class OnlineSpeech(
             }
         }
 
-    suspend fun analyze(token: String, registration: String, transcript: String): fi.bundo.data.VoiceDraft = withTimeout(110_000) {
+    suspend fun analyze(token: String, registration: String, transcript: String, current: fi.bundo.data.VoiceDraft? = null): fi.bundo.data.VoiceDraft = withTimeout(110_000) {
         require(transcript.isNotBlank() && InboxLimits.length(transcript) <= InboxLimits.DESCRIPTION)
-        val bytes = JSONObject().put("transcript", transcript).toString().toByteArray(Charsets.UTF_8)
+        val body = JSONObject().put("transcript", transcript)
+        if (current != null) {
+            val normalized = current.normalized()
+            require(normalized.valid)
+            body.put("currentDraft", JSONObject().put("title", normalized.title).put("description", normalized.description)
+                .put("items", org.json.JSONArray(normalized.items)))
+        }
+        val bytes = body.toString().toByteArray(Charsets.UTF_8)
         try {
             val result = request(token, registration, bytes, "analyze", "application/json", null)
             val items = result.getJSONArray("items")
-            fi.bundo.data.VoiceDraft(transcript, result.getString("title"), result.getString("description"),
+            fi.bundo.data.VoiceDraft(current?.transcript ?: transcript, result.getString("title"), result.getString("description"),
                 (0 until items.length()).map(items::getString)).also { require(it.valid) }
         } finally { bytes.fill(0) }
     }
@@ -89,7 +96,7 @@ class OnlineSpeech(
                                 else -> "ONLINE_FAILED"
                             })
                             val text = connection.inputStream.use { input ->
-                                val buffer = ByteArray(64 * 1024 + 1)
+                                val buffer = ByteArray(128 * 1024 + 1)
                                 var count = 0
                                 while (count < buffer.size) {
                                     val read = input.read(buffer, count, buffer.size - count)

@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -85,44 +86,55 @@ internal fun taskCue(title: String): String {
         listOf("pyör", "bike", "bicycle").any(text::contains) -> "bike"
         listOf("kissa", "koira", "eläin", "pet", "dog", "cat ", "vet").any(text::contains) -> "pet"
         listOf("osta", "kauppa", "buy ", "shop", "grocer").any(text::contains) -> "shop"
-        listOf("varasto", "storage", "hylly", "shelf").any(text::contains) -> "storage"
+        listOf("varasto", "storage", "hylly", "shelf", "shed", "garage", "autotalli").any(text::contains) -> "storage"
         else -> "task"
     }
 }
 
+// Only the detail view reads account-scoped cached artwork. Queue cues remain local icons.
+internal val LocalTaskArtwork = staticCompositionLocalOf<suspend (String) -> android.graphics.Bitmap?> { { null } }
+
 @Composable
 internal fun TaskCue(title: String) {
-    Icon(painterResource(when (taskCue(title)) {
-        "bike" -> R.drawable.cue_bike
-        "pet" -> R.drawable.cue_pet
-        "shop" -> R.drawable.cue_shop
-        "storage" -> R.drawable.cue_home
-        else -> R.drawable.cue_task
-    }), contentDescription = null, tint = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(top = 4.dp).size(28.dp))
+    val cue = taskCue(title)
+    val colors = MaterialTheme.colorScheme
+    val (background, ink) = when (cue) {
+        "bike", "storage" -> colors.tertiaryContainer to colors.onTertiaryContainer
+        "pet", "shop" -> colors.secondaryContainer to colors.onSecondaryContainer
+        else -> colors.primaryContainer to colors.onPrimaryContainer
+    }
+    Surface(color = background, shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)) {
+        Icon(painterResource(when (cue) {
+            "bike" -> R.drawable.cue_bike
+            "pet" -> R.drawable.cue_pet
+            "shop" -> R.drawable.cue_shop
+            "storage" -> R.drawable.cue_home
+            else -> R.drawable.cue_task
+        }), null, tint = ink, modifier = Modifier.padding(10.dp).size(26.dp))
+    }
 }
 
 @Composable
-internal fun IllustratedTaskHeader(title: String, attribution: (@Composable () -> Unit)? = null) {
-    val art = when (taskCue(title)) {
-        "bike" -> R.drawable.bike_royal
-        "pet" -> R.drawable.pet_royal
-        "storage" -> R.drawable.dojo_storage
-        else -> null
+internal fun TaskArtwork(title: String, height: androidx.compose.ui.unit.Dp = 220.dp, header: @Composable () -> Unit = {}) {
+    val load = LocalTaskArtwork.current
+    // A changed account/title immediately gets a fresh state, never the previous account's bitmap.
+    val image = remember(load, title) { mutableStateOf<android.graphics.Bitmap?>(null) }
+    LaunchedEffect(load, title) {
+        try { image.value = load(title) }
+        catch (error: kotlinx.coroutines.CancellationException) { throw error }
+        catch (_: Exception) { /* Decorative art falls back to the bundled scene. */ }
     }
     val surface = MaterialTheme.colorScheme.surface
-    Box(Modifier.fillMaxWidth().heightIn(min = if (art == null) 0.dp else 156.dp)) {
-        if (art != null) {
-            Image(painterResource(art), null, contentScale = ContentScale.Fit, alignment = Alignment.CenterEnd,
-                modifier = Modifier.matchParentSize())
-            // One continuous veil keeps all text legible without cropping the subject.
-            Box(Modifier.matchParentSize().background(Brush.horizontalGradient(
-                0f to surface, .55f to surface.copy(alpha = .96f), 1f to surface.copy(alpha = .62f))))
-        }
-        Column(Modifier.fillMaxWidth().padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
-            attribution?.invoke()
-        }
+    Box(Modifier.fillMaxWidth().height(height).testTag("task-artwork")) {
+        val bitmap = image.value
+        if (bitmap == null) Image(painterResource(R.drawable.dojo_garden),
+            null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize())
+        else Image(bitmap = bitmap.asImageBitmap(), contentDescription = null,
+            contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize())
+        Box(Modifier.matchParentSize().background(Brush.verticalGradient(
+            0f to surface.copy(alpha = .6f), .28f to surface.copy(alpha = .05f),
+            .62f to Color.Transparent, 1f to surface)))
+        header()
     }
 }
 

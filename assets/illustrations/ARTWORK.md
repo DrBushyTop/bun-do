@@ -8,7 +8,7 @@ Selected app assets are WebP derivatives resized to 960 × 640 at quality 82.
 They are illustrative examples, not output generated from users' task data.
 The approved app logo was not regenerated or edited.
 
-## Native assets and source
+## Original task-header assets and source
 
 Copied without image edits from the approved household reference,
 `c0449a18b1eacc4c9878dc2b8478e23c7ef22b73` on `prototype/household-v1`.
@@ -17,6 +17,10 @@ Android resource names replace hyphens with underscores.
 - `bike-royal.webp` becomes `bike_royal.webp`.
 - `pet-royal.webp` becomes `pet_royal.webp`.
 - `dojo-storage.webp` becomes `dojo_storage.webp`.
+
+The September 17 task redesign retired these three Android copies. Their source
+remains in the pinned prototype commit above. Task detail now reuses cached
+adventure artwork, with the bundled dojo garden as its fallback.
 
 The dojo derivative uses WebP quality 84. Its original prompt mentions a later
 adventure concept; native V1 uses only the approved image in ordinary task

@@ -256,6 +256,17 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
         { choice, retry -> AdventureArtworkClient.load(context, repository, data, choice, retry) }
     }
     CompositionLocalProvider(LocalAdventureArtwork provides artworkLoader) {
+    val taskArtworkLoader: suspend (String) -> android.graphics.Bitmap? = remember(data) { { title ->
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val directory = data.directory
+            if (directory == null) null else {
+                val theme = when (taskCue(title)) { "storage" -> "storage"; "shop" -> "kitchen"; "bike", "pet" -> "garden"; else -> "home" }
+                val cache = ArtworkCache(java.io.File(directory, "adventure-artwork"), data.lease)
+                (cache.read("dojo-v1-$theme") ?: cache.read("dojo-v1-home")).also { data.lease.check() }
+            }
+        }
+    } }
+    CompositionLocalProvider(LocalTaskArtwork provides taskArtworkLoader) {
     InboxApp(state, model, appearance, onAppearance, voice = data.voice, voiceTarget = VoiceTarget(selected.scope), onAccount = onAccount, onWelcome = onWelcome, onReminders = onReminders, onRecovery = onRecovery, queueTitle = selected.name, onHomeBack = ::back,
         queueTopBar = { bar -> HouseholdScene(
             if (joy) "joy" else if (current?.blocked != null || recovery != null || current == null) "dojo" else sceneActivity(canonical.values.map(::JSONObject), now),
@@ -312,11 +323,14 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
             }
         } },
         rowSummary = { id -> byId[id]?.let { SharedTaskSummary(it, membership); ChecklistProgress(it, byId) } },
-        taskControls = { id, onOpen -> byId[id]?.let { task ->
-            SharedChecklist(task, byId, membership, !busy && current?.blocked == null && recovery == null,
-                onOpen, { checklistId = id }, ::act)
-            SharedTaskControls(task, taskStates, membership, !busy && current?.blocked == null && recovery == null, failed, ::act)
-            SharedRepeatControls(task, membership, !busy && current?.blocked == null && recovery == null) { displayed, blueprint ->
+        taskControls = { id, section, onOpen, closeMenu -> byId[id]?.let { task ->
+            if (section == TaskDetailSection.CONTENT || section == TaskDetailSection.STEPS) SharedChecklist(task, byId, membership, !busy && current?.blocked == null && recovery == null,
+                onOpen, { closeMenu(); checklistId = id }, ::act, actionsOnly = section == TaskDetailSection.STEPS)
+            SharedTaskControls(task, taskStates, membership, !busy && current?.blocked == null && recovery == null, failed, { action ->
+                if (section == TaskDetailSection.MORE || section == TaskDetailSection.SCHEDULE) closeMenu()
+                act(action)
+            }, section)
+            if (section == TaskDetailSection.SCHEDULE) SharedRepeatControls(task, membership, !busy && current?.blocked == null && recovery == null) { displayed, blueprint ->
                 run {
                     repository.changeRepeat(displayed, blueprint) {
                         (context.applicationContext as BunDoApplication).withAccountToken(data) { token ->
@@ -388,6 +402,7 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
             if (failed) Text(stringResource(R.string.shared_action_failed), color = MaterialTheme.colorScheme.error)
         }
     }) })
+    }
     checklistDraft?.takeUnless { dictatingSteps || current?.blocked != null }?.let { draft -> ChecklistEditor(draft, busy || current?.blocked != null, failed,
         repository::saveChecklistDraft,
         onSave = { latest -> run {

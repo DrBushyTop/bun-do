@@ -31,9 +31,11 @@ internal fun ChecklistProgress(task: JSONObject, tasks: Map<String, JSONObject>)
 
 @Composable
 internal fun SharedChecklist(task: JSONObject, tasks: Map<String, JSONObject>, membership: JSONObject?, enabled: Boolean,
-    onOpen: (String) -> Unit, onAdd: () -> Unit, onAction: (SharedTaskAction) -> Unit) {
+    onOpen: (String) -> Unit, onAdd: () -> Unit, onAction: (SharedTaskAction) -> Unit,
+    actionsOnly: Boolean = false) {
     var confirmation by remember(task.getString("id")) { mutableStateOf<SharedTaskAction?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (!actionsOnly) {
         task.nullableString("parentId")?.let { parent ->
             SettingsNavigationRow(stringResource(R.string.checklist_parent), { onOpen(parent) }, Modifier.testTag("checklist-parent"))
         }
@@ -59,11 +61,12 @@ internal fun SharedChecklist(task: JSONObject, tasks: Map<String, JSONObject>, m
                 }
             }
         }
+        }
         val aiSplit = task.optJSONObject("cleanup")?.takeIf { it.optString("mode") == "SPLIT" }
         if (aiSplit?.optString("status") in listOf("PENDING", "RUNNING")) Text(stringResource(R.string.split_pending))
         if (aiSplit?.optString("status") == "READY") Text(stringResource(R.string.split_review))
         if (aiSplit?.optString("status") == "FAILED") Text(stringResource(R.string.split_failed))
-        if (task.isNull("parentId") && task.isNull("deletion") &&
+        if (actionsOnly && task.isNull("parentId") && task.isNull("deletion") &&
             (task.optString("lifecycle", "OPEN") == "OPEN" || task.optBoolean("emptyChecklist")))
             OutlinedButton(onClick = onAdd, enabled = enabled, modifier = Modifier.testTag("checklist-add")) {
                 Text(stringResource(if (task.optBoolean("isChecklist")) R.string.checklist_add else R.string.checklist_split))
