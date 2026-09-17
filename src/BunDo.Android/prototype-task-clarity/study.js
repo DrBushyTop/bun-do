@@ -2,10 +2,10 @@
    No microphone, AI, persistence, network requests or real task mutations.
    Voice revision is proposed; explicit initial checklist capture already exists for shared tasks. */
 const params = new URLSearchParams(location.search);
-let variant = ['A','B','C'].includes(params.get('variant')) ? params.get('variant') : 'A';
+let variant = 'A'; // Owner-selected structure; earlier options remain in Git history.
 let screen = ['queue','task','checklist','review'].includes(params.get('screen')) ? params.get('screen') : 'task';
 let lang = params.get('lang') === 'en' ? 'en' : 'fi';
-let compare = params.get('mode') !== 'focus';
+let compare = false;
 let large = params.get('text') === 'large';
 const t = (fi,en) => lang === 'fi' ? fi : en;
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -43,6 +43,10 @@ function picture(s,kind='detail-art') {
   const task=taskSamples().find(x=>x.key===s.taskKey)||taskSamples()[0];
   return `<img class="${kind}" src="assets/${task.image}" alt="" loading="eager">`;
 }
+function artworkHeader(s,content) {
+  // Reused bundled adventure scene demonstrates catalog reuse, not a live catalog read.
+  return `<div class="task-banner"><img class="banner-art" src="assets/dojo-garden.webp" alt="">${content}</div>`;
+}
 function initial() {
   return {taskKey:'cloth',view:screen==='queue'?'queue':'detail',title:sampleTitle(),note:sampleNote(),items:screen==='checklist'?sampleSteps():[],checked:[],
     menu:null,claimed:false,due:'',snooze:'',repeat:'',position:'',done:false,deleted:false,cancelled:false,
@@ -68,7 +72,7 @@ function checklist(s,draft=false) {
 function toast(s) { return s.toast?`<div class="toast" role="status"><span>${esc(s.toast)}</span>${s.undo?`<button class="text-button" data-action="undo">${esc(t('Kumoa','Undo'))}</button>`:''}</div>`:''; }
 function completeButton(s) { return s.items.length?`<p class="muted">${esc(t('Tehtävä valmistuu, kun kaikki vaiheet on tehty.','Complete each step to finish this task.'))}</p>`:button(t('Merkitse valmiiksi','Mark complete'),'complete','grow','check'); }
 function focusView(s) {
-  return `${bar(t('Tehtävä','Task'))}<div class="content">${picture(s)}<h2 class="task-title">${esc(s.title)}</h2><p class="task-description">${esc(s.note)}</p>${owner(s)}${checklist(s)}</div>${toast(s)}<footer class="footer"><div class="actions">${button(t('Muokkaa','Edit'),'edit','secondary')}${completeButton(s)}</div></footer>`;
+  return `${artworkHeader(s,bar(t('Tehtävä','Task')))}<div class="content"><h2 class="task-title">${esc(s.title)}</h2><p class="task-description">${esc(s.note)}</p>${owner(s)}${checklist(s)}</div>${toast(s)}<footer class="footer"><div class="actions">${button(t('Muokkaa','Edit'),'edit','secondary')}${completeButton(s)}</div></footer>`;
 }
 function editView(s) {
   return `${bar(t('Tehtävä','Task'))}<div class="content">${picture(s,'edit-art')}${!s.items.length?`<label class="completion-row"><input type="checkbox" data-complete><span>${esc(t('Merkitse valmiiksi','Mark complete'))}</span></label>`:''}
@@ -81,7 +85,7 @@ function queueBase(s,open=false,v=variant) {
   return `<div class="queue-background" ${open?'inert':''}><div class="queue-scene"><header class="appbar"><img class="brand" src="assets/bun.svg" alt=""><strong>Bun Do</strong>${ib('more',t('Listan toiminnot','Queue actions'),'queue-menu')}</header>
     <button class="adventure-entry" data-action="adventure-demo">${icon('list')}<span>${esc(t('Seikkailu','Adventure'))}</span>${icon('next')}</button></div>
     <div class="queue-content"><div class="queue-count"><strong>${esc(t('3 tehtävää','3 tasks'))}</strong><button class="text-button" data-action="queue-menu">${esc(t('Kaikki','All'))}${icon('next')}</button></div>
-    ${samples.map(task=>`<button class="visual-task" data-action="open-task:${task.key}"><span class="category ${task.tint}">${icon(task.glyph)}</span><span class="task-copy"><strong>${esc(task.title)}</strong>${task.items?.length?`<small>${task.checked.length}/${task.items.length} ${esc(t('vaihetta','steps'))}</small>`:''}</span><img class="task-thumb" src="assets/${task.image}" alt="">${icon('next')}</button>`).join('')}
+    ${samples.map(task=>`<button class="visual-task" data-action="open-task:${task.key}"><span class="category ${task.tint}">${icon(task.glyph)}</span><span class="task-copy"><strong>${esc(task.title)}</strong>${task.items?.length?`<small>${task.checked.length}/${task.items.length} ${esc(t('vaihetta','steps'))}</small>`:''}</span>${icon('next')}</button>`).join('')}
     </div><div class="capture-dock">${button(t('Kirjoita','Type'),'new-demo','secondary grow','plus')}${button(t('Puhu tehtävä','Speak a task'),'capture-demo','grow','mic')}</div>
     <nav class="app-tabs" aria-label="${esc(t('Päänavigaatio','Main navigation'))}"><button class="selected" data-action="queue">${icon('list')}<span>${esc(t('Tehtävät','Tasks'))}</span></button><button data-action="activity-demo">${icon('clock')}<span>${esc(t('Tapahtumat','Activity'))}</span></button><button data-action="together-demo">${icon('heart')}<span>${esc(t('Yhdessä','Together'))}</span></button></nav></div>`;
 }
@@ -90,8 +94,8 @@ function sheetView(s,v) {
     <div class="content">${picture(s,'sheet-art')}<h2 class="task-title">${esc(s.title)}</h2><p class="task-description">${esc(s.note)}</p>${owner(s)}${checklist(s)}</div>${toast(s)}<footer class="footer">${completeButton(s)}</footer></section>`;
 }
 function reviewView(s,v) {
-  return `${bar(t('Tarkista ehdotus','Review suggestion'),'leave-review','review-menu',true)}
-    <div class="content"><p class="muted">${esc(t('Ei vielä tallennettu','Not saved yet'))}</p>${picture(s,'review-art')}<h2 class="task-title space">${esc(s.title)}</h2>
+  return `${artworkHeader(s,bar(t('Tarkista ehdotus','Review suggestion'),'leave-review','review-menu',true))}
+    <div class="content"><p class="muted">${esc(t('Ei vielä tallennettu','Not saved yet'))}</p><h2 class="task-title space">${esc(s.title)}</h2>
     <p class="task-description">${esc(s.note)}</p>${checklist(s,true)}
     ${s.revisionCount?`<p class="notice space">${esc(t('Puhemuutos hyväksytty luonnokseen. Voit vielä muokata ennen tallennusta.','Voice revision accepted into the draft. You can still edit before saving.'))}</p>`:''}</div>${toast(s)}
     <footer class="footer stack">${button(t('Muuta puhumalla','Revise by voice'),'revise','tonal fill','mic')}
@@ -122,12 +126,12 @@ function overlay(s,v) {
       title=t('Tehtävän toiminnot','Task actions'); showBack=false;
       html=row(t('Ajoitus','Schedule'),'schedule','clock',t('Määräpäivä, lykkäys ja toisto','Due date, snooze and repeat'))+
         row(t('Vaiheet ja tekoäly','Steps and AI'),'steps-menu','list')+
-        row(t('Tiedot ja alkuperäinen teksti','Details and original text'),'info','info')+
-        row(t('Muut toiminnot','More actions'),'more','more',t('Järjestys, peruminen ja poisto','Position, cancellation and deletion'));
+        row(t('Muut toiminnot','More actions'),'more','more',t('Järjestys, peruminen ja poisto','Position, cancellation and deletion'))+
+        row(t('Alkuperäinen teksti ja tiedot','Original text and details'),'info','info');
       break;
     case 'review-menu':
       title=t('Luonnos','Draft'); showBack=false;
-      html=row(t('Alkuperäinen sanelu','Original dictation'),'original','info')+row(t('Hylkää luonnos','Discard draft'),'discard','trash','',true);
+      html=row(t('Hylkää luonnos','Discard draft'),'discard','trash','',true)+row(t('Alkuperäinen sanelu','Original dictation'),'original','info');
       break;
     case 'edit':
       title=t('Muokkaa tehtävää','Edit task'); showBack=false;
@@ -230,12 +234,12 @@ function overlay(s,v) {
 }
 function render(focusDialog=false) {
   document.documentElement.lang=lang;
-  document.querySelector('#study-header').innerHTML=`<div class="study-top"><h1>${esc(t('Tehtävä ilman toimintoviidakkoa','Task details, without the clutter'))}</h1><span class="prototype-label">${esc(t('Bun Do · suunnittelukokeilu #70','Bun Do · design study #70'))}</span></div>
-    <div class="toolbar"><label>${esc(t('Näkymä','Screen'))}<select id="screen">${[['queue',t('Etusivu ja tehtäväkuvat','Home and task images')],['task',t('Tavallinen tehtävä','Simple task')],['checklist',t('Tehtävä ja vaiheet','Task with steps')],['review',t('Tekoälyn ehdotus','AI suggestion')]].map(([k,n])=>`<option value="${k}" ${screen===k?'selected':''}>${esc(n)}</option>`).join('')}</select></label>
+  document.querySelector('#study-header').innerHTML=`<div class="study-top"><h1>${esc(t('Valittu A · kevyempi tehtäväsivu','Selected A · a lighter task page'))}</h1><span class="prototype-label">${esc(t('Bun Do · suunnittelukokeilu #70','Bun Do · design study #70'))}</span></div>
+    <div class="toolbar"><label>${esc(t('Näkymä','Screen'))}<select id="screen">${[['queue',t('Tehtävälista','Task list')],['task',t('Tavallinen tehtävä','Simple task')],['checklist',t('Tehtävä ja vaiheet','Task with steps')],['review',t('Tekoälyn ehdotus','AI suggestion')]].map(([k,n])=>`<option value="${k}" ${screen===k?'selected':''}>${esc(n)}</option>`).join('')}</select></label>
     <label>${esc(t('Kieli','Language'))}<select id="lang"><option value="fi" ${lang==='fi'?'selected':''}>Suomi</option><option value="en" ${lang==='en'?'selected':''}>English</option></select></label>
     <label><input id="large" type="checkbox" ${large?'checked':''}>${esc(t('Iso teksti','Large text'))}</label>
-    <label class="desktop-only"><input id="compare" type="checkbox" ${compare?'checked':''}>${esc(t('Vertaa rinnakkain','Compare side by side'))}</label></div>
-    <p class="study-note">${esc(screen==='review'?t('Uusi ehdotus: puheella tarkennus nykyiseen luonnokseen, muutosten esikatselu ja erillinen hyväksyntä. Sama kokeiltava kulku kaikissa vaihtoehdoissa.','Proposed feature: revise the current draft by voice, inspect the changes, then accept. The same interactive flow is shown in all three options.'):t('Avaa valikko ja kokeile toimintoja. Kaikki muutokset ovat esimerkkejä tässä välilehdessä, eivät oikeita tehtäviä.','Open the menus and try the actions. Changes are examples in this tab, never real tasks.'))}</p>`;
+</div>
+    <p class="study-note">${esc(screen==='review'?t('Uusi ehdotus: puheella tarkennus nykyiseen luonnokseen, muutosten esikatselu ja erillinen hyväksyntä. Puhe ja muutokset ovat tässä esimerkkejä.','Proposed feature: revise the current draft by voice, inspect the changes, then accept. Speech and changes are simulated here.'):t('Avaa valikko ja kokeile toimintoja. Kaikki muutokset ovat esimerkkejä tässä välilehdessä, eivät oikeita tehtäviä.','Open the menus and try the actions. Changes are examples in this tab, never real tasks.'))}</p>`;
   const labels=variants();
   document.querySelector('#previews').className=compare?'':'focus';
   document.querySelector('#previews').innerHTML=['A','B','C'].filter(v=>compare||v===variant).map(v=>{
@@ -247,13 +251,14 @@ function render(focusDialog=false) {
       ${finishedState?finished(s):screen==='review'&&!s.reviewDone?reviewView(s,v):s.view==='queue'?queueBase(s,false,v):v==='A'?focusView(s):v==='B'?editView(s):sheetView(s,v)}</div>${overlay(s,v)}</section>
       <details class="state"><summary>${esc(t('Esittelyn tila','Prototype state'))}</summary><pre>${esc(JSON.stringify(s,null,2))}</pre></details></article>`;
   }).join('');
-  document.querySelector('#findings').innerHTML=`<h2>${esc(t('Mitä muuttuisi?','What would change?'))}</h2><p>${esc(t('Suosittelen A:ta. Se säilyttää tutun tehtäväsivun, mutta erottaa tekemisen ja hallinnan. B sopii jatkuvaan muokkaukseen. C vähentää listan ja tehtävän välillä siirtymistä.','I recommend A. It keeps the familiar task page while separating doing from administration. B favors frequent editing. C reduces navigation between the queue and details.'))}</p>
+  document.querySelector('#findings').innerHTML=`<h2>${esc(t('Mitä muuttuisi?','What would change?'))}</h2><p>${esc(t('A on valittu. Listalla säilyvät värilliset kuvakkeet, mutta ei tehtäväkuvia. Tehtävän kuva sulautuu ylätunnisteeseen ilman erillistä kuvapalikkaa. Alkuperäinen teksti ja tiedot ovat valikon viimeisenä.','A is selected. The list keeps colored icons, without task images. Task artwork fades into the header instead of taking a separate block. Original text and details come last in the menu.'))}</p>
     <details class="space"><summary>${esc(t('Nykyinen toiminta ja uudet ehdotukset','Existing behavior and new proposals'))}</summary><ul>
     <li>${esc(t('Jo olemassa: tekoäly voi luoda enintään 16 suoraa vaihetta ensimmäisestä sanelusta, jos siinä luetellaan tuotteita tai vaiheita. Ei automaattisia keksittyjä vaiheita yhdelle toiminnolle.','Already exists: AI can create up to 16 direct steps from initial dictation when products or steps are explicitly listed. It does not invent steps for a simple action.'))}</li>
     <li>${esc(t('Vaatii perheen tehtävälistan, verkkoyhteyden ja tekoälyanalyysin asetuksen. Paikallisen inboxin sanelu ei luo vaiheita.','Requires a shared family list, connectivity and AI analysis enabled. Local inbox dictation does not create checklist steps.'))}</li>
     <li>${esc(t('Uutta: nykyisen, myös käsin muokatun luonnoksen tarkentaminen puheohjeella. Peruuttaminen, virhe tai hylkäys säilyttää vanhan luonnoksen.','New: revise the current draft, including manual edits, with a spoken instruction. Cancel, failure or rejection keeps the previous draft.'))}</li>
-    <li>${esc(t('Kuvat ovat tehtäväkohtaisia. Liinatehtävälle luodaan oma kuva; pyörä- ja pahvitehtävillä on omat aiemmin luodut kuvat. Värilliset kuvakkeet ovat visuaalisia vihjeitä, eivät uusia kategorioita.','Images belong to individual tasks. The cloth task has its own new illustration; bike and cardboard tasks reuse separate earlier generated artwork. Colored icons are visual cues, not new categories.'))}</li>
+    <li>${esc(t('Tehtävän ylätunniste käyttää tässä samaa olemassa olevaa seikkailumaisemaa. Näin eri tehtävät voivat käyttää samaa kuvaa. Tuotannossa kuvan voi valita tallennetusta seikkailukuvastosta; prototyyppi ei lue sitä palvelimelta.','The task header reuses the same existing adventure scene here. Different tasks can share artwork. Production can select from the stored adventure catalog; this prototype does not fetch that catalog.'))}</li>
     <li>${esc(t('Tämä on selainprototyyppi. Ei mikrofoni-, tekoäly- tai tilikutsuja. Ulkoasu ja suuret fontit on vielä tarkistettava natiivissa Androidissa valinnan jälkeen.','This is a browser prototype. No microphone, AI or account calls. Native Android layout and large-text verification follow after selection.'))}</li></ul></details>`;
+  document.querySelector('#switcher').hidden=!compare;
   document.querySelector('#switcher').innerHTML=`<button data-cycle="-1" aria-label="${esc(t('Edellinen vaihtoehto','Previous option'))}">${icon('back')}</button><span class="variant-name">${variant} · ${esc(labels[variant].name)}</span><button data-cycle="1" aria-label="${esc(t('Seuraava vaihtoehto','Next option'))}">${icon('next')}</button>`;
   updateUrl();
   if(focusDialog) requestAnimationFrame(()=>document.querySelector(`.option[data-variant="${variant}"] .sheet button`)?.focus({preventScroll:true}));
@@ -376,7 +381,7 @@ document.addEventListener('keydown',event=>{
     if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
     else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
   }
-  if(!modal&&!event.target.closest('input,textarea,select,[contenteditable]')&&['ArrowLeft','ArrowRight'].includes(event.key)){
+  if(compare&&!modal&&!event.target.closest('input,textarea,select,[contenteditable]')&&['ArrowLeft','ArrowRight'].includes(event.key)){
     event.preventDefault();document.querySelector(`[data-cycle="${event.key==='ArrowLeft'?-1:1}"]`).click();
   }
 });

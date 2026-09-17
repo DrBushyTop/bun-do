@@ -4,7 +4,37 @@ Throwaway browser prototype for issue #70, based on master `46abf1ee`.
 Keep this on `prototype/task-detail-clarity`; do not merge it into the app.
 No native app, release or design-contract changes are included.
 
-## Question
+## Selected direction, September 17, 2026
+
+The owner selected A for task details and the shared review flow. This refinement
+keeps colored task cues on the main list but removes its task thumbnails. The
+selected task and draft review reuse the existing bundled adventure scene in a
+96px navigation header. There is no separate picture block above the title.
+Original text and attribution are last in the action menus.
+
+This is still the browser prototype, not native implementation. A is now the
+only displayed structure. The original A/B/C comparison remains at commit
+`a4d938e39fae2e8eb915da1f8b00f1f2227f4637` on this branch.
+
+## Reusing stored adventure artwork
+
+`ArtworkCatalog` already owns five generic reusable themes: home, storage,
+garden, kitchen and cleaning. The Android `ArtworkCache` is account-scoped.
+Task text is not needed in the shared image catalog or an image-generation
+prompt. Prefer a suitable ready catalog image, retaining a bundled fallback
+when offline or missing. Do not generate an image when opening a task.
+
+The current `AdventureArtworkClient` and `/adventure-artwork` endpoint authorize
+reads through a current adventure choice, batch, workspace and epoch. They are
+not a general task-image endpoint. A native follow-up must add an authorized
+catalog-read path or share an already available account-scoped cached image,
+without inventing adventure IDs or weakening ownership checks.
+
+This browser refinement reuses bundled `dojo-garden.webp` to demonstrate the
+compact treatment. It has not fetched production catalog entries and does not
+claim those five images are currently generated or ready.
+
+## Original question
 
 Can a task be read, edited and completed without exposing every management
 command? Compare three structures in the existing paper/evergreen Material
@@ -15,8 +45,8 @@ individual tasks, in the queue and detail views.
 - B: inline title/description editing and a completion checkbox.
 - C: a detail sheet over the task list.
 
-The home screen uses the same per-task imagery in all options. Opening a row
-shows that option's detail structure. Queue filter/reorder, capture and other
+The initial comparison used per-task queue thumbnails. The selected refinement
+removes them. Opening a row shows A's compact illustrated detail header. Queue filter/reorder, capture and other
 app destinations are outside this comparison and open an explicit scope note.
 The AI review is a shared proposed flow rather than three competing AI flows.
 
@@ -36,11 +66,11 @@ Remove only its route with `tailscale serve --https=443 --set-path /task-clarity
 Never reset Tailscale Serve to remove a prototype.
 
 URL controls:
-- `variant=A|B|C`. The bottom arrows and keyboard arrows cycle variants.
+- A is selected. Old variant and comparison parameters resolve to A in focus mode.
 - `screen=queue|task|checklist|review`.
-- `lang=fi|en`, `text=large`, `mode=compare|focus`.
+- `lang=fi|en`, `text=large`.
 
-Desktop compares three views; phones show one. Text inputs keep their arrow
+The selected A view appears on desktop and phones. Text inputs keep their arrow
 keys. Screen/language changes reset sample data. Task state stays in memory
 while navigating within an option; reload resets everything. The optional
 Prototype state disclosure and console show the current simulation state.
