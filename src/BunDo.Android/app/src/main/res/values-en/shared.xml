@@ -26,5 +26,5 @@
     <string name="shared_dismiss">Dismiss this edit</string>
     <string name="shared_action_failed">The change did not go through. Your text is safe. Review the current task and try again.</string>
     <string name="shared_registration_recovery">The status of older edits could not be confirmed. Reconnect this device, then choose which text to copy.</string>
-    <string name="shared_import_file">Import recovery file (JSON)</string>
+    <string name="shared_import_file">Open a recovery file</string>
 </resources>

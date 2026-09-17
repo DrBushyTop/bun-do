@@ -66,6 +66,7 @@ class WelcomeLocalFlowTest {
             compose.waitUntil(10_000) { models.none { it.busy } }
             compose.onNodeWithTag("welcome-family").performScrollTo().performClick()
             compose.onNodeWithTag("welcome-create").performScrollTo().performClick()
+        compose.onNodeWithTag("welcome-continue").performScrollTo().performClick()
             compose.onNodeWithTag("welcome-sign-in-alice").performScrollTo().performClick()
             compose.waitUntil(30_000) { !models[0].busy }
             assertEquals("Owner sign-in: ${models[0].errorCode}", "alice", stores[0].active.value?.identity?.subject)

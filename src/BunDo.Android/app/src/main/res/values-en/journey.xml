@@ -2,13 +2,16 @@
     <string name="journey_title">Bun’s journey</string>
     <string name="journey_back">Back</string>
     <string name="journey_intro">A little way forward, together</string>
-    <string name="journey_start_body">As your family finishes tasks, Bun explores the paths beyond the dojo. Each new first completion moves the journey forward. There is no rush.</string>
+    <string name="journey_start_body">As your family finishes tasks, Bun explores the paths beyond the dojo. There is no rush.</string>
     <string name="journey_start">Start our journey</string>
     <string name="journey_start_hint">Starts online for the whole family. Earlier completions stay in your statistics.</string>
     <string name="journey_open">See Bun’s journey</string>
     <string name="journey_unavailable">Connect and refresh to see your family’s journey.</string>
     <string name="journey_failed">Couldn’t reach the family just now. Check your connection and try again.</string>
-    <string name="journey_progress">First completions at this stop: %1$d / %2$d</string>
+    <plurals name="journey_progress">
+        <item quantity="one">%1$d of %2$d task toward the next stop</item>
+        <item quantity="other">%1$d of %2$d tasks toward the next stop</item>
+    </plurals>
     <string name="journey_at">Bun is at %1$s</string>
     <string name="journey_explanation">New first completions count after sync, even outside adventures. Reopening a task never takes a step away.</string>
     <string name="journey_resting">Bun has reached the end of this path and can rest here. Your family’s completions still count.</string>

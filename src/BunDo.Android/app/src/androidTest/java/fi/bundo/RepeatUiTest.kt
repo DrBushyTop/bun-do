@@ -82,7 +82,7 @@ class RepeatUiTest {
         compose.onNodeWithText("Aseta toisto").performClick()
         compose.onNodeWithTag("repeat-title").performScrollTo().assertIsDisplayed()
         screenshot("repeat-fi-large")
-        compose.onNodeWithText("Tallenna toisto verkossa").performScrollTo().performClick()
+        compose.onNodeWithText("Tallenna toisto").performScrollTo().performClick()
         compose.waitUntil(5_000) { saved != null }
         assertEquals("DAILY", JSONObject(saved!!).getString("frequency"))
         assertTrue(JSONObject(saved!!).isNull("weekday"))

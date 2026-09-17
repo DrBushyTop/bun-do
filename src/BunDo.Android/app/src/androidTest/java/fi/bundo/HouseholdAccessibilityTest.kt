@@ -59,8 +59,10 @@ class HouseholdAccessibilityTest {
         compose.onNodeWithTag("account").performClick()
         compose.onNodeWithText(compose.activity.getString(R.string.account_export_warning)).assertDoesNotExist()
         compose.onNodeWithTag("account-recovery-details").performScrollTo().performClick()
+        compose.onNodeWithTag("recovery-backup").performScrollTo().performClick()
         compose.onNodeWithText(compose.activity.getString(R.string.account_export_warning)).performScrollTo().assertIsDisplayed()
         screenshot("finish-account-recovery.png")
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
         compose.onNodeWithTag("account-diagnostics").performScrollTo().performClick()
         compose.onNodeWithTag("account-refresh").performScrollTo().assertIsDisplayed()
         screenshot("finish-account-details.png")
@@ -103,6 +105,9 @@ class HouseholdAccessibilityTest {
                 val light = android.util.TypedValue()
                 assertTrue(dialog!!.context.theme.resolveAttribute(android.R.attr.isLightTheme, light, true))
                 assertTrue(light.data != 0)
+                val accent = android.util.TypedValue()
+                assertTrue(dialog!!.context.theme.resolveAttribute(android.R.attr.colorAccent, accent, true))
+                assertEquals(compose.activity.getColor(R.color.launcher_background), accent.data)
             }
             screenshot("finish-native-date-light.png")
         } finally {
@@ -113,8 +118,8 @@ class HouseholdAccessibilityTest {
         }
     }
 
-    @Test fun englishJoinFormKeepsTypedInputAfterInvalidLink() = joinForm("en", 1.3f)
-    @Test fun finnishJoinFormSupportsLargeTextAndBack() = joinForm("fi", 2f)
+    @Test fun englishFamilyManagementOpensSharedSetup() = joinForm("en", 1.3f)
+    @Test fun finnishFamilyManagementSupportsLargeTextAndBack() = joinForm("fi", 2f)
 
     private fun joinForm(language: String, scale: Float) {
         val activity = compose.activity
@@ -125,22 +130,20 @@ class HouseholdAccessibilityTest {
         }
         val translated = activity.createConfigurationContext(configuration)
         var closed = false
+        var setup = false
         compose.runOnUiThread { activity.setContent {
             androidx.compose.runtime.CompositionLocalProvider(
                 androidx.compose.ui.platform.LocalContext provides translated,
                 androidx.compose.ui.platform.LocalResources provides translated.resources,
                 androidx.compose.ui.platform.LocalConfiguration provides configuration,
                 androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(activity.resources.displayMetrics.density, scale),
-            ) { fi.bundo.ui.BunDoTheme("light") { fi.bundo.ui.HouseholdScreen(data, model, null, {}, { closed = true }) } }
+            ) { fi.bundo.ui.BunDoTheme("light") { fi.bundo.ui.HouseholdScreen(data, model, { setup = true }, onClose = { closed = true }) } }
         } }
-        compose.waitUntil(10000) { compose.onAllNodes(hasTestTag("household-join") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithTag("household-join").performScrollTo().performClick()
-        compose.onNodeWithTag("household-your-name").performScrollTo().performTextInput("Aino")
-        compose.onNodeWithTag("household-link").performScrollTo().performTextInput("not-an-invitation")
-        compose.onNodeWithTag("household-join-confirm").performScrollTo().performClick()
-        compose.onNodeWithText(translated.getString(R.string.household_invalid_link)).performScrollTo().assertIsDisplayed()
-        compose.onNodeWithTag("household-link").performScrollTo().assertTextContains("not-an-invitation")
-        screenshot("finish-join-$language.png")
+        compose.waitUntil(10000) { compose.onAllNodes(hasTestTag("household-setup") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("household-setup").performScrollTo().performClick()
+        assertTrue(setup)
+        compose.onNodeWithTag("household-link").assertDoesNotExist()
+        screenshot("finish-family-$language.png")
         compose.runOnUiThread { activity.onBackPressedDispatcher.onBackPressed() }
         assertTrue(closed)
     }

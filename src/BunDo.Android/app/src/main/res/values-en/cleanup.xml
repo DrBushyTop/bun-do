@@ -5,7 +5,7 @@
     <string name="cleanup_failed">Text cleanup did not finish. Retry or edit it yourself.</string>
     <string name="cleanup_ready">A text suggestion is ready to compare. Your current text was kept.</string>
     <string name="cleanup_cancel">Cancel cleanup</string>
-    <string name="cleanup_compare">Compare text</string>
+    <string name="cleanup_compare">Review suggestion</string>
     <string name="cleanup_current">Current text</string>
     <string name="cleanup_suggestion">AI suggestion</string>
     <string name="cleanup_apply">Use suggestion</string>

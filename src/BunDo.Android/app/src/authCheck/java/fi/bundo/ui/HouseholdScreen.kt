@@ -32,22 +32,18 @@ import java.time.format.FormatStyle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HouseholdScreen(account: AccountData, signIn: SignInModel, incomingLink: String?,
-    onLinkConsumed: () -> Unit, onClose: () -> Unit) {
+fun HouseholdScreen(account: AccountData, signIn: SignInModel, onSetup: () -> Unit, initialHouseholdId: String? = null, onClose: () -> Unit) {
     val model: HouseholdModel = viewModel(key = "households-${account.lease.generation}", factory = viewModelFactory {
         initializer { HouseholdModel(account, signIn) }
     })
+    var initialHome by remember { mutableStateOf(initialHouseholdId) }
+    LaunchedEffect(model.homes, initialHome) {
+        val home = model.homes.firstOrNull { it.id == initialHome }
+        if (home != null) { initialHome = null; model.open(home) }
+    }
     val context = LocalContext.current
     val selected by account.selectedHousehold.collectAsState()
-    var displayName by remember { mutableStateOf("") }
-    var name by remember { mutableStateOf("") }
-    var link by remember { mutableStateOf(incomingLink.orEmpty()) }
-    var showCreate by remember { mutableStateOf(false) }
-    var showJoin by remember { mutableStateOf(incomingLink != null) }
     var confirm by remember { mutableStateOf<Pair<Int, () -> Unit>?>(null) }
-    LaunchedEffect(incomingLink) {
-        incomingLink?.let { link = it; showJoin = true; model.back(); onLinkConsumed() }
-    }
     LaunchedEffect(model, signIn.busy) {
         if (!signIn.busy && account.registrationId != null) model.refresh()
     }
@@ -76,27 +72,9 @@ fun HouseholdScreen(account: AccountData, signIn: SignInModel, incomingLink: Str
                     }
                 }
                 if (model.homes.isEmpty()) Text(stringResource(R.string.household_intro))
-                Button(onClick = { showCreate = !showCreate; showJoin = false }, enabled = !model.busy,
-                    modifier = Modifier.fillMaxWidth().testTag("household-create")) { Text(stringResource(R.string.household_create)) }
-                if (showCreate || showJoin) OutlinedTextField(displayName, { if (it.length <= 60) displayName = it },
-                    label = { Text(stringResource(R.string.household_your_name)) }, singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag("household-your-name"))
-                if (showCreate) {
-                    OutlinedTextField(name, { if (it.length <= 80) name = it }, label = { Text(stringResource(R.string.household_name)) },
-                        modifier = Modifier.fillMaxWidth().testTag("household-name"), singleLine = true)
-                    Button(onClick = { model.create(name, displayName) }, enabled = name.isNotBlank() && displayName.isNotBlank() && !model.busy,
-                        modifier = Modifier.testTag("household-create-confirm")) { Text(stringResource(R.string.household_create)) }
-                }
-                OutlinedButton(onClick = { showJoin = !showJoin; showCreate = false }, enabled = !model.busy,
-                    modifier = Modifier.fillMaxWidth().testTag("household-join")) { Text(stringResource(R.string.household_join)) }
-                if (showJoin) {
-                    OutlinedTextField(link, { if (it.length <= 512) link = it },
-                        label = { Text(stringResource(R.string.household_link)) }, modifier = Modifier.fillMaxWidth()
-                            .testTag("household-link"), maxLines = 4)
-                    Text(stringResource(R.string.household_join_explanation))
-                    Button(onClick = { model.redeem(link, displayName) }, enabled = link.isNotBlank() && displayName.isNotBlank() && !model.busy,
-                        modifier = Modifier.testTag("household-join-confirm")) { Text(stringResource(R.string.household_request_join)) }
-                }
+                SettingsNavigationRow(stringResource(R.string.welcome_setup), onSetup,
+                    Modifier.testTag("household-setup"), enabled = !model.busy)
+
             } else {
                 if (home.deleted) {
                     Text(stringResource(R.string.household_deleted))
@@ -105,28 +83,6 @@ fun HouseholdScreen(account: AccountData, signIn: SignInModel, incomingLink: Str
                     else Button(onClick = { model.select(home) }, enabled = !model.busy,
                         modifier = Modifier.fillMaxWidth().testTag("household-select")) {
                         Text(stringResource(R.string.household_select))
-                    }
-                    Text(stringResource(R.string.household_inbox_separate), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.household_members), style = MaterialTheme.typography.titleLarge)
-                    home.members.forEach { member ->
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            val label = if (member.id == home.me) stringResource(R.string.household_you)
-                                else member.displayName.ifBlank { stringResource(R.string.household_member, member.id.take(8)) }
-                            Text(label + if (member.owner) " · " + stringResource(R.string.household_owner) else "")
-                            if (home.owner && member.id != home.me) {
-                                TextButton(onClick = { confirm = R.string.household_remove_warning to {
-                                    model.command("remove", home, member = member)
-                                } }, enabled = !model.busy, modifier = Modifier.testTag("household-remove-${member.id.take(8)}")) {
-                                    Text(stringResource(R.string.household_remove))
-                                }
-                                TextButton(onClick = { confirm = R.string.household_transfer_warning to {
-                                    model.command("transfer", home, member = member)
-                                } }, enabled = !model.busy,
-                                    modifier = Modifier.testTag("household-transfer-${member.id.take(8)}")) {
-                                    Text(stringResource(R.string.household_transfer))
-                                }
-                            }
-                        }
                     }
                     if (home.owner) {
                         HorizontalDivider()
@@ -143,6 +99,31 @@ fun HouseholdScreen(account: AccountData, signIn: SignInModel, incomingLink: Str
                             }, modifier = Modifier.fillMaxWidth().testTag("household-share")) { Text(stringResource(R.string.household_share)) }
                         }
                     }
+                    HelpDisclosure(stringResource(R.string.about_family_tasks)) {
+                        Text(stringResource(R.string.household_inbox_separate), style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Text(stringResource(R.string.household_members), style = MaterialTheme.typography.titleLarge)
+                    home.members.forEach { member ->
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            val label = if (member.id == home.me) stringResource(R.string.household_you)
+                                else member.displayName.ifBlank { stringResource(R.string.household_member, member.id.take(8)) }
+                            Text(label + if (member.owner) " · " + stringResource(R.string.household_owner) else "")
+                            if (home.owner && member.id != home.me) {
+                                OutlinedButton(onClick = { confirm = R.string.household_remove_warning to {
+                                    model.command("remove", home, member = member)
+                                } }, enabled = !model.busy, modifier = Modifier.testTag("household-remove-${member.id.take(8)}")) {
+                                    Text(stringResource(R.string.household_remove))
+                                }
+                                OutlinedButton(onClick = { confirm = R.string.household_transfer_warning to {
+                                    model.command("transfer", home, member = member)
+                                } }, enabled = !model.busy,
+                                    modifier = Modifier.testTag("household-transfer-${member.id.take(8)}")) {
+                                    Text(stringResource(R.string.household_transfer))
+                                }
+                            }
+                        }
+                    }
+
                 }
                 if (!home.deleted) home.invitations.forEachIndexed { index, invitation ->
                     HorizontalDivider()

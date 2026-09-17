@@ -35,7 +35,7 @@ internal fun SharedChecklist(task: JSONObject, tasks: Map<String, JSONObject>, m
     var confirmation by remember(task.getString("id")) { mutableStateOf<SharedTaskAction?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         task.nullableString("parentId")?.let { parent ->
-            TextButton(onClick = { onOpen(parent) }, modifier = Modifier.testTag("checklist-parent")) { Text(stringResource(R.string.checklist_parent)) }
+            SettingsNavigationRow(stringResource(R.string.checklist_parent), { onOpen(parent) }, Modifier.testTag("checklist-parent"))
         }
         if (task.optBoolean("isChecklist")) {
             Text(stringResource(R.string.checklist_title), style = MaterialTheme.typography.titleMedium)
@@ -119,10 +119,11 @@ internal fun ChecklistEditor(draft: ChecklistDraft, busy: Boolean, failed: Boole
             Text(draft.title, style = MaterialTheme.typography.titleMedium)
             value.nullableString("sourceDescription")?.let { Text(it) }
             if (canGenerate || splitRequest != null) {
+                Text(stringResource(R.string.split_online_notice), style = MaterialTheme.typography.bodySmall)
                 OutlinedTextField(value = instructions, onValueChange = { if (InboxLimits.length(it) <= 2000) change { value -> value.put("instructions", it) } },
                     enabled = !busy && !pending, minLines = 2, modifier = Modifier.fillMaxWidth().testTag("split-instructions"),
                     label = { Text(stringResource(R.string.split_instructions)) })
-                TextButton(enabled = !busy && !pending, onClick = { onDictate(latest()) }, modifier = Modifier.testTag("split-dictate")) {
+                OutlinedButton(enabled = !busy && !pending, onClick = { onDictate(latest()) }, modifier = Modifier.testTag("split-dictate")) {
                     Text(stringResource(R.string.split_dictate))
                 }
                 if (pending) {
@@ -136,7 +137,7 @@ internal fun ChecklistEditor(draft: ChecklistDraft, busy: Boolean, failed: Boole
                     Button(enabled = !busy, onClick = onAdopt, modifier = Modifier.testTag("split-review")) { Text(stringResource(R.string.split_review)) }
             }
             if (rows == null) {
-                Text(stringResource(R.string.checklist_editor_help, SharedChecklistActions.MAX_ITEMS))
+                Text(stringResource(R.string.checklist_line_hint))
                 OutlinedTextField(value = text, onValueChange = { if (it.length <= 16000) text = it }, minLines = 4,
                     enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("checklist-draft"), label = { Text(stringResource(R.string.checklist_items)) })
             } else {

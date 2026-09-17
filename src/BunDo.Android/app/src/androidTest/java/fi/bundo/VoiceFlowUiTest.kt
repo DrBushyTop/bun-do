@@ -144,6 +144,7 @@ class VoiceFlowUiTest {
             compose.onNodeWithTag("voice-keep-audio").performScrollTo().assertIsOff().performClick().assertIsOn()
             compose.onNodeWithTag("voice-history").performScrollTo().performClick()
             screenshot("voice-settings-$language")
+            compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
             compose.onNodeWithTag("voice-keep-audio").performScrollTo().performClick().assertIsOff()
         } finally {
             releaseTransfer.complete(Unit)

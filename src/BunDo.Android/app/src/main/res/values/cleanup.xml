@@ -5,7 +5,7 @@
     <string name="cleanup_failed">Tekstin siistiminen ei onnistunut. Yritä uudelleen tai muokkaa itse.</string>
     <string name="cleanup_ready">Tekstiehdotus on valmis vertailtavaksi. Nykyinen tekstisi säilyi.</string>
     <string name="cleanup_cancel">Peru siistiminen</string>
-    <string name="cleanup_compare">Vertaa tekstejä</string>
+    <string name="cleanup_compare">Tarkista ehdotus</string>
     <string name="cleanup_current">Nykyinen teksti</string>
     <string name="cleanup_suggestion">Tekoälyn ehdotus</string>
     <string name="cleanup_apply">Käytä ehdotusta</string>

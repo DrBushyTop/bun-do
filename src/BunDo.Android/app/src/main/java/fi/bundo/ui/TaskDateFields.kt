@@ -53,34 +53,30 @@ internal fun TaskDateFields(details: String, creating: Boolean, enabled: Boolean
             Text(due?.getString("localDate")?.let { LocalDate.parse(it).format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)) }
                 ?: stringResource(R.string.detail_choose_date))
         }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(enabled = enabled, modifier = Modifier.testTag("due-today"), onClick = { change(today) }) { Text(stringResource(R.string.detail_today)) }
-            TextButton(enabled = enabled, modifier = Modifier.testTag("due-tomorrow"), onClick = { change(today.plusDays(1)) }) { Text(stringResource(R.string.detail_tomorrow)) }
-            TextButton(enabled = enabled, modifier = Modifier.testTag("due-next-week"), onClick = { change(today.plusWeeks(1)) }) { Text(stringResource(R.string.detail_next_week)) }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = due?.optString("localDate") == today.toString(), enabled = enabled, modifier = Modifier.heightIn(min = 48.dp).testTag("due-today"), onClick = { change(today) }, label = { Text(stringResource(R.string.detail_today)) })
+            FilterChip(selected = due?.optString("localDate") == today.plusDays(1).toString(), enabled = enabled, modifier = Modifier.heightIn(min = 48.dp).testTag("due-tomorrow"), onClick = { change(today.plusDays(1)) }, label = { Text(stringResource(R.string.detail_tomorrow)) })
+            FilterChip(selected = due?.optString("localDate") == today.plusWeeks(1).toString(), enabled = enabled, modifier = Modifier.heightIn(min = 48.dp).testTag("due-next-week"), onClick = { change(today.plusWeeks(1)) }, label = { Text(stringResource(R.string.detail_next_week)) })
         }
         if (due != null) {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(enabled = enabled, modifier = Modifier.testTag("due-time"), onClick = {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(enabled = enabled, modifier = Modifier.testTag("due-time"), onClick = {
                     chooseTime(context, due.optString("localTime").takeIf { it != "null" && it.isNotBlank() }?.let(LocalTime::parse) ?: LocalTime.of(9, 0)) {
                         change(LocalDate.parse(due.getString("localDate")), it)
                     }
                 }) { Text(if (due.getString("kind") == "DATE_TIME") due.getString("localTime") else stringResource(R.string.detail_add_time)) }
-                if (due.getString("kind") == "DATE_TIME") TextButton(enabled = enabled,
+                if (due.getString("kind") == "DATE_TIME") OutlinedButton(enabled = enabled,
                     onClick = { change(LocalDate.parse(due.getString("localDate")), null) }) { Text(stringResource(R.string.detail_date_only)) }
-                TextButton(enabled = enabled, modifier = Modifier.testTag("due-clear"), onClick = { change(null) }) { Text(stringResource(R.string.detail_remove_due)) }
+                OutlinedButton(enabled = enabled, modifier = Modifier.testTag("due-clear"), onClick = { change(null) }) { Text(stringResource(R.string.detail_remove_due)) }
             }
             Text(zone, style = MaterialTheme.typography.bodySmall)
             val adjustment = SharedTaskDetails.normalize(due).optString("adjustment")
             if (adjustment == "GAP_FORWARD" || adjustment == "OVERLAP_EARLIER") Text(stringResource(
                 if (adjustment == "GAP_FORWARD") R.string.detail_gap else R.string.detail_overlap), style = MaterialTheme.typography.bodySmall)
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            Text(stringResource(R.string.detail_urgent), style = MaterialTheme.typography.bodyLarge)
-            Switch(checked = value.optBoolean("urgent"), enabled = enabled, modifier = Modifier.testTag("task-urgent"), onCheckedChange = {
-                value.put("urgent", it); onChange(value.toString())
-            })
-        }
+        SettingToggleRow(stringResource(R.string.detail_urgent), value.optBoolean("urgent"), {
+            value.put("urgent", it); onChange(value.toString())
+        }, Modifier.testTag("task-urgent"), enabled = enabled)
         Text(stringResource(if (!creating) R.string.detail_keep_position else if (SharedTaskDetails.expedited(value))
             R.string.detail_priority_position else R.string.detail_append_position), modifier = Modifier.testTag("placement-hint"),
             style = MaterialTheme.typography.bodyMedium)

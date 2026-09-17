@@ -199,3 +199,34 @@ scrollable 640 dp maximum-width content column. Finnish/English and large-text
 layouts must keep Stop and Save reachable. Microphone permission is requested
 only when recording is requested. The native rendered verification belongs in
 the owning issue, not in this design contract.
+
+## Task-first settings and secondary screens
+
+On September 17, 2026, the owner selected option B from the UI clarity study for
+all seven screens and authorized the same direction for the remaining menus.
+Keep the established artwork, paper and evergreen palette, and Material type.
+
+Use full-width, left-aligned navigation rows with optional leading icons, a
+current value below the label, and a trailing chevron. One row is one accessible
+target. Use filled buttons for the main action, tonal buttons for AI suggestions,
+and outlined buttons for secondary actions. Quiet Back, Cancel and app-bar
+buttons may remain text buttons. Do not convert the task queue into cards.
+
+Settings groups family/account, voice, reminders and recovery before app
+preferences. Language opens a choice; a switch changes one setting. Details
+expand under an explicit label with an announced expanded/collapsed state.
+Keep privacy destinations visible beside voice choices. Keep saved work,
+shared consequences and irreversible deletion warnings at the decision.
+
+Empty adventures lead to planning or adding tasks. Loading, missing access,
+failed generation and expired suggestions are separate states, not empty lists.
+The planner puts the goal before artwork and offers optional time presets plus
+custom minutes. AI ideas remain optional, with a separate plan preview and
+family-wide approval. Counts lead with completed work; all-zero charts and
+counting rules do not occupy the first-use screen.
+
+Recovery opens saved text for explicit selection and copying into new local
+inbox tasks. Family import remains a separate decision. Originals are retained.
+Backup/export warnings appear before the file picker, while connection details
+and storage formats remain available on request. Sign-out, switching accounts,
+local deletion and disconnecting an old device use distinct confirmations.

@@ -5,11 +5,14 @@
     <string name="adventure_open">Yhteinen seikkailu</string>
     <string name="adventure_preview">Katso tehtävät</string>
     <plurals name="adventure_task_count"><item quantity="one">%1$d päätehtävä</item><item quantity="other">%1$d päätehtävää</item></plurals>
-    <string name="adventure_progress">Päätehtäviä valmiina: %1$d / %2$d</string>
+    <plurals name="adventure_progress">
+        <item quantity="one">%1$d / %2$d tehtävä valmis</item>
+        <item quantity="other">%1$d / %2$d tehtävää valmiina</item>
+    </plurals>
     <string name="adventure_complete">Seikkailu valmis. Bun kiittää kumarruksella.</string>
     <string name="adventure_failed">Yhteys ei onnistunut tai seikkailu muuttui. Tarkista tilanne ja yritä uudelleen.</string>
     <string name="adventure_unavailable">Yhdistä verkkoon nähdäksesi perheen seikkailun.</string>
-    <string name="adventure_empty">Seikkailu kokoaa vähintään kolme päätehtävää. Lisää tehtäviä tai suunnittele jotain uutta.</string>
+    <string name="adventure_empty">Suunnittele pieni seikkailu tai lisää tehtäviä Bunin avuksi.</string>
     <string name="adventure_generating">Bun etsii tehtäville yhteistä suuntaa. Päivitä hetken kuluttua.</string>
     <string name="adventure_generation_failed">Uusia ehdotuksia ei nyt saatu. Voit yrittää uudelleen verkossa.</string>
     <string name="adventure_expired">Nämä ehdotukset ovat vanhentuneet. Päivitä verkossa saadaksesi uudet.</string>
@@ -18,7 +21,7 @@
     <string name="adventure_accept_hint">Aloittaa seikkailun koko perheelle. Tehtävät pysyvät ennallaan, eikä niitä varata kenellekään.</string>
     <string name="adventure_not_now">Takaisin</string>
     <string name="adventure_offline_hint">Tehtäviä voi jatkaa ilman verkkoa. Seikkailun muuttaminen tarvitsee yhteyden.</string>
-    <string name="adventure_source_unavailable">Tehtävä ei ole saatavilla. Voit poistaa viittauksen tai valita toisen.</string>
+    <string name="adventure_source_unavailable">Tehtävä ei ole saatavilla. Poista seikkailun vaihe tai valitse toinen tehtävä.</string>
     <string name="adventure_task_done">Valmis</string>
     <string name="adventure_estimate">Arvio: %1$d / 3 tähteä · noin %2$d min</string>
     <string name="adventure_estimate_hint">Tähdet ja minuutit ovat muokattavia arvioita, eivät pisteitä.</string>
@@ -26,10 +29,10 @@
     <string name="adventure_phase_name">Vaiheen nimi</string>
     <string name="adventure_minutes">Arvio minuuteissa</string>
     <string name="adventure_replace">Valitse toinen tehtävä</string>
-    <string name="adventure_remove">Poista viittaus</string>
+    <string name="adventure_remove">Poista seikkailusta</string>
     <string name="adventure_save">Tallenna koko perheelle</string>
     <string name="adventure_edit_invalid">Anna vaiheelle nimi ja kestoksi 1–1440 minuuttia.</string>
-    <string name="adventure_no_roots">Ei tehtäväviittauksia. Tyhjä seikkailu ei ole valmis.</string>
+    <string name="adventure_no_roots">Seikkailussa ei ole tehtäviä. Tyhjä seikkailu ei ole valmis seikkailu.</string>
     <string name="adventure_no_replacements">Muita päätehtäviä ei ole saatavilla.</string>
     <string name="adventure_leave">Lopeta seikkailu</string>
     <string name="adventure_leave_confirm">Seikkailu päättyy molemmille. Kaikki tehtävät jäävät ennalleen.</string>

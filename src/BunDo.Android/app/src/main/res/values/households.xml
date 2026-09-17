@@ -4,11 +4,7 @@
     <string name="household_back">Takaisin</string>
     <string name="household_refresh">Päivitä</string>
     <string name="household_intro">Luo talous tai liity tutun kutsusta.</string>
-    <string name="household_create">Luo talous</string>
-    <string name="household_name">Talouden nimi</string>
-    <string name="household_join">Liity kutsulla</string>
     <string name="household_link">Kutsulinkki</string>
-    <string name="household_join_explanation">Saat koodin, jonka tarkistat kutsujan kanssa. Näet yhteiset tehtävät vasta, kun kutsuja hyväksyy sinut.</string>
     <string name="household_request_join">Pyydä liittymistä</string>
     <string name="household_pending">Odottaa hyväksyntää</string>
     <string name="household_selected">Valittu talous</string>

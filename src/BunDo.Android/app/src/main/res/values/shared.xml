@@ -26,5 +26,5 @@
     <string name="shared_dismiss">Ohita tämä muokkaus</string>
     <string name="shared_action_failed">Muutos ei onnistunut. Tekstisi on tallessa. Tarkista tehtävän nykyinen sisältö ja yritä uudelleen.</string>
     <string name="shared_registration_recovery">Vanhojen muokkausten tilaa ei voitu varmistaa. Yhdistä laite uudelleen ja valitse sitten itse kopioitavat tekstit.</string>
-    <string name="shared_import_file">Tuo palautustiedosto (JSON)</string>
+    <string name="shared_import_file">Avaa palautustiedosto</string>
 </resources>

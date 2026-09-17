@@ -46,7 +46,8 @@ import org.json.JSONObject
 
 @Composable
 fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearance: String,
-    onAppearance: (String) -> Unit, onAccount: () -> Unit, onWelcome: (() -> Unit)? = null) {
+    onAppearance: (String) -> Unit, onAccount: () -> Unit, onWelcome: (() -> Unit)? = null,
+    onReminders: (() -> Unit)? = null, onRecovery: (() -> Unit)? = null) {
     val resources = LocalResources.current
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
@@ -255,7 +256,7 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
         { choice, retry -> AdventureArtworkClient.load(context, repository, data, choice, retry) }
     }
     CompositionLocalProvider(LocalAdventureArtwork provides artworkLoader) {
-    InboxApp(state, model, appearance, onAppearance, voice = data.voice, voiceTarget = VoiceTarget(selected.scope), onAccount = onAccount, onWelcome = onWelcome, queueTitle = selected.name, onHomeBack = ::back,
+    InboxApp(state, model, appearance, onAppearance, voice = data.voice, voiceTarget = VoiceTarget(selected.scope), onAccount = onAccount, onWelcome = onWelcome, onReminders = onReminders, onRecovery = onRecovery, queueTitle = selected.name, onHomeBack = ::back,
         queueTopBar = { bar -> HouseholdScene(
             if (joy) "joy" else if (current?.blocked != null || recovery != null || current == null) "dojo" else sceneActivity(canonical.values.map(::JSONObject), now),
             !reordering, adventure?.takeIf { current?.blocked == null && recovery == null },
@@ -282,11 +283,11 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
                 })
             else if (destination == "adventure") SharedAdventureScreen(adventure?.takeIf { recovery == null && current?.blocked == null },
                 adventureBusy, adventureFailed, current != null && current?.blocked == null && recovery == null,
-                byId, ::adventureAction, onOpen, ::back, { repository.acknowledgeAdventure(it, false) }, { navigate("creator") })
+                byId, ::adventureAction, onOpen, ::back, { repository.acknowledgeAdventure(it, false) }, { navigate("creator") }, { navigate("queue"); model.openEditor() })
             else if (destination == "journey") SharedJourneyScreen(progress, journeyBusy, journeyFailed,
                 current != null && current?.blocked == null && recovery == null, { journey(true) }, { journey(false) }, ::back)
             else SharedProgressScreen(progress, destination == "activity", byId, membership,
-                { SharedSyncWorker.request(context, data) }, onOpen, { navigate("journey") }, { navigate("adventure") })
+                { SharedSyncWorker.request(context, data) }, onOpen, { navigate("journey") }, { navigate("adventure") }, { navigate("queue") })
         }) else null,
         canEdit = current?.blocked == null, queueTasks = queueRows,
         onSplit = if (state.editor?.let { it.key == InboxRepository.NEW_DRAFT || byId[it.key]?.let { task ->
@@ -357,7 +358,7 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
                 Text(stringResource(if (recovering.problem == "STORAGE_REQUIRED") R.string.shared_storage_required
                     else if (recovering.problem != null) R.string.shared_recovery_paused else R.string.shared_rebuilding))
                 if (recovering.problem != null) {
-                    TextButton(onClick = onAccount) { Text(stringResource(R.string.shared_export_saved)) }
+                    androidx.compose.material3.OutlinedButton(onClick = onRecovery ?: onAccount) { Text(stringResource(R.string.shared_export_saved)) }
                     if (recovering.problem == "STORAGE_REQUIRED") TextButton(onClick = {
                         context.startActivity(android.content.Intent(android.provider.Settings.ACTION_INTERNAL_STORAGE_SETTINGS))
                     }) { Text(stringResource(R.string.shared_manage_storage)) }
@@ -380,7 +381,7 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
                     modifier = Modifier.testTag("shared-refresh")) { Text(stringResource(R.string.household_refresh)) }
             }
             }
-                if (problems.isNotEmpty()) TextButton(onClick = { showProblems = true },
+                if (problems.isNotEmpty()) androidx.compose.material3.OutlinedButton(onClick = { showProblems = true },
                     modifier = Modifier.testTag("shared-recovery")) {
                     Text(stringResource(R.string.shared_review, problems.size))
                 }
@@ -466,18 +467,18 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
                     SharedTaskSummary(task, membership)
                 } else Text(stringResource(R.string.shared_missing))
                 val terminal = intent.status in listOf("REJECTED", "BLOCKED_DEPENDENCY", "QUARANTINED")
-                if (shared != null && JSONObject(shared).isNull("deletion") && intent.kind == "EditTask" && terminal) TextButton(
+                if (shared != null && JSONObject(shared).isNull("deletion") && intent.kind == "EditTask" && terminal) androidx.compose.material3.OutlinedButton(
                     enabled = !busy && current?.blocked == null && recovery == null,
                     onClick = { reapply = intent.sequence to shared }) {
                     Text(stringResource(R.string.shared_reapply))
                 }
                 if (intent.taskAction == null || intent.kind in SharedChecklistActions.splitKinds || shared == null || !JSONObject(shared).isNull("deletion"))
-                    TextButton(enabled = !busy && current?.blocked == null && terminal, onClick = { run {
+                    androidx.compose.material3.OutlinedButton(enabled = !busy && current?.blocked == null && terminal, onClick = { run {
                     repository.copyText(intent.title, intent.description.orEmpty())
                     showProblems = false
                     SharedSyncWorker.request(context, data)
                 } }) { Text(stringResource(R.string.shared_copy_new)) }
-                if (terminal) TextButton(enabled = !busy, onClick = { run { repository.dismiss(intent.sequence) } }) {
+                if (terminal) androidx.compose.material3.OutlinedButton(enabled = !busy, onClick = { run { repository.dismiss(intent.sequence) } }) {
                     Text(stringResource(R.string.shared_dismiss))
                 }
             }

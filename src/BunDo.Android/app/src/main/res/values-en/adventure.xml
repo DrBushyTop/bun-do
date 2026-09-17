@@ -5,11 +5,14 @@
     <string name="adventure_open">Our adventure</string>
     <string name="adventure_preview">Preview tasks</string>
     <plurals name="adventure_task_count"><item quantity="one">%1$d main task</item><item quantity="other">%1$d main tasks</item></plurals>
-    <string name="adventure_progress">Main tasks complete: %1$d / %2$d</string>
+    <plurals name="adventure_progress">
+        <item quantity="one">%1$d of %2$d task done</item>
+        <item quantity="other">%1$d of %2$d tasks done</item>
+    </plurals>
     <string name="adventure_complete">Adventure complete. A little bow from Bun.</string>
     <string name="adventure_failed">Couldn’t connect, or the adventure changed. Check the current choice and try again.</string>
     <string name="adventure_unavailable">Connect to see your family’s adventure.</string>
-    <string name="adventure_empty">Adventures bring at least three main tasks together. Add a few tasks or plan something new.</string>
+    <string name="adventure_empty">Plan a small adventure, or add tasks for Bun to work with.</string>
     <string name="adventure_generating">Bun is finding a shared thread. Refresh in a moment.</string>
     <string name="adventure_generation_failed">Fresh suggestions aren’t available. You can retry when online.</string>
     <string name="adventure_expired">These suggestions have expired. Refresh online for new ones.</string>
@@ -18,18 +21,18 @@
     <string name="adventure_accept_hint">Starts for the whole family. Tasks stay as they are, without being claimed.</string>
     <string name="adventure_not_now">Back</string>
     <string name="adventure_offline_hint">Task work continues offline. Changing the shared adventure needs a connection.</string>
-    <string name="adventure_source_unavailable">Task unavailable. You can remove this reference or choose another.</string>
+    <string name="adventure_source_unavailable">Task unavailable. Remove it from the adventure or choose another.</string>
     <string name="adventure_task_done">Complete</string>
     <string name="adventure_estimate">Estimate: %1$d / 3 stars · about %2$d min</string>
     <string name="adventure_estimate_hint">Stars and minutes are editable estimates, not scores.</string>
     <string name="adventure_edit">Edit adventure</string>
-    <string name="adventure_phase_name">Phase name</string>
+    <string name="adventure_phase_name">Step name</string>
     <string name="adventure_minutes">Estimated minutes</string>
     <string name="adventure_replace">Choose another task</string>
-    <string name="adventure_remove">Remove reference</string>
+    <string name="adventure_remove">Remove from adventure</string>
     <string name="adventure_save">Save for everyone</string>
     <string name="adventure_edit_invalid">Give each phase a name and an estimate of 1–1440 minutes.</string>
-    <string name="adventure_no_roots">No task references. An empty adventure is not complete.</string>
+    <string name="adventure_no_roots">No tasks left in this adventure. An empty adventure does not count as complete.</string>
     <string name="adventure_no_replacements">No other main tasks are available.</string>
     <string name="adventure_leave">Leave adventure</string>
     <string name="adventure_leave_confirm">This ends the adventure for both of you. All tasks stay untouched.</string>

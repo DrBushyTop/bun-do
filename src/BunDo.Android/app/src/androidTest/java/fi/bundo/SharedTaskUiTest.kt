@@ -154,7 +154,7 @@ class SharedTaskUiTest {
         runBlocking { data.database.shared().saveWorkspace(state.copy(progress = journeyFixture().toString())) }
         compose.onNodeWithTag("household-together").performClick()
         compose.onNodeWithTag("journey-open").performScrollTo().performClick()
-        compose.onNodeWithTag("journey-progress").performScrollTo().assertTextEquals("First completions at this stop: 2 / 5")
+        compose.onNodeWithTag("journey-progress").performScrollTo().assertTextEquals("2 of 5 tasks toward the next stop")
         compose.onNodeWithTag("household-queue").performClick()
         compose.onNodeWithText("Vie paperit kierrätykseen").assertExists()
         assertEquals(2, runBlocking { data.database.shared().projectionRows(state.scope, "initial") }.count {

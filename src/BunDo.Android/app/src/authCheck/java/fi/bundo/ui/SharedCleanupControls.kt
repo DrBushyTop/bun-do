@@ -35,7 +35,7 @@ internal fun SharedCleanupControls(task: JSONObject, enabled: Boolean, onAction:
         }
         if (pending) TextButton(enabled = enabled, modifier = Modifier.testTag("cleanup-cancel"),
             onClick = { onAction(SharedTaskAction("CancelCleanup", task.toString())) }) { Text(stringResource(R.string.cleanup_cancel)) }
-        if (status == "READY") TextButton(modifier = Modifier.testTag("cleanup-compare"), onClick = { compare = !compare }) {
+        if (status == "READY") FilledTonalButton(modifier = Modifier.testTag("cleanup-compare"), onClick = { compare = !compare }) {
             Text(stringResource(R.string.cleanup_compare))
         }
         if (compare && status == "READY") cleanup?.optJSONObject("proposal")?.let { proposal ->

@@ -1,6 +1,6 @@
 <resources>
     <string name="guided_back">Takaisin</string>
-    <string name="guided_title">Suunnitellaan seikkailu</string>
+    <string name="guided_title">Suunnittele seikkailu</string>
     <string name="guided_error">Tämä vaihe ei onnistunut. Muutoksesi ovat tallessa. Tarkista yhteys ja yritä uudelleen.</string>
     <string name="guided_pending">Hyväksytyt tehtävät lisätään perheen listalle. Seikkailu alkaa vasta, kun ne ovat tallentuneet.</string>
     <string name="guided_resume">Jatka aloittamista</string>
@@ -17,9 +17,9 @@
     <string name="guided_approve">Lisää tehtävät ja aloita seikkailu</string>
     <string name="guided_discard">Hylkää luonnos</string>
     <string name="guided_outcome">Mitä haluaisit saada aikaan?</string>
-    <string name="guided_time">Aikaa minuutteina, vapaaehtoinen</string>
+    <string name="guided_time">Käytettävissä oleva aika, vapaaehtoinen</string>
     <string name="guided_preview_hint">Bun ehdottaa luonnosta verkossa. Listalle ei lisätä mitään ennen hyväksyntääsi.</string>
-    <string name="guided_plan">Tee luonnos</string>
+    <string name="guided_plan">Esikatsele suunnitelma</string>
     <string name="guided_ended">Tämä aloitusyritys on päättynyt. Jo lisätyt tai synkronointia odottavat tehtävät jäävät listalle.</string>
     <string name="guided_acknowledge">Selvä</string>
     <string name="guided_difficulty">Arvioitu vaikeus</string>
@@ -28,7 +28,8 @@
     <string name="guided_time_invalid">Anna kokonaisluku väliltä 1–1 440 tai jätä tyhjäksi.</string>
     <string name="guided_record">Kerro ideasi puhumalla</string>
     <string name="guided_use_recording">Käytä seikkailun ideana</string>
-    <string name="guided_ideas">Ehdota meille ideoita</string>
+    <string name="guided_ideas">Ehdota ideoita</string>
     <string name="guided_ideas_refresh">Ehdota muita ideoita</string>
-    <string name="guided_ideas_hint">Tekoäly hyödyntää perheen nykyisiä tehtäviä ja viimeaikaista tehtävähistoriaa. Ideoista ei lisätä mitään ilman hyväksyntääsi.</string>
+    <string name="guided_ideas_hint">Tekoäly käyttää perheen tehtäviä ja viimeaikaista historiaa. Mitään ei vielä lisätä.</string>
+    <string name="guided_custom_minutes">Muu aika minuutteina</string>
 </resources>

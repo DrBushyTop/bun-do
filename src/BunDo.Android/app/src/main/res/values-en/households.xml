@@ -4,11 +4,7 @@
     <string name="household_back">Back</string>
     <string name="household_refresh">Refresh</string>
     <string name="household_intro">Create a household or join someone you know.</string>
-    <string name="household_create">Create household</string>
-    <string name="household_name">Household name</string>
-    <string name="household_join">Join with an invitation</string>
     <string name="household_link">Invitation link</string>
-    <string name="household_join_explanation">You will get a code to check with the person who invited you. They approve your request before you can see shared tasks.</string>
     <string name="household_request_join">Request to join</string>
     <string name="household_pending">Waiting for approval</string>
     <string name="household_selected">Selected household</string>

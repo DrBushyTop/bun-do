@@ -1,5 +1,5 @@
 <resources>
-    <string name="split_generate">Suggest steps with AI</string>
+    <string name="split_generate">Suggest steps</string>
     <string name="split_retry">Try suggesting steps again</string>
     <string name="split_instructions">How should this task be split?</string>
     <string name="split_dictate">Dictate instructions</string>
@@ -14,4 +14,5 @@
     <string name="split_invalid">Select 1–16 different steps. Each needs a short title.</string>
     <string name="split_save_first">Save and choose steps</string>
     <string name="split_cancel">Cancel suggestions</string>
+    <string name="split_online_notice">AI uses this task and your instructions online. You review the steps before adding them.</string>
 </resources>

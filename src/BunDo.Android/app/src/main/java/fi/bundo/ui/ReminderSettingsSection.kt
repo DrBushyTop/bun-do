@@ -16,6 +16,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.ui.platform.LocalConfiguration
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -33,6 +37,7 @@ import fi.bundo.reminders.AndroidReminders
 import fi.bundo.reminders.ReminderWorker
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.map
 import java.time.LocalTime
 
 @Composable
@@ -40,12 +45,11 @@ internal fun ReminderSettingsSection(data: AccountData) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
-    val saved by remember(data) { data.database.reminders().observeSettings() }.collectAsState(null)
+    val saved by remember(data) { data.database.reminders().observeSettings().map { it ?: ReminderSettings() } }.collectAsState(null)
     val settings = saved ?: ReminderSettings()
     var permitted by remember { mutableStateOf(AndroidReminders.permissionGranted(context)) }
     var failed by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
-    var time by remember(saved?.dateOnlyTime) { mutableStateOf(settings.dateOnlyTime) }
     var pendingOwner by remember { mutableStateOf<AccountData?>(null) }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         val owner = pendingOwner
@@ -84,31 +88,31 @@ internal fun ReminderSettingsSection(data: AccountData) {
         }
     }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(R.string.reminders_title), style = MaterialTheme.typography.titleLarge)
-        Text(stringResource(R.string.reminders_approximate))
+        Column(Modifier.selectableGroup()) {
         for ((mode, label) in listOf(0 to R.string.reminders_off, 1 to R.string.reminders_mine, 2 to R.string.reminders_all)) {
             val selected = if (!settings.enabled) mode == 0 else if (settings.allTasks) mode == 2 else mode == 1
-            FilterChip(selected, onClick = { save(ask = mode != 0) { it.copy(enabled = mode != 0, allTasks = mode == 2) } },
-                enabled = !busy, modifier = Modifier.heightIn(min = 48.dp).testTag("reminders-mode-$mode"),
-                label = { Text(stringResource(label)) })
+            SettingChoiceRow(stringResource(label), selected, onClick = { save(ask = mode != 0) { it.copy(enabled = mode != 0, allTasks = mode == 2) } },
+                enabled = !busy && saved != null, modifier = Modifier.testTag("reminders-mode-$mode"))
         }
-        if (!permitted) {
+        }
+        if (settings.enabled && !permitted) {
             Text(stringResource(R.string.reminders_denied), modifier = Modifier.testTag("reminders-denied"))
-            TextButton(onClick = {
+            androidx.compose.material3.OutlinedButton(onClick = {
                 context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                     .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName))
             }) { Text(stringResource(R.string.reminders_system_settings)) }
         }
-        val validTime = time.matches(Regex("[0-9]{2}:[0-9]{2}")) && runCatching { LocalTime.parse(time) }.isSuccess
-        Text(stringResource(R.string.reminders_time), style = MaterialTheme.typography.titleMedium)
-        OutlinedTextField(value = time, onValueChange = { time = it }, singleLine = true,
-            label = { Text(stringResource(R.string.reminders_time_short)) }, isError = !validTime,
-            supportingText = { Text(stringResource(if (validTime) R.string.reminders_time_hint else R.string.reminders_time_invalid)) },
-            modifier = Modifier.fillMaxWidth().testTag("reminders-time"))
-        Button(onClick = { save { it.copy(dateOnlyTime = time) } }, enabled = validTime && time != settings.dateOnlyTime && !busy) {
-            Text(stringResource(R.string.reminders_save_time))
+        val locale = LocalConfiguration.current.locales[0]
+        val time = LocalTime.parse(settings.dateOnlyTime)
+        SettingsNavigationRow(stringResource(R.string.reminders_time), {
+            chooseTime(context, time) { chosen -> save { it.copy(dateOnlyTime = chosen.format(DateTimeFormatter.ofPattern("HH:mm"))) } }
+        }, Modifier.testTag("reminders-time"), value = time.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale)),
+            enabled = !busy && saved != null)
+        HelpDisclosure(stringResource(R.string.reminders_details)) {
+            Text(stringResource(R.string.reminders_approximate))
+            Text(stringResource(R.string.reminders_time_hint))
+            Text(stringResource(R.string.reminders_offline))
         }
-        Text(stringResource(R.string.reminders_offline))
         if (failed) Text(stringResource(R.string.reminders_failed), color = MaterialTheme.colorScheme.error)
     }
 }
