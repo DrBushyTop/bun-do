@@ -4,17 +4,30 @@ Throwaway browser prototype for issue #70, based on master `46abf1ee`.
 Keep this on `prototype/task-detail-clarity`; do not merge it into the app.
 No native app, release or design-contract changes are included.
 
-## Selected direction, September 17, 2026
+## Current question, September 17, 2026
 
-The owner selected A for task details and the shared review flow. This refinement
-keeps colored task cues on the main list but removes its task thumbnails. The
-selected task and draft review reuse the existing bundled adventure scene in a
-96px navigation header. There is no separate picture block above the title.
-Original text and attribution are last in the action menus.
+The owner retained A's read-first task controls but found the 96px faded header
+too shallow. This round compares only artwork placement, not those task controls:
 
-This is still the browser prototype, not native implementation. A is now the
-only displayed structure. The original A/B/C comparison remains at commit
-`a4d938e39fae2e8eb915da1f8b00f1f2227f4637` on this branch.
+- A, faded scene: a 220px edge-to-edge picture above the title, with a clear center.
+- B, title first: the complete 3:2 scene below the title, with no crop or overlaid text.
+- C, picture alongside: a 230px portrait crop beside the title. Large text stacks
+  the title above a 190px landscape crop instead of squeezing the text.
+
+Every option reuses the same bundled adventure scene for a fair comparison.
+The picture scrolls with the task content; the primary footer stays available.
+Queue rows retain colored icons, without task pictures. Original details remain
+last in the action menus. These are browser options, not native app changes.
+
+One AI revision can add several direct checklist steps. The selected voice sample
+explicitly asks for three steps in one instruction. All three appear in one change
+review and enter the draft together on acceptance. Existing steps and manual edits
+remain; repeating the same sample does not duplicate its additions. Speech and AI
+responses are still simulated, not live services or arbitrary text interpretation.
+
+The earlier structural A/B/C comparison remains at `a4d938e39fae2e8eb915da1f8b00f1f2227f4637`.
+The selected A with the rejected 96px header remains at `27c8bba1c7a6af2813c3b53d8bb0b5a2faa66e97`.
+The A/B/C labels now refer to image layouts within the selected task design.
 
 ## Reusing stored adventure artwork
 
@@ -31,7 +44,7 @@ catalog-read path or share an already available account-scoped cached image,
 without inventing adventure IDs or weakening ownership checks.
 
 This browser refinement reuses bundled `dojo-garden.webp` to demonstrate the
-compact treatment. It has not fetched production catalog entries and does not
+image treatments. It has not fetched production catalog entries and does not
 claim those five images are currently generated or ready.
 
 ## Original question
@@ -46,8 +59,8 @@ individual tasks, in the queue and detail views.
 - C: a detail sheet over the task list.
 
 The initial comparison used per-task queue thumbnails. The selected refinement
-removes them. Opening a row shows A's compact illustrated detail header. Queue filter/reorder, capture and other
-app destinations are outside this comparison and open an explicit scope note.
+removes them. Opening a row shows the selected artwork layout. Queue
+filter/reorder, capture and other app destinations are outside this comparison and open an explicit scope note.
 The AI review is a shared proposed flow rather than three competing AI flows.
 
 ## Run and share
@@ -66,20 +79,21 @@ Remove only its route with `tailscale serve --https=443 --set-path /task-clarity
 Never reset Tailscale Serve to remove a prototype.
 
 URL controls:
-- A is selected. Old variant and comparison parameters resolve to A in focus mode.
+- `variant=A|B|C` selects an image layout. Desktop defaults to side-by-side.
+- `mode=focus` shows just the selected layout. The floating arrows switch layouts.
 - `screen=queue|task|checklist|review`.
 - `lang=fi|en`, `text=large`.
 
-The selected A view appears on desktop and phones. Text inputs keep their arrow
-keys. Screen/language changes reset sample data. Task state stays in memory
+Desktop can compare all three layouts; phones show the selected one. The
+floating arrows and keyboard left/right switch layouts. Text inputs keep their arrow keys. Screen/language changes reset sample data. Task state stays in memory
 while navigating within an option; reload resets everything. The optional
 Prototype state disclosure and console show the current simulation state.
 
 ## Behavior and limits
 
 The app calls no microphone, API or storage service. All commands modify only
-sample data. The three voice instructions produce predetermined changes to the
-current draft. Manual edits are preserved. Rejection and simulated offline/error
+sample data. The three voice samples produce predetermined changes to the
+current draft. The add sample adds three steps in a single revision. Manual edits are preserved. Rejection and simulated offline/error
 results keep the original draft. Accepting a revision and adding the task are
 separate actions. The generated artwork is bundled preview imagery, not a
 runtime task-image service. Color/icon choices are fixture mappings, not AI
@@ -127,5 +141,5 @@ and is embedded in the source PNG. The served WebP is 960 × 640, quality 84.
 Their original generation prompts remain in that branch's `art/ARTWORK.md`.
 `dojo-garden.webp` and `bun.svg` are existing assets copied from the current app
 and approved logo. WebP provenance sidecars record each source. No logo was
-regenerated. The bike and storage images are reused examples associated with
-individual demo tasks, not newly generated for those tasks at runtime.
+regenerated. The bike, storage and cloth images are retained historical comparison assets.
+This round displays the shared dojo scene, not those per-task examples.

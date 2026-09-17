@@ -43,12 +43,6 @@ h1 { font-size: 27px; line-height: 1.2; font-weight: 650; }
 .content { padding: 18px 24px 24px; overflow-y: auto; flex: 1; min-height: 0; }
 .task-title { font-size: 1.6em; font-weight: 600; line-height: 1.24; overflow-wrap: anywhere; }
 .task-description { margin-top: 18px; line-height: 1.6; }
-.detail-art, .sheet-art, .review-art { display: block; width: 100%; height: 146px; object-fit: contain; object-position: right center; background: #f6f2eb; margin-bottom: 20px; border-radius: 12px; }
-.edit-art { display: block; width: 110px; height: 92px; object-fit: cover; object-position: right center; float: right; border-radius: 12px; margin: 0 0 14px 14px; }
-.edit-art + .completion-row { min-height: 92px; }
-.edit-art ~ .field { clear: both; }
-.review-art { height: 104px; margin: 14px 0 0; }
-.sheet-art { height: 122px; }
 .status-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 20px; }
 .status-button { border: 1px solid var(--line); border-radius: 10px; background: transparent; padding: 8px 12px; min-height: 44px; display: inline-flex; align-items: center; gap: 8px; font-size: .875em; color: var(--green); }
 .status-button svg { width: 18px; height: 18px; }
@@ -87,8 +81,6 @@ h1 { font-size: 27px; line-height: 1.2; font-weight: 650; }
 .field > span { font-size: .875em; color: var(--muted); }
 input[type=text], input[type=date], textarea, .field select { width: 100%; border: 1px solid #889c89; border-radius: 9px; background: transparent; padding: 12px; line-height: 1.45; }
 textarea { resize: vertical; min-height: 112px; }
-.inline-title { font-size: 1.55em; font-weight: 600; line-height: 1.25; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 0 0 14px; resize: none; min-height: 126px; }
-.inline-note { border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 4px 0 12px; min-height: 132px; }
 .completion-row { display: flex; align-items: center; gap: 10px; padding: 6px 0 20px; font-size: .875em; color: var(--green); }
 .completion-row input { width: 24px; height: 24px; margin: 0; }
 .edit-label { margin: 20px 0 8px; font-size: .8em; color: var(--muted); }
@@ -112,7 +104,6 @@ textarea { resize: vertical; min-height: 112px; }
 .task-copy { flex: 1; min-width: 0; }
 .task-copy strong { font-size: .9em; font-weight: 600; line-height: 1.4; display: block; }
 .task-copy small { color: var(--muted); font-size: .75em; }
-.task-thumb { width: 62px; height: 72px; border-radius: 10px; object-fit: cover; object-position: right center; flex-shrink: 0; }
 .visual-task > svg { width: 14px; height: 16px; color: var(--muted); }
 .capture-dock { display: flex; gap: 8px; padding: 12px 16px 16px; flex-shrink: 0; }
 .capture-dock .button { font-size: .82em; padding: 10px 12px; }
@@ -120,15 +111,6 @@ textarea { resize: vertical; min-height: 112px; }
 .app-tabs button { flex: 1; display: flex; flex-direction: column; gap: 4px; align-items: center; background: transparent; border: 0; font-size: .72em; color: var(--muted); min-height: 48px; }
 .app-tabs button svg { width: 44px; height: 29px; padding: 3px 10px; border-radius: 16px; }
 .app-tabs button.selected svg { background: #d5e7db; color: var(--green); }
-.queue-row { display: flex; gap: 14px; align-items: center; border-bottom: 1px solid var(--line); padding: 18px 24px; }
-.queue-row svg { color: var(--green); }
-.queue-row.selected { background: var(--tint); }
-.queue-sheet { position: absolute; inset: 125px 0 0; display: flex; flex-direction: column; background: var(--paper); border-radius: 24px 24px 0 0; box-shadow: 0 -10px 28px #1424171c; }
-.queue-sheet .appbar { min-height: 55px; padding-top: 0; }
-.queue-sheet .content { padding-top: 8px; }
-.queue-sheet .task-title { font-size: 1.4em; }
-.queue-sheet .footer { padding-bottom: 20px; }
-.queue-sheet + .overlay { z-index: 6; }
 .notice { background: #e4ebe0; color: #274132; border-radius: 10px; padding: 12px 14px; margin-bottom: 18px; font-size: .875em; }
 .notice.error { background: #f5e7e1; color: #71312b; }
 .notice p:last-child { margin-bottom: 0; }
@@ -186,11 +168,23 @@ textarea { resize: vertical; min-height: 112px; }
 }
 @media (prefers-reduced-motion: reduce) { button:active:not(:disabled) { transform: none; } }
 
-/* Selected A: artwork shares the navigation header, never a content-sized image slot. */
-.task-banner { position: relative; flex-shrink: 0; isolation: isolate; overflow: hidden; }
-.banner-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 48%; z-index: -2; }
-.task-banner::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, #f8f9f48a 0%, #f8f9f4b8 58%, var(--paper) 100%); }
-.task-banner .appbar { min-height: 96px; align-items: flex-start; padding-top: 16px; }
-.task-banner .appbar strong { padding-top: 8px; }
-.task-banner .icon-button { background: #f8f9f4c9; }
-#switcher[hidden] { display: none; }
+/* Image study: all variants retain the selected read-first task controls. */
+.image-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+.task-reading { padding: 18px 24px 24px; }
+.scene-image { display: block; width: 100%; height: 100%; object-fit: cover; }
+.panorama { height: 220px; position: relative; isolation: isolate; }
+.panorama > img { position: absolute; inset: 0; z-index: -2; object-position: center 57%; }
+.panorama::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, #f8f9f4c9 0, #f8f9f426 36%, transparent 64%, var(--paper) 100%); }
+.panorama .icon-button { background: #f8f9f4e6; }
+.panorama + .task-reading { padding-top: 2px; }
+.draft-label { margin-bottom: 10px; }
+.whole-scene { margin: 20px 0 0; aspect-ratio: 3 / 2; overflow: hidden; border-radius: 12px; }
+.whole-scene .scene-image { object-fit: contain; }
+.split-opening { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; align-items: center; }
+.split-opening .task-title { font-size: 1.4em; overflow-wrap: normal; hyphens: auto; }
+.portrait-scene { height: 230px; position: relative; overflow: hidden; border-radius: 12px; }
+.portrait-scene .scene-image { object-position: 78% center; }
+.large .split-opening { grid-template-columns: minmax(0, 1fr); }
+.large .portrait-scene { height: 190px; }
+.large .portrait-scene .scene-image { object-position: center 58%; }
+@media (max-width: 460px) { .task-reading { padding: 16px 20px 24px; } }
