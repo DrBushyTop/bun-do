@@ -101,13 +101,13 @@ fun LegacyRecordingsSection(accounts: AccountStore, data: AccountData, onSaved: 
                 Text(stringResource(R.string.voice_expires,
                     dateFormat.format(Date(item.recording.expiresAt))))
                 if (!item.readable) Text(stringResource(R.string.legacy_audio_unreadable))
-                TextButton(enabled = !busy && item.readable, onClick = { run {
+                androidx.compose.material3.OutlinedButton(enabled = !busy && item.readable, onClick = { run {
                     accounts.legacyAudio.recover(data, item.source)
                     data.lease.check()
                     withContext(Dispatchers.Main) { showVoice = true }
                 } }, modifier = Modifier.testTag("legacy-recover")) { Text(stringResource(R.string.legacy_audio_recover)) }
                 Text(stringResource(R.string.voice_export_warning), style = MaterialTheme.typography.bodySmall)
-                TextButton(enabled = !busy && item.readable, onClick = {
+                androidx.compose.material3.OutlinedButton(enabled = !busy && item.readable, onClick = {
                     exportSource = item.source
                     exportOwner = data.lease.owner
                     exportGeneration = data.lease.generation

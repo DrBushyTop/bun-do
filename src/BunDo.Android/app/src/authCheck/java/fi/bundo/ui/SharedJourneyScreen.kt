@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -49,7 +50,7 @@ internal fun SharedJourneyScreen(progress: String?, busy: Boolean, failed: Boole
                 modifier = Modifier.testTag("journey-error"))
             if (snapshot == null) {
                 Text(stringResource(R.string.journey_unavailable))
-                TextButton(onClick = onRefresh, enabled = allowed && !busy, modifier = Modifier.heightIn(min = 48.dp).testTag("journey-refresh")) {
+                OutlinedButton(onClick = onRefresh, enabled = allowed && !busy, modifier = Modifier.heightIn(min = 48.dp).testTag("journey-refresh")) {
                     Text(stringResource(R.string.household_refresh))
                 }
             } else if (journey == null) {
@@ -62,18 +63,20 @@ internal fun SharedJourneyScreen(progress: String?, busy: Boolean, failed: Boole
             } else {
                 Text(stringResource(routeName(journey.routeId)), style = MaterialTheme.typography.titleLarge)
                 Text(stringResource(R.string.journey_at, locationName(journey.locationId, journey.locationIndex)))
-                Text(stringResource(R.string.journey_progress, journey.locationCompletions, journey.completionsPerLocation),
+                Text(pluralStringResource(R.plurals.journey_progress, journey.completionsPerLocation, journey.locationCompletions, journey.completionsPerLocation),
                     modifier = Modifier.testTag("journey-progress"))
                 LinearProgressIndicator(progress = { journey.locationCompletions.toFloat() / journey.completionsPerLocation },
                     modifier = Modifier.fillMaxWidth().clearAndSetSemantics { }, gapSize = 0.dp, drawStopIndicator = {})
                 if (journey.resting) Text(stringResource(R.string.journey_resting), modifier = Modifier.testTag("journey-resting"))
                 JourneyStops(journey)
-                Text(stringResource(R.string.journey_explanation), style = MaterialTheme.typography.bodyMedium)
+                HelpDisclosure(stringResource(R.string.journey_how), Modifier.testTag("journey-details")) {
+                    Text(stringResource(R.string.journey_explanation), style = MaterialTheme.typography.bodyMedium)
+                }
                 val formatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT).withLocale(LocalConfiguration.current.locales[0])
                     .withZone(ZoneId.of(snapshot.getJSONObject("statistics").getString("zoneId")))
                 Text(stringResource(R.string.progress_as_of, formatter.format(Instant.parse(snapshot.getString("asOf")))),
                     style = MaterialTheme.typography.bodySmall)
-                TextButton(onClick = onRefresh, enabled = allowed && !busy, modifier = Modifier.heightIn(min = 48.dp).testTag("journey-refresh")) {
+                OutlinedButton(onClick = onRefresh, enabled = allowed && !busy, modifier = Modifier.heightIn(min = 48.dp).testTag("journey-refresh")) {
                     Text(stringResource(R.string.household_refresh))
                 }
                 if (journey.completedRoutes.isNotEmpty()) {

@@ -7,11 +7,8 @@
     <string name="reminders_all">All household tasks</string>
     <string name="reminders_denied">Notifications are blocked. Due tasks still appear in your household’s Due list.</string>
     <string name="reminders_system_settings">Open notification settings</string>
-    <string name="reminders_time">Date-only reminder time</string>
-    <string name="reminders_time_short">Time</string>
-    <string name="reminders_time_invalid">Enter a time between 00:00 and 23:59.</string>
-    <string name="reminders_time_hint">Use HH:mm, for example 09:00. Uses each deadline’s saved time zone.</string>
-    <string name="reminders_save_time">Save reminder time</string>
+    <string name="reminders_time">When no time is set</string>
+    <string name="reminders_time_hint">Uses each deadline\'s saved time zone.</string>
     <string name="reminders_offline">While offline, this device may remind you about work someone else has finished. It checks again after syncing.</string>
     <string name="reminders_failed">Could not save reminders. Try again.</string>
     <string name="reminders_waiting">Household tasks are due</string>

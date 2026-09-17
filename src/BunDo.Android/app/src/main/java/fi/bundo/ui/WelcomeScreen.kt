@@ -7,6 +7,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -56,6 +58,7 @@ internal fun WelcomeScreen(
     actions: WelcomeActions,
     signInChoices: List<String> = emptyList(),
 ) {
+    var familyChoice by rememberSaveable { mutableStateOf("create") }
     val needsSignIn = progress.step in listOf(WelcomeStep.CREATE, WelcomeStep.JOIN, WelcomeStep.HOME) && !connectedAccount
     val pending = home?.invitations?.firstOrNull { it.phase == "Pending" }
     val title = when {
@@ -130,10 +133,14 @@ internal fun WelcomeScreen(
                                 Text(item.name.ifBlank { stringResource(R.string.welcome_wait_title) })
                             }
                         }
-                        WelcomeButton(stringResource(R.string.welcome_create), "welcome-create", !busy, actions.create)
-                        OutlinedButton(onClick = actions.join, enabled = !busy,
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("welcome-join")) {
-                            Text(stringResource(R.string.welcome_join))
+                        Column(Modifier.selectableGroup()) {
+                            SettingChoiceRow(stringResource(R.string.welcome_create), familyChoice == "create", { familyChoice = "create" },
+                                Modifier.testTag("welcome-create"), enabled = !busy)
+                            SettingChoiceRow(stringResource(R.string.welcome_join), familyChoice == "join", { familyChoice = "join" },
+                                Modifier.testTag("welcome-join"), enabled = !busy)
+                        }
+                        WelcomeButton(stringResource(R.string.continue_action), "welcome-continue", !busy) {
+                            if (familyChoice == "create") actions.create() else actions.join()
                         }
                     }
                     progress.step == WelcomeStep.CREATE || progress.step == WelcomeStep.JOIN -> {

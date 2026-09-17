@@ -35,7 +35,7 @@ import java.time.Instant
 @Composable
 internal fun SharedAdventureScreen(snapshot: AdventureSnapshot?, busy: Boolean, failed: Boolean, allowed: Boolean,
     tasks: Map<String, JSONObject>, onAction: (JSONObject) -> Unit, onOpen: (String) -> Unit, onBack: () -> Unit,
-    onAcknowledge: suspend (String) -> Boolean = { false }, onCreate: (() -> Unit)? = null) {
+    onAcknowledge: suspend (String) -> Boolean = { false }, onCreate: (() -> Unit)? = null, onQueue: (() -> Unit)? = null) {
     BackHandler(onBack = onBack)
     var now by remember { mutableStateOf(Instant.now()) }
     LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(1000); now = Instant.now() } }
@@ -56,14 +56,14 @@ internal fun SharedAdventureScreen(snapshot: AdventureSnapshot?, busy: Boolean, 
             AdventureArtwork(active.artwork, active)
             Text(active.draft.title, style = MaterialTheme.typography.titleLarge)
             if (active.draft.flavor.isNotEmpty()) Text(active.draft.flavor)
-            Text(stringResource(R.string.adventure_progress, snapshot.completed, snapshot.total), modifier = Modifier.testTag("adventure-progress"))
+            Text(pluralStringResource(R.plurals.adventure_progress, snapshot.total, snapshot.completed, snapshot.total), modifier = Modifier.testTag("adventure-progress"))
             LinearProgressIndicator(progress = { if (snapshot.total == 0) 0f else snapshot.completed.toFloat() / snapshot.total },
                 modifier = Modifier.fillMaxWidth(), gapSize = 0.dp, drawStopIndicator = {})
             if (snapshot.complete) {
                 AdventureBow(active.id, onAcknowledge)
                 Text(stringResource(R.string.adventure_complete), style = MaterialTheme.typography.titleMedium)
             }
-            Text(stringResource(R.string.adventure_offline_hint), style = MaterialTheme.typography.bodySmall)
+            if (!allowed) Text(stringResource(R.string.adventure_offline_hint), style = MaterialTheme.typography.bodySmall)
             AdventurePhases(active.draft, snapshot.tasks, tasks, onOpen)
             OutlinedButton(onClick = { edit = true }, enabled = allowed && !busy, modifier = Modifier.testTag("adventure-edit")) { Text(stringResource(R.string.adventure_edit)) }
             if (snapshot.complete) Button(onClick = { onAction(action("dismiss")) }, enabled = allowed && !busy,
@@ -72,7 +72,11 @@ internal fun SharedAdventureScreen(snapshot: AdventureSnapshot?, busy: Boolean, 
         } else if (snapshot?.creation != null) {
             Text(stringResource(R.string.guided_pending))
         } else {
-            Text(stringResource(R.string.adventure_intro))
+            if (status == "EMPTY" && !busy && !failed) {
+                AdventureArtwork("dojo-garden")
+                Text(stringResource(R.string.adventure_empty_heading), style = MaterialTheme.typography.titleLarge)
+            }
+            if (status == "READY") Text(stringResource(R.string.adventure_intro))
             if (status == "READY") for (choice in snapshot!!.proposals) {
                 ElevatedCard(onClick = { preview = choice }, modifier = Modifier.fillMaxWidth().testTag("adventure-proposal-${choice.id}")) {
                     AdventureArtwork(choice.artwork, choice)
@@ -83,16 +87,22 @@ internal fun SharedAdventureScreen(snapshot: AdventureSnapshot?, busy: Boolean, 
                         Text(stringResource(R.string.adventure_preview), color = MaterialTheme.colorScheme.primary)
                     }
                 }
-            } else Text(stringResource(when (status) {
+            } else if (!busy) Text(stringResource(when (status) {
                 "EMPTY" -> R.string.adventure_empty; "RUNNING" -> R.string.adventure_generating
                 "FAILED" -> R.string.adventure_generation_failed; "EXPIRED" -> R.string.adventure_expired
                 else -> R.string.adventure_unavailable
             }), modifier = Modifier.testTag("adventure-status"))
         }
-        if (active == null && onCreate != null) OutlinedButton(onClick = onCreate, modifier = Modifier.testTag("adventure-create")) {
+        if (active == null && onCreate != null) Button(onClick = onCreate, modifier = Modifier.fillMaxWidth().testTag("adventure-create")) {
             Text(stringResource(if (snapshot?.creation != null) R.string.guided_resume else R.string.guided_title))
         }
-        TextButton(onClick = { onAction(if (status == "FAILED") JSONObject().put("action", "retry").put("batchId", snapshot?.batchId)
+        if (active == null && status == "EMPTY" && snapshot?.creation == null && onQueue != null) OutlinedButton(
+            onClick = onQueue, modifier = Modifier.fillMaxWidth().testTag("adventure-add-tasks")) { Text(stringResource(R.string.adventure_add_tasks)) }
+        HelpDisclosure(stringResource(R.string.adventure_how)) {
+            Text(stringResource(R.string.adventure_how_body))
+            Text(stringResource(R.string.adventure_offline_hint))
+        }
+        OutlinedButton(onClick = { onAction(if (status == "FAILED") JSONObject().put("action", "retry").put("batchId", snapshot?.batchId)
             else JSONObject().put("action", "visit")) }, enabled = allowed && !busy, modifier = Modifier.testTag("adventure-refresh")) {
             Text(stringResource(if (status == "FAILED") R.string.adventure_retry else R.string.household_refresh))
         }
@@ -156,10 +166,8 @@ private fun AdventurePhases(draft: AdventureDraft, projected: Map<String, JSONOb
             Text(stringResource(R.string.adventure_estimate, phase.stars, phase.minutes), style = MaterialTheme.typography.bodySmall)
             if (!AdventureSnapshot.available(task)) Text(stringResource(R.string.adventure_source_unavailable), modifier = Modifier.testTag("adventure-unavailable-${phase.rootId}"))
             else {
-                if (AdventureSnapshot.available(editable[phase.rootId])) TextButton(onClick = { onOpen(phase.rootId) },
-                    modifier = Modifier.heightIn(min = 48.dp).testTag("adventure-task-${phase.rootId}"), contentPadding = PaddingValues(0.dp)) {
-                    Text(task!!.getString("title"))
-                }
+                if (AdventureSnapshot.available(editable[phase.rootId])) SettingsNavigationRow(task!!.getString("title"), { onOpen(phase.rootId) },
+                    Modifier.testTag("adventure-task-${phase.rootId}"))
                 else {
                     Text(task!!.getString("title"), style = MaterialTheme.typography.bodyLarge)
                     Text(stringResource(R.string.adventure_task_sync), style = MaterialTheme.typography.bodySmall)
@@ -197,8 +205,8 @@ private fun AdventureEditor(active: AdventureChoice, tasks: Map<String, JSONObje
                     OutlinedTextField(phase.minutes.takeIf { it > 0 }?.toString().orEmpty(), { update(phase.copy(minutes = it.toIntOrNull() ?: 0)) },
                         label = { Text(stringResource(R.string.adventure_minutes)) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                     Text(tasks[phase.rootId]?.getString("title") ?: stringResource(R.string.adventure_source_unavailable))
-                    TextButton(onClick = { replacement = index }, modifier = Modifier.testTag("adventure-replace-$index")) { Text(stringResource(R.string.adventure_replace)) }
-                    TextButton(onClick = { draft = draft.copy(phases = draft.phases.filterIndexed { i, _ -> i != index }) }, modifier = Modifier.testTag("adventure-remove-$index")) { Text(stringResource(R.string.adventure_remove)) }
+                    OutlinedButton(onClick = { replacement = index }, modifier = Modifier.testTag("adventure-replace-$index")) { Text(stringResource(R.string.adventure_replace)) }
+                    OutlinedButton(onClick = { draft = draft.copy(phases = draft.phases.filterIndexed { i, _ -> i != index }) }, modifier = Modifier.testTag("adventure-remove-$index")) { Text(stringResource(R.string.adventure_remove)) }
                     HorizontalDivider()
                 }
                 val valid = runCatching { AdventureDraft.read(draft.json(), true) }.isSuccess

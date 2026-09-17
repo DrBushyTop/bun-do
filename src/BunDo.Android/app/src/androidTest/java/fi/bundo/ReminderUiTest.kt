@@ -48,7 +48,7 @@ class ReminderUiTest {
         val translated = compose.activity.createConfigurationContext(config)
         compose.runOnUiThread {
             compose.activity.setContent {
-                CompositionLocalProvider(LocalContext provides translated, androidx.compose.ui.platform.LocalResources provides translated.resources, LocalConfiguration provides config,
+                CompositionLocalProvider(LocalContext provides compose.activity, androidx.compose.ui.platform.LocalResources provides translated.resources, LocalConfiguration provides config,
                     LocalActivityResultRegistryOwner provides compose.activity) {
                     val density = LocalDensity.current
                     CompositionLocalProvider(LocalDensity provides Density(density.density, scale)) {
@@ -70,20 +70,25 @@ class ReminderUiTest {
         compose.waitUntil(5000) { runBlocking { data.database.reminders().settings()!!.enabled } }
         compose.onNodeWithTag("reminders-mode-1").assertIsSelected()
         screenshot("reminders-en-settings")
-        compose.onNodeWithTag("reminders-time").performScrollTo().performTextReplacement("10:30")
-        compose.onNodeWithText("Save reminder time").performScrollTo().performClick()
+        compose.onNodeWithTag("reminders-time").performScrollTo().performClick()
+        setPickerTime(10, 30)
+        nativeNode("android:id/button1").performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)
         compose.waitUntil(5000) { runBlocking { data.database.reminders().settings()!!.dateOnlyTime == "10:30" } }
         compose.onNodeWithTag("reminders-mode-0").performScrollTo().performClick()
         compose.waitUntil(5000) { runBlocking { !data.database.reminders().settings()!!.enabled } }
     }
 
     @Test fun finnishSettingsRemainUsableAtDoubleFontSize() {
-        settings("fi", 2.0f)
+        val data = settings("fi", 2.0f)
         compose.onNodeWithTag("reminders-mode-2").performScrollTo().assertIsDisplayed()
         screenshot("reminders-fi-large")
-        compose.onNodeWithTag("reminders-time").performScrollTo().performTextReplacement("25:70")
-        compose.onNodeWithText("Tallenna muistutusaika").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("reminders-denied").assertDoesNotExist()
+        val before = runBlocking { data.database.reminders().settings()!!.dateOnlyTime }
+        compose.onNodeWithTag("reminders-time").performScrollTo().performClick()
+        setPickerTime(11, 59)
         screenshot("reminders-fi-large-time")
+        nativeNode("android:id/button2").performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)
+        assertEquals(before, runBlocking { data.database.reminders().settings()!!.dateOnlyTime })
     }
 
     @Test fun dueListStillWorksWithRemindersOffAndKeepsOldTasks() {
@@ -111,6 +116,27 @@ class ReminderUiTest {
         compose.onNodeWithText("Overdue milk").assertExists()
         assertFalse(runBlocking { data.database.reminders().settings()?.enabled ?: false })
         screenshot("reminders-due-list")
+    }
+
+    private fun nativeNode(id: String): android.view.accessibility.AccessibilityNodeInfo {
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        automation.serviceInfo = automation.serviceInfo.apply {
+            flags = flags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS
+        }
+        var found: android.view.accessibility.AccessibilityNodeInfo? = null
+        compose.waitUntil(5000) {
+            found = automation.rootInActiveWindow?.findAccessibilityNodeInfosByViewId(id)?.firstOrNull()
+            found != null
+        }
+        return checkNotNull(found)
+    }
+
+    private fun setPickerTime(hour: Int, minute: Int) {
+        nativeNode("android:id/toggle_mode").performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)
+        for ((id, value) in listOf("input_hour" to hour, "input_minute" to minute)) {
+            nativeNode("android:id/$id").performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_SET_TEXT,
+                android.os.Bundle().apply { putCharSequence(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, value.toString()) })
+        }
     }
 
     private fun screenshot(name: String) {

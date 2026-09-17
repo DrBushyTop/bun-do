@@ -1,5 +1,7 @@
 package fi.bundo.ui
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -27,63 +29,73 @@ fun VoiceSettings(controller: VoiceController, onReview: () -> Unit, modifier: M
     val state by controller.state.collectAsStateWithLifecycle()
     var history by rememberSaveable { mutableStateOf(initialHistory) }
     var setup by rememberSaveable { mutableStateOf(false) }
-    var notices by rememberSaveable { mutableStateOf(false) }
+    var choosingMode by rememberSaveable { mutableStateOf(false) }
     var exportId by rememberSaveable { mutableStateOf<String?>(null) }
     val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("audio/wav")) { uri ->
         val id = exportId; exportId = null
         if (id != null && uri != null) controller.export(id, uri)
     }
     LaunchedEffect(state.reviewId) { if (state.reviewId != null) onReview() }
-    Column(modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(stringResource(R.string.voice_model), style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
-        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-            listOf(false to R.string.voice_model_auto, true to R.string.voice_model_local).forEachIndexed { index, (local, label) ->
-                SegmentedButton(selected = state.localOnly == local, onClick = { controller.configure(localOnly = local) },
-                    enabled = !state.busy, shape = SegmentedButtonDefaults.itemShape(index, 2),
-                    modifier = Modifier.testTag(if (local) "voice-model-local" else "voice-model-auto")) { Text(stringResource(label)) }
+    val pageScroll = key(history, setup) { rememberScrollState() }
+    BackHandler(enabled = history || setup) { history = false; setup = false }
+    if (choosingMode) AlertDialog(onDismissRequest = { choosingMode = false }, title = { Text(stringResource(R.string.voice_model)) },
+        text = { Column(Modifier.selectableGroup()) {
+            listOf(false to R.string.voice_model_auto, true to R.string.voice_model_local).forEach { (local, label) ->
+                SettingChoiceRow(stringResource(label), state.localOnly == local, {
+                    controller.configure(localOnly = local); choosingMode = false
+                }, Modifier.testTag(if (local) "voice-model-local" else "voice-model-auto"), enabled = !state.busy)
             }
+        } }, confirmButton = { TextButton(onClick = { choosingMode = false }) { Text(stringResource(R.string.back)) } })
+    Column(modifier.verticalScroll(pageScroll).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        if (history || setup) TextButton(onClick = { history = false; setup = false }) { Text(stringResource(R.string.back)) }
+        if (!history && !setup) {
+            Text(stringResource(R.string.voice_settings_heading), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
+            SettingsNavigationRow(stringResource(R.string.voice_model), { choosingMode = true }, Modifier.testTag("voice-mode"),
+                value = stringResource(if (state.localOnly) R.string.voice_model_local else R.string.voice_model_auto), enabled = !state.busy)
+            Text(stringResource(if (state.localOnly) R.string.voice_model_local_hint else R.string.voice_model_auto_hint), style = MaterialTheme.typography.bodyMedium)
+            SettingToggleRow(stringResource(R.string.voice_analysis_setting), state.analyze, { controller.configure(analyze = it) },
+                Modifier.testTag("voice-analyze"), enabled = !state.busy, hint = stringResource(R.string.voice_analysis_hint))
+            SettingToggleRow(stringResource(R.string.voice_keep_audio), state.keepAudio, { controller.configure(keepAudio = it) },
+                Modifier.testTag("voice-keep-audio"), enabled = !state.busy, hint = stringResource(R.string.voice_audio_short))
+            HorizontalDivider()
+            SettingsNavigationRow(stringResource(R.string.voice_offline_setup), { setup = true }, Modifier.testTag("voice-model-setup"),
+                value = stringResource(when { state.phase == "INSTALLING" -> R.string.voice_downloading
+                    state.modelReady -> R.string.voice_model_installed; else -> R.string.voice_not_downloaded }))
+            SettingsNavigationRow(stringResource(R.string.voice_history, state.recordings.size), { history = true }, Modifier.testTag("voice-history"))
+            HelpDisclosure(stringResource(R.string.voice_privacy_details)) { Text(stringResource(R.string.voice_keep_audio_hint)) }
         }
-        Text(stringResource(if (state.localOnly) R.string.voice_model_local_hint else R.string.voice_model_auto_hint), style = MaterialTheme.typography.bodyMedium)
-        TextButton(onClick = { setup = !setup }, modifier = Modifier.heightIn(min = 48.dp).testTag("voice-model-setup")) {
-            Text(stringResource(if (state.modelReady) R.string.voice_model_installed else R.string.voice_model_setup))
-        }
-        if (setup || state.phase == "INSTALLING") {
+        if (setup) {
+            Text(stringResource(R.string.voice_offline_setup), style = MaterialTheme.typography.titleLarge)
             Text(stringResource(R.string.voice_install_explanation), style = MaterialTheme.typography.bodyMedium)
             if (state.phase == "INSTALLING") {
                 Text(stringResource(if (state.progress < 1f) R.string.voice_downloading else R.string.voice_verifying))
                 LinearProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth())
-                TextButton(onClick = controller::cancel) { Text(stringResource(R.string.voice_cancel)) }
+                OutlinedButton(onClick = controller::cancel) { Text(stringResource(R.string.voice_cancel)) }
             } else if (!state.modelReady) Button(onClick = controller::install, enabled = !state.busy,
                 modifier = Modifier.testTag("install-model")) { Text(stringResource(R.string.voice_install)) }
-            TextButton(onClick = { notices = !notices }) { Text(stringResource(R.string.voice_licenses)) }
-            if (notices) Text(stringResource(R.string.voice_attribution), style = MaterialTheme.typography.bodySmall)
-        }
-        VoiceSettingSwitch(stringResource(R.string.voice_analysis_setting), state.analyze, !state.busy, "voice-analyze") { controller.configure(analyze = it) }
-        Text(stringResource(R.string.voice_analysis_hint), style = MaterialTheme.typography.bodyMedium)
-        VoiceSettingSwitch(stringResource(R.string.voice_keep_audio), state.keepAudio, !state.busy, "voice-keep-audio") { controller.configure(keepAudio = it) }
-        Text(stringResource(R.string.voice_keep_audio_hint), style = MaterialTheme.typography.bodyMedium)
-        HorizontalDivider()
-        TextButton(onClick = { history = !history }, modifier = Modifier.heightIn(min = 48.dp).testTag("voice-history")) {
-            Text(stringResource(R.string.voice_history, state.recordings.size))
+            else Text(stringResource(R.string.voice_model_installed))
+            HelpDisclosure(stringResource(R.string.voice_licenses)) { Text(stringResource(R.string.voice_attribution), style = MaterialTheme.typography.bodySmall) }
         }
         if (history) {
+            Text(stringResource(R.string.voice_history, state.recordings.size), style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.testTag("voice-history-list").semantics { heading() })
             if (state.recordings.isEmpty()) Text(stringResource(R.string.voice_history_empty))
             for (recording in state.recordings) {
                 val preview = recording.state == "REVIEW"
                 Text(DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(recording.createdAt)),
                     style = MaterialTheme.typography.titleSmall)
                 if (preview) {
-                    TextButton(onClick = { controller.openReview(recording.id) }, enabled = !state.busy,
+                    OutlinedButton(onClick = { controller.openReview(recording.id) }, enabled = !state.busy,
                         modifier = Modifier.testTag("voice-resume-${recording.id}")) { Text(stringResource(R.string.voice_resume_draft)) }
                 } else if (recording.state !in setOf("COMMITTED", "USED")) {
                     if (recording.reason.isNotEmpty()) Text(stringResource(voiceMessageResource(recording.reason)))
-                    TextButton(onClick = { controller.retry(recording.id) }, enabled = !state.busy) { Text(stringResource(R.string.retry)) }
+                    OutlinedButton(onClick = { controller.retry(recording.id) }, enabled = !state.busy) { Text(stringResource(R.string.retry)) }
                 }
                 if (recording.keepAudio && recording.expiresAt > System.currentTimeMillis()) {
                     Text(stringResource(R.string.voice_expires, DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(recording.expiresAt))),
                         style = MaterialTheme.typography.bodySmall)
                     Text(stringResource(R.string.voice_export_warning), style = MaterialTheme.typography.bodySmall)
-                    TextButton(onClick = { exportId = recording.id; export.launch("bun-do-recording.wav") }, enabled = !state.busy) {
+                    OutlinedButton(onClick = { exportId = recording.id; export.launch("bun-do-recording.wav") }, enabled = !state.busy) {
                         Text(stringResource(R.string.voice_export))
                     }
                 }
@@ -94,14 +106,5 @@ fun VoiceSettings(controller: VoiceController, onReview: () -> Unit, modifier: M
             }
         }
         if (state.message.isNotEmpty()) Text(stringResource(voiceMessageResource(state.message)), style = MaterialTheme.typography.bodyMedium)
-    }
-}
-
-@Composable
-private fun VoiceSettingSwitch(label: String, value: Boolean, enabled: Boolean, tag: String, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-        Switch(checked = value, onCheckedChange = onChange, enabled = enabled, modifier = Modifier.testTag(tag)
-            .semantics { contentDescription = label })
     }
 }

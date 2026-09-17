@@ -67,10 +67,5 @@ internal fun HouseholdWorld() {
 @Composable
 internal fun WorldPreference() {
     val (visible, change) = worldPreference()
-    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("show-world")
-        .toggleable(visible, role = Role.Switch, onValueChange = change), verticalAlignment = Alignment.CenterVertically) {
-        Text(stringResource(R.string.show_world), Modifier.weight(1f))
-        Switch(visible, onCheckedChange = null)
-    }
-    Text(stringResource(R.string.show_world_hint), style = MaterialTheme.typography.bodySmall)
+    SettingToggleRow(stringResource(R.string.show_world), visible, change, Modifier.testTag("show-world"))
 }

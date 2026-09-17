@@ -65,7 +65,9 @@ class MainActivity : AppCompatActivity() {
             val account by accounts.active.collectAsStateWithLifecycle()
             val progress by welcome.state.collectAsStateWithLifecycle()
             var showAccount by rememberSaveable { mutableStateOf(false) }
+            var accountPage by rememberSaveable { mutableStateOf("account") }
             var showHouseholds by rememberSaveable { mutableStateOf(false) }
+            val inboxState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
             val signIn: SignInModel = viewModel()
             androidx.compose.runtime.LaunchedEffect(account?.identity, signIn.busy) {
                 if (!signIn.busy && account != null) welcome.bind(account?.identity)
@@ -85,26 +87,33 @@ class MainActivity : AppCompatActivity() {
                 }
                 if (showHouseholds && account?.identity != null) {
                     key(account!!.lease.generation) {
-                        HouseholdScreen(account!!, signIn, null, {}) {
+                        val selectedHousehold by account!!.selectedHousehold.collectAsStateWithLifecycle()
+                        HouseholdScreen(account!!, signIn, onSetup = {
+                            showHouseholds = false; showAccount = false
+                            welcome.update { it.copy(visible = true, step = fi.bundo.data.WelcomeStep.FAMILY) }
+                        }, initialHouseholdId = selectedHousehold) {
                             showHouseholds = false
                         }
                     }
                 } else if (showAccount) {
-                    AccountScreen(accounts, signIn, onHouseholds = { showHouseholds = true }) { showAccount = false }
+                    AccountScreen(accounts, signIn, initialPage = accountPage, onSetup = { showAccount = false; welcome.reopen() }, onHouseholds = { showHouseholds = true }) { showAccount = false }
                 } else if (progress.visible) {
                     if (welcome.matches(account?.identity))
-                        fi.bundo.ui.WelcomeRoute(welcome, account, signIn, onAccountHelp = { showAccount = true })
+                        fi.bundo.ui.WelcomeRoute(welcome, account, signIn, onAccountHelp = { accountPage = "account"; showAccount = true })
                     else CircularProgressIndicator()
                 } else if (account == null) {
                     CircularProgressIndicator()
                 } else key(account!!.lease.generation) {
+                inboxState.SaveableStateProvider(account!!.lease.generation) {
                 val data = account!!
                 val selected by data.selectedWorkspace.collectAsStateWithLifecycle()
                 if (selected != null) {
                     SharedWorkspaceScreen(data, selected!!, appearance, {
                         preferences.edit { putString("theme", it) }
                         appearance = it
-                    }, { showAccount = true }, onWelcome = welcome::reopen)
+                    }, { accountPage = "account"; showAccount = true }, onWelcome = welcome::reopen,
+                        onReminders = { accountPage = "reminders"; showAccount = true },
+                        onRecovery = { accountPage = "recovery"; showAccount = true })
                 } else {
                 val model: InboxViewModel = viewModel(key = data.lease.generation, factory = viewModelFactory {
                     initializer {
@@ -122,9 +131,12 @@ class MainActivity : AppCompatActivity() {
                         appearance = it
                     },
                     voice = data.voice,
-                    onAccount = { showAccount = true },
+                    onAccount = { accountPage = "account"; showAccount = true },
                     onWelcome = welcome::reopen,
+                    onReminders = { accountPage = "reminders"; showAccount = true },
+                    onRecovery = { accountPage = "recovery"; showAccount = true },
                 )
+                }
                 }
                 }
             }

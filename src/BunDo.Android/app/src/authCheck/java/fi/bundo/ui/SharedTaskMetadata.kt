@@ -78,14 +78,14 @@ internal fun SharedSnoozePresets(task: JSONObject, membership: JSONObject?, enab
         invalidTime = !Instant.parse(due.getString("instant")).isAfter(Instant.now())
         if (!invalidTime) onAction(SharedTaskAction("SetSnooze", task.toString(), until = due.getString("instant")))
     }
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        TextButton(enabled = enabled, modifier = Modifier.testTag("snooze-tomorrow"), onClick = { snooze(today.plusDays(1), LocalTime.of(9, 0)) }) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(enabled = enabled, modifier = Modifier.testTag("snooze-tomorrow"), onClick = { snooze(today.plusDays(1), LocalTime.of(9, 0)) }) {
             Text(stringResource(R.string.detail_snooze_tomorrow))
         }
-        TextButton(enabled = enabled, modifier = Modifier.testTag("snooze-week"), onClick = { snooze(today.plusWeeks(1), LocalTime.of(9, 0)) }) {
+        OutlinedButton(enabled = enabled, modifier = Modifier.testTag("snooze-week"), onClick = { snooze(today.plusWeeks(1), LocalTime.of(9, 0)) }) {
             Text(stringResource(R.string.detail_snooze_week))
         }
-        TextButton(enabled = enabled, modifier = Modifier.testTag("snooze-custom"), onClick = {
+        OutlinedButton(enabled = enabled, modifier = Modifier.testTag("snooze-custom"), onClick = {
             chooseDate(context, today.plusDays(1)) { date -> chooseTime(context, LocalTime.of(9, 0)) { time -> snooze(date, time) } }
         }) { Text(stringResource(R.string.detail_snooze_choose)) }
     }

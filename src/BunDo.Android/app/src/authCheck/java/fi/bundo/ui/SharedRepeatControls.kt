@@ -36,7 +36,7 @@ internal fun SharedRepeatControls(task: JSONObject, membership: JSONObject?, ena
                 stringResource(R.string.repeat_on_weekday, DayOfWeek.of(rule.getInt("weekday")).getDisplayName(TextStyle.FULL, locale))
                 else stringResource(R.string.repeat_daily))
         }
-        if (open || active) TextButton(enabled = enabled, modifier = Modifier.testTag("repeat-edit"),
+        if (open || active) OutlinedButton(enabled = enabled, modifier = Modifier.testTag("repeat-edit"),
             onClick = { basis = if (basis == null) task.toString() else null }) {
             Text(stringResource(if (repeat == null || !active) R.string.repeat_start else R.string.repeat_edit))
         }

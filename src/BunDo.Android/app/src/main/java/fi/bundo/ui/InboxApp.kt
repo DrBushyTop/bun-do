@@ -31,6 +31,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -107,6 +112,8 @@ fun InboxApp(
     queueTopBar: (@Composable (@Composable () -> Unit) -> Unit)? = null,
     queueSideNavigation: (@Composable () -> Unit)? = null,
     onHomeBack: () -> Unit = {},
+    onReminders: (() -> Unit)? = null,
+    onRecovery: (() -> Unit)? = null,
 ) {
     var feedback by remember { mutableStateOf<HouseholdFeedback?>(null) }
     var settings by rememberSaveable { mutableStateOf(false) }
@@ -168,11 +175,6 @@ fun InboxApp(
                         }
                     },
                     actions = {
-                        if (onAccount != null && settings) {
-                            TextButton(onClick = onAccount, modifier = Modifier.testTag("account")) {
-                                Text(stringResource(R.string.account_title))
-                            }
-                        }
                         if (editor != null) {
                             TextButton(
                                 onClick = { model.closeEditor(commit = true) {
@@ -201,8 +203,8 @@ fun InboxApp(
                     settings && voiceSettings && voice != null -> VoiceSettings(voice,
                         onReview = { voiceAutoStart = false; showVoice = true },
                         modifier = Modifier.align(Alignment.TopCenter).widthIn(max = 640.dp).fillMaxWidth())
-                    settings -> Settings(appearance, onAppearance, Modifier.align(Alignment.TopCenter).widthIn(max = 640.dp).fillMaxWidth(), queueTitle == null,
-                        onWelcome = onWelcome, onVoiceSettings = voice?.let { { it.closeReview(); it.clearMessage(); voiceSettings = true } })
+                    settings -> Settings(Modifier.align(Alignment.TopCenter).widthIn(max = 640.dp).fillMaxWidth(), queueTitle == null,
+                        onWelcome = onWelcome, onAccount = onAccount, onReminders = onReminders, onRecovery = onRecovery, onVoiceSettings = voice?.let { { it.closeReview(); it.clearMessage(); voiceSettings = true } })
                     selected != null && (!wide || queueContent != null) -> TaskDetail(
                         selected, { model.openEditor(selected.id) }, state, model::retry, Modifier.fillMaxSize(), queueTitle == null,
                         taskControls, canEdit && canEditTask(selected.id), { selectedId = it }, taskAttribution,
@@ -421,7 +423,7 @@ private fun Editor(state: InboxUiState, model: InboxViewModel, onSplit: (() -> U
 @Composable
 private fun FieldCount(value: String, limit: Int) {
     val length = InboxLimits.length(value)
-    Text(
+    if (length >= limit * 0.9) Text(
         if (length > limit) stringResource(R.string.too_long, limit)
         else stringResource(R.string.character_count, length, limit),
     )
@@ -469,52 +471,47 @@ private fun ErrorNotice(message: Int, retry: () -> Unit) {
 }
 
 @Composable
-private fun Settings(appearance: String, onAppearance: (String) -> Unit, modifier: Modifier, localOnly: Boolean, onVoiceSettings: (() -> Unit)? = null, onWelcome: (() -> Unit)? = null) {
+private fun Settings(modifier: Modifier, localOnly: Boolean,
+    onVoiceSettings: (() -> Unit)? = null, onWelcome: (() -> Unit)? = null, onAccount: (() -> Unit)? = null,
+    onReminders: (() -> Unit)? = null, onRecovery: (() -> Unit)? = null) {
     val language = AppCompatDelegate.getApplicationLocales().toLanguageTags()
-    Column(modifier.verticalScroll(rememberScrollState()).padding(16.dp)) {
-        if (onWelcome != null) {
-            TextButton(onClick = onWelcome, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("welcome-settings")) {
-                Text(stringResource(R.string.welcome_setup))
-            }
-            Spacer(Modifier.height(16.dp))
-        }
-        if (onVoiceSettings != null) {
-            TextButton(onClick = onVoiceSettings, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("voice-settings")) {
-                Text(stringResource(R.string.voice_settings))
-            }
-            Spacer(Modifier.height(16.dp))
-        }
+    var choosingLanguage by rememberSaveable { mutableStateOf(false) }
+    val choices = listOf("" to R.string.system_default, "fi" to R.string.finnish, "en" to R.string.english)
+    Column(modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (onAccount != null) SettingsNavigationRow(stringResource(R.string.family_account), onAccount,
+            Modifier.testTag("account"), icon = Icons.Outlined.Person)
+        else if (onWelcome != null) SettingsNavigationRow(stringResource(R.string.welcome_setup), onWelcome,
+            Modifier.testTag("welcome-settings"), icon = Icons.Outlined.Home)
+        if (onVoiceSettings != null) SettingsNavigationRow(stringResource(R.string.voice_settings), onVoiceSettings,
+            Modifier.testTag("voice-settings"), icon = Icons.Outlined.PlayArrow)
+        if (onReminders != null) SettingsNavigationRow(stringResource(R.string.reminders_title), onReminders,
+            Modifier.testTag("settings-reminders"), icon = Icons.Outlined.Notifications)
+        if (onRecovery != null) SettingsNavigationRow(stringResource(R.string.account_recovery_details), onRecovery,
+            Modifier.testTag("settings-recovery"), icon = Icons.Outlined.Refresh)
+        HorizontalDivider()
+        Text(stringResource(R.string.this_app), Modifier.padding(top = 16.dp), style = MaterialTheme.typography.titleMedium)
+        SettingsNavigationRow(stringResource(R.string.language), { choosingLanguage = true }, Modifier.testTag("settings-language"),
+            value = stringResource(choices.firstOrNull { it.first == language }?.second ?: R.string.system_default), icon = Icons.Outlined.Settings)
         MotionPreference()
-        Spacer(Modifier.height(16.dp))
         WorldPreference()
-        Spacer(Modifier.height(24.dp))
-        Text(stringResource(R.string.language), style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
-        Text(stringResource(R.string.language_hint), Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodyMedium)
-        Choices(
-            language,
-            listOf("" to R.string.system_default, "fi" to R.string.finnish, "en" to R.string.english),
-        ) { AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(it)) }
-        if (localOnly) {
-            Spacer(Modifier.height(24.dp))
-            Text(stringResource(R.string.local_only), style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
-            Text(stringResource(R.string.local_explanation), Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodyLarge)
+        HelpDisclosure(stringResource(R.string.about_settings)) {
+            Text(stringResource(R.string.language_hint))
+            Text(stringResource(R.string.motion_system_override))
+            Text(stringResource(R.string.show_world_hint))
+            if (localOnly) Text(stringResource(R.string.local_explanation))
         }
     }
+    if (choosingLanguage) androidx.compose.material3.AlertDialog(onDismissRequest = { choosingLanguage = false },
+        title = { Text(stringResource(R.string.language)) },
+        text = { Choices(language, choices) { choosingLanguage = false; AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(it)) } },
+        confirmButton = { TextButton(onClick = { choosingLanguage = false }) { Text(stringResource(R.string.back)) } })
 }
 
 @Composable
 private fun Choices(selected: String, options: List<Pair<String, Int>>, onSelect: (String) -> Unit) {
     Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { (key, label) ->
-            Row(
-                Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                    .selectable(selected = selected == key, onClick = { onSelect(key) }, role = Role.RadioButton)
-                    .padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                RadioButton(selected = selected == key, onClick = null)
-                Text(stringResource(label), Modifier.padding(start = 16.dp), style = MaterialTheme.typography.bodyLarge)
-            }
+            SettingChoiceRow(stringResource(label), selected == key, { onSelect(key) })
         }
     }
 }

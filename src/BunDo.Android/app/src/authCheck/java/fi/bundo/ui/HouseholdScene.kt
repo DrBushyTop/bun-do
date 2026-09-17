@@ -102,7 +102,7 @@ internal fun AdventureSignpost(snapshot: AdventureSnapshot?, onOpen: () -> Unit,
                     if (compact) stringResource(R.string.adventure_title) else active?.draft?.title ?: stringResource(R.string.adventure_title),
                     maxLines = if (compact) 1 else 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
                 if (active != null) {
-                    val accessibleProgress = stringResource(R.string.adventure_progress, snapshot.completed, snapshot.total)
+                    val accessibleProgress = pluralStringResource(R.plurals.adventure_progress, snapshot.total, snapshot.completed, snapshot.total)
                     Text(if (compact) "${snapshot.completed} / ${snapshot.total}" else
                         pluralStringResource(R.plurals.adventure_signpost_progress, snapshot.total, snapshot.completed, snapshot.total), style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

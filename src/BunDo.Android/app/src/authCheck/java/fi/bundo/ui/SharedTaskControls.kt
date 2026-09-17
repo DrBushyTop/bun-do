@@ -123,24 +123,24 @@ internal fun SharedTaskControls(task: JSONObject, ordered: List<JSONObject>, mem
             SharedCleanupControls(task, canAct, onAction)
             if (open) {
                 SharedSnoozePresets(task, membership, canAct, onAction)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(enabled = canAct && index > 0, modifier = Modifier.testTag("task-earlier"), onClick = {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(enabled = canAct && index > 0, modifier = Modifier.testTag("task-earlier"), onClick = {
                         onAction(SharedTaskAction("MoveTask", task.toString(), after = active.getOrNull(index - 2), before = active[index - 1]))
                     }) { Text(stringResource(R.string.task_earlier)) }
-                    TextButton(enabled = canAct && index >= 0 && index < active.lastIndex, modifier = Modifier.testTag("task-later"), onClick = {
+                    OutlinedButton(enabled = canAct && index >= 0 && index < active.lastIndex, modifier = Modifier.testTag("task-later"), onClick = {
                         onAction(SharedTaskAction("MoveTask", task.toString(), after = active[index + 1], before = active.getOrNull(index + 2)))
                     }) { Text(stringResource(R.string.task_later)) }
                 }
-                TextButton(enabled = canAct, modifier = Modifier.testTag("task-cancel"),
+                OutlinedButton(enabled = canAct, modifier = Modifier.testTag("task-cancel"),
                     onClick = { onAction(SharedTaskAction("CancelTask", task.toString())) }) { Text(stringResource(R.string.task_cancel)) }
-                if (task.isNull("snoozedUntil")) TextButton(enabled = canAct, modifier = Modifier.testTag("task-snooze"),
+                if (task.isNull("snoozedUntil")) OutlinedButton(enabled = canAct, modifier = Modifier.testTag("task-snooze"),
                     onClick = { onAction(SharedTaskAction("SetSnooze", task.toString(), until = Instant.now().plusSeconds(3600).toString())) }) {
                     Text(stringResource(R.string.task_snooze_hour))
                 }
             }
-            if (!task.isNull("snoozedUntil")) TextButton(enabled = canAct, modifier = Modifier.testTag("task-unsnooze"),
+            if (!task.isNull("snoozedUntil")) OutlinedButton(enabled = canAct, modifier = Modifier.testTag("task-unsnooze"),
                 onClick = { onAction(SharedTaskAction("ClearSnooze", task.toString())) }) { Text(stringResource(R.string.task_unsnooze)) }
-            TextButton(enabled = canAct, modifier = Modifier.testTag("task-delete"),
+            OutlinedButton(enabled = canAct, modifier = Modifier.testTag("task-delete"),
                 onClick = { onAction(SharedTaskAction("DeleteTask", task.toString())) }) { Text(stringResource(R.string.task_delete)) }
         }
     }

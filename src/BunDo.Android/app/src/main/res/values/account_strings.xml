@@ -1,26 +1,22 @@
 <resources>
-    <string name="account_title">Tili</string>
     <string name="account_inbox">Tilin paikalliset tehtävät</string>
-    <string name="account_signed_in">Oma tili tällä laitteella</string>
+    <string name="account_signed_in">Oma tili</string>
     <string name="account_anonymous">Ilman kirjautumista</string>
     <string name="account_local_notice">Kotitalouden tehtävät synkronoituvat, kun yhteys on käytettävissä. Paikallisen listan tehtävät pysyvät tällä laitteella, kunnes valitset ne tuotaviksi kotitalouteen.</string>
     <string name="account_installation_reset">Asennuksen tunniste puuttui tai ei vastannut tiedostoja. Vanhat tiedostot on eristetty. Kirjaudu uudelleen uuden laiterekisteröinnin luomiseksi. Salattuja tiedostoja ei voi avata ilman alkuperäistä laiteavainta.</string>
-    <string name="account_pending">Tekstit: %1$d · Äänitteet: %2$d</string>
+    <string name="account_pending">Tallennettuja tekstejä: %1$d · Äänityksiä: %2$d</string>
     <string name="account_operation_failed">Toiminto epäonnistui. Lähdetiedot säilyvät. Yritä uudelleen.</string>
     <string name="account_export_warning">Vienti sisältää yksityistä tekstiä. Valitse tallennuspaikka huolella. Äänitteet viedään erikseen puhevalikosta.</string>
     <string name="account_exported">Teksti viety. Alkuperäiset tiedot säilyvät.</string>
-    <string name="account_export_json">Vie JSON, osa %1$d</string>
-    <string name="account_export_text">Vie teksti, osa %1$d</string>
+    <string name="account_export_json">Tallenna palautustiedosto, osa %1$d</string>
+    <string name="account_export_text">Tallenna luettava teksti, osa %1$d</string>
     <string name="account_import_preview">Tuo ennen kirjautumista tallennetut tehtävät</string>
     <string name="account_import_notice">Valitut tekstit kopioidaan uusina paikallisina tehtävinä. Alkuperäiset säilyvät. Kotitalouteen siirto vaatii myöhemmin erillisen valinnan.</string>
-    <string name="account_import_selected">Kopioi valitut tekstit</string>
+    <string name="account_import_selected">Kopioi paikalliselle listalle</string>
     <string name="account_delete_sign_out">Poista tämän tilin paikalliset tiedot ja kirjaudu ulos</string>
     <string name="account_revoke_registration">Poista aiempi laiterekisteröinti %1$d ja rekisteröi tämä laite</string>
     <string name="account_registration_retired">Rekisteröinti on vanhentunut tai poistettu. Avaa tili rekisteröimällä laite uudelleen. Paikalliset tekstit säilyvät palautusta varten eikä niitä lähetetä kotitalouteen.</string>
     <string name="account_register_again">Luo uusi laiterekisteröinti</string>
-    <string name="account_confirm_title">Tarkista paikalliset tiedot</string>
-    <string name="account_confirm_body">Peruuta ja vie tiedot ensin, jos tarvitset varmuuskopion. Uloskirjautuminen lukitsee tiedot samalle tilille. Jos valitsit poiston, tiedot poistetaan pysyvästi. Rekisteröinnin poistaminen estää kyseisen laitteen tulevat muutokset.</string>
-    <string name="account_continue">Jatka valittua toimintoa</string>
     <string name="account_cancel">Peruuta</string>
     <string name="identity_registration_failed">Laitteen rekisteröinti epäonnistui. Jos laiteraja täyttyi, valitse vanha rekisteröinti poistettavaksi.</string>
 </resources>

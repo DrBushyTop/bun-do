@@ -75,7 +75,7 @@ class AdventureUiTest {
     @Test fun finnishDoubleTextKeepsCompletionAndDismissReachable() {
         val complete = adventureTask("Kauppalista", true)
         screen(adventureFixture(state, complete), "fi", 2f)
-        compose.onNodeWithTag("adventure-progress").performScrollTo().assertTextEquals("Päätehtäviä valmiina: 1 / 1")
+        compose.onNodeWithTag("adventure-progress").performScrollTo().assertTextEquals("1 / 1 tehtävä valmis")
         screenshot("adventure-fi-large-complete")
         compose.onNodeWithTag("adventure-dismiss").performScrollTo().performClick()
         assertEquals("dismiss", action!!.getString("action"))
@@ -85,7 +85,7 @@ class AdventureUiTest {
         screen(busy = true, failed = true)
         compose.onNodeWithTag("adventure-error").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("adventure-edit").performScrollTo().assertIsNotEnabled()
-        compose.onNodeWithTag("adventure-progress").performScrollTo().assertTextEquals("Main tasks complete: 0 / 1")
+        compose.onNodeWithTag("adventure-progress").performScrollTo().assertTextEquals("0 of 1 task done")
         screenshot("adventure-en-offline")
     }
     @Test fun failedAcceptExplainsRetryInsidePreview() {

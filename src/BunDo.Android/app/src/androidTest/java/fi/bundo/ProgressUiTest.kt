@@ -100,6 +100,7 @@ class ProgressUiTest {
         compose.onNodeWithText("3 tehtävää hoidettu").assertExists()
         compose.onNodeWithTag("progress-streak").performScrollTo().assertTextEquals("2 viikon putki")
         compose.onNodeWithTag("progress-lifetime").performScrollTo().assertTextEquals("25 asiaa hoidettu yhdessä")
+        compose.onNodeWithTag("progress-details").performScrollTo().performClick()
         compose.onNodeWithText("Jokainen päätehtävä lasketaan kerran.", substring = true).performScrollTo().assertIsDisplayed()
         screenshot("progress-fi-large")
     }

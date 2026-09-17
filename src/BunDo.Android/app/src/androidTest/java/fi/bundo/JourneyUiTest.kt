@@ -62,7 +62,7 @@ class JourneyUiTest {
     }
     @Test fun cachedProgressAndRetryStayVisibleAfterConnectionFailure() {
         screen(failed = true)
-        compose.onNodeWithTag("journey-progress").performScrollTo().assertTextEquals("First completions at this stop: 2 / 5")
+        compose.onNodeWithTag("journey-progress").performScrollTo().assertTextEquals("2 of 5 tasks toward the next stop")
         screenshot("journey-en-progress")
         compose.onNodeWithText("Here now").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("journey-refresh").performScrollTo().performClick()

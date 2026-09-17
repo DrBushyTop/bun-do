@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -20,6 +21,7 @@ import fi.bundo.data.*
 import fi.bundo.speech.VoiceController
 import org.json.JSONObject
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun GuidedAdventureScreen(creation: GuidedCreation?, remote: JSONObject?, busy: Boolean, failed: Boolean,
     tasks: Map<String, JSONObject>, canStart: Boolean, onPlan: (String, Int?) -> Unit, onApprove: (GuidedDraft) -> Unit,
@@ -81,7 +83,6 @@ internal fun GuidedAdventureScreen(creation: GuidedCreation?, remote: JSONObject
                 modifier = Modifier.testTag("guided-approve")) { Text(stringResource(R.string.guided_approve)) }
             TextButton(onClick = onDiscard, enabled = !busy) { Text(stringResource(R.string.guided_discard)) }
         } else {
-            AdventureArtwork("dojo-garden")
             val invalidOutcome = outcome.isNotEmpty() && (outcome.isBlank() || outcome.length > 1000 || outcome.any(Char::isISOControl))
             val invalidTime = minutes.isNotEmpty() && minutes.toIntOrNull() !in 1..1440
             OutlinedTextField(outcome, { outcome = it }, label = { Text(stringResource(R.string.guided_outcome)) },
@@ -94,21 +95,27 @@ internal fun GuidedAdventureScreen(creation: GuidedCreation?, remote: JSONObject
                 Text(stringResource(R.string.guided_record))
             }
             if (onIdeas != null) {
-                TextButton(onClick = onIdeas, enabled = !busy && canStart, modifier = Modifier.testTag("guided-ideas")) {
+                FilledTonalButton(onClick = onIdeas, enabled = !busy && canStart, modifier = Modifier.testTag("guided-ideas")) {
                     Text(stringResource(if (ideas.isEmpty()) R.string.guided_ideas else R.string.guided_ideas_refresh))
                 }
                 Text(stringResource(R.string.guided_ideas_hint), style = MaterialTheme.typography.bodySmall)
-                ideas.forEachIndexed { index, idea ->
-                    TextButton(onClick = { outcome = idea }, enabled = !busy, modifier = Modifier.testTag("guided-idea-$index")) { Text(idea) }
-                }
+                Column(Modifier.selectableGroup()) { ideas.forEachIndexed { index, idea ->
+                    SettingChoiceRow(idea, outcome == idea, { outcome = idea }, Modifier.testTag("guided-idea-$index"), enabled = !busy)
+                } }
             }
-            OutlinedTextField(minutes, { minutes = it }, label = { Text(stringResource(R.string.guided_time)) }, singleLine = true,
+            Text(stringResource(R.string.guided_time), style = MaterialTheme.typography.titleMedium)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                for (preset in listOf("15", "30", "60", "")) FilterChip(selected = minutes == preset,
+                    onClick = { minutes = preset }, modifier = Modifier.heightIn(min = 48.dp).testTag("guided-time-$preset"),
+                    label = { Text(if (preset.isEmpty()) stringResource(R.string.guided_no_limit) else stringResource(R.string.guided_minutes_preset, preset)) })
+            }
+            OutlinedTextField(minutes, { minutes = it }, label = { Text(stringResource(R.string.guided_custom_minutes)) }, singleLine = true,
                 modifier = Modifier.fillMaxWidth().testTag("guided-time"), isError = invalidTime,
                 supportingText = { if (invalidTime) Text(stringResource(R.string.guided_time_invalid), Modifier.testTag("guided-time-error")) })
             Text(stringResource(R.string.guided_preview_hint), style = MaterialTheme.typography.bodySmall)
             Button(onClick = { focus.clearFocus(); keyboard?.hide(); onPlan(outcome.trim(), minutes.toIntOrNull()) },
                 enabled = !busy && canStart && outcome.isNotBlank() && outcome.length <= 1000 && outcome.none(Char::isISOControl) &&
-                    (minutes.isEmpty() || minutes.toIntOrNull() in 1..1440), modifier = Modifier.testTag("guided-plan")) {
+                    (minutes.isEmpty() || minutes.toIntOrNull() in 1..1440), modifier = Modifier.fillMaxWidth().testTag("guided-plan")) {
                 Text(stringResource(R.string.guided_plan))
             }
         }

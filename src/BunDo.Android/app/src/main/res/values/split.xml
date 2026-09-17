@@ -1,5 +1,5 @@
 <resources>
-    <string name="split_generate">Ehdota vaiheita tekoälyllä</string>
+    <string name="split_generate">Ehdota vaiheita</string>
     <string name="split_retry">Yritä vaiheiden ehdottamista uudelleen</string>
     <string name="split_instructions">Miten tehtävä jaetaan vaiheisiin?</string>
     <string name="split_dictate">Sanele ohjeet</string>
@@ -14,4 +14,5 @@
     <string name="split_invalid">Valitse 1–16 erilaista vaihetta. Jokainen tarvitsee lyhyen otsikon.</string>
     <string name="split_save_first">Tallenna ja valitse vaiheet</string>
     <string name="split_cancel">Peru ehdotukset</string>
+    <string name="split_online_notice">Tekoäly käyttää tehtävää ja ohjeitasi verkossa. Tarkistat vaiheet ennen niiden lisäämistä.</string>
 </resources>

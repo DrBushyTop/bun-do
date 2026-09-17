@@ -114,8 +114,8 @@ class LegacyRecordingUiTest {
         compose.onNodeWithTag("legacy-recover").performScrollTo().performClick()
         compose.waitUntil(10_000) { runBlocking { accounts.active.value!!.database.recordings().all().size == 1 } }
         // Recovery opens the secondary settings/history flow, never the normal capture sheet.
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("voice-history").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithTag("voice-history").assertExists()
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("voice-history-list").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("voice-history-list").assertExists()
         assertTrue(runBlocking { accounts.active.value!!.database.inbox().intents().isEmpty() })
         assertTrue(runBlocking { accounts.legacyAudio.preview(accounts.active.value!!).recordings.isEmpty() })
     }

@@ -72,15 +72,10 @@ fun HouseholdMotionProvider(content: @Composable () -> Unit) {
 internal fun MotionPreference() {
     val context = LocalContext.current
     val motion = LocalHouseholdMotion.current
-    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("decorative-motion")
-        .toggleable(motion.preferred, role = Role.Switch, onValueChange = {
-            motion.preferred = it
-            context.getSharedPreferences("appearance", 0).edit { putBoolean("motion", it) }
-        }), verticalAlignment = Alignment.CenterVertically) {
-        Text(stringResource(R.string.decorative_motion), Modifier.weight(1f))
-        Switch(checked = motion.preferred, onCheckedChange = null)
-    }
-    Text(stringResource(R.string.motion_system_override), style = MaterialTheme.typography.bodySmall)
+    SettingToggleRow(stringResource(R.string.decorative_motion), motion.preferred, {
+        motion.preferred = it
+        context.getSharedPreferences("appearance", 0).edit { putBoolean("motion", it) }
+    }, Modifier.testTag("decorative-motion"))
 }
 
 // These cues are presentation only. They never become task fields or AI classifications.

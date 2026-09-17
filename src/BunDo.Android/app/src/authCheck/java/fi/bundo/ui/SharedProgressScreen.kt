@@ -25,7 +25,7 @@ import java.time.format.FormatStyle
 
 @Composable
 internal fun SharedProgressScreen(progress: String?, activity: Boolean, tasks: Map<String, JSONObject>, membership: JSONObject?,
-    onRefresh: () -> Unit, onOpen: (String) -> Unit, onJourney: (() -> Unit)? = null, onAdventure: (() -> Unit)? = null) {
+    onRefresh: () -> Unit, onOpen: (String) -> Unit, onJourney: (() -> Unit)? = null, onAdventure: (() -> Unit)? = null, onQueue: (() -> Unit)? = null) {
     if (activity) {
         SharedActivityScreen(progress, tasks, membership, onRefresh, onOpen)
         return
@@ -35,7 +35,7 @@ internal fun SharedProgressScreen(progress: String?, activity: Boolean, tasks: M
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(stringResource(R.string.progress_together),
             style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
-        TextButton(onClick = onRefresh, modifier = Modifier.testTag("progress-refresh")) { Text(stringResource(R.string.household_refresh)) }
+        OutlinedButton(onClick = onRefresh, modifier = Modifier.testTag("progress-refresh")) { Text(stringResource(R.string.household_refresh)) }
         if (onJourney != null) OutlinedButton(onClick = onJourney,
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("journey-open")) { Text(stringResource(R.string.journey_open)) }
         if (onAdventure != null) OutlinedButton(onClick = onAdventure,
@@ -65,7 +65,13 @@ internal fun SharedProgressScreen(progress: String?, activity: Boolean, tasks: M
             Text(stringResource(R.string.progress_period, date(buckets.getJSONObject(0).getString("start")),
                 date(buckets.getJSONObject(buckets.length() - 1).getString("end"))))
             val maximum = (0 until buckets.length()).maxOf { buckets.getJSONObject(it).getInt("count") }.coerceAtLeast(1)
-            for (index in 0 until buckets.length()) {
+            if (stats.getInt(if (month) "monthCount" else "weekCount") == 0) {
+                Text(stringResource(R.string.progress_empty_period))
+                if (onQueue != null) Button(onClick = onQueue, modifier = Modifier.testTag("progress-go-tasks")) {
+                    Text(stringResource(R.string.inbox))
+                }
+            }
+            else for (index in 0 until buckets.length()) {
                 val bucket = buckets.getJSONObject(index)
                 val label = if (month) stringResource(R.string.progress_period, date(bucket.getString("start")), date(bucket.getString("end")))
                     else LocalDate.parse(bucket.getString("start")).dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, locale) +
@@ -80,12 +86,15 @@ internal fun SharedProgressScreen(progress: String?, activity: Boolean, tasks: M
             HorizontalDivider()
             Text(pluralStringResource(R.plurals.progress_streak, stats.getInt("streak"), stats.getInt("streak")), style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.testTag("progress-streak").semantics { heading() })
-            Text(stringResource(R.string.progress_streak_explanation))
+
             Text(pluralStringResource(R.plurals.progress_lifetime, stats.getInt("lifetimeCount"), stats.getInt("lifetimeCount")), style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.testTag("progress-lifetime").semantics { heading() })
             if (stats.getInt("reachedMilestone") > 0) Text(stringResource(R.string.progress_milestone, stats.getInt("reachedMilestone")))
             if (!stats.isNull("nextMilestone")) Text(stringResource(R.string.progress_next_milestone, stats.getInt("nextMilestone")))
-            Text(stringResource(R.string.progress_counting_explanation, zone.id), style = MaterialTheme.typography.bodyMedium)
+            HelpDisclosure(stringResource(R.string.progress_how), Modifier.testTag("progress-details")) {
+                Text(stringResource(R.string.progress_streak_explanation))
+                Text(stringResource(R.string.progress_counting_explanation, zone.id), style = MaterialTheme.typography.bodyMedium)
+            }
         }
     }
 }
