@@ -326,9 +326,11 @@ household sync without a separate setup step. A compact home entry shows the
 current location and accepted progress; private tasks never advance it.
 
 Adventure, Lists, Together and Activity render cached content during background
-reads. Reopening a fresh adventure does not fetch again. Pull-to-refresh requests
-a fresh read; an accessible named action and the page overflow offer the same
-operation. No permanent Refresh button or connectivity disclaimer belongs in
+reads. Reopening a fresh adventure does not fetch again.
+While Adventure is visible, stale content refreshes quietly,
+including pending suggestions; returning from the background checks freshness.
+Pull-to-refresh requests a fresh read; an accessible named action and the page
+overflow offer the same operation. No permanent Refresh button or connectivity disclaimer belongs in
 the content. Show failures when they happen and retain cached work. Keep privacy
 and destructive-action explanations where they support a decision.
 

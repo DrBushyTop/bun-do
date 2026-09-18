@@ -179,9 +179,8 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
     LaunchedEffect(adventure?.active?.id) {
         if (destination == "creator" && adventure?.active != null) { back(); if (destinations.last() != "adventure") navigate("adventure") }
     }
-    LaunchedEffect(destination, selected.scope, current == null) {
-        if (destination == "adventure") refreshAdventure()
-    }
+    if (destination == "adventure") AdventureVisitRefresh(selected.scope,
+        adventure?.status == "RUNNING") { refreshAdventure() }
     var history by rememberSaveable(selected.scope) { mutableStateOf(false) }
     var deleted by rememberSaveable(selected.scope) { mutableStateOf(false) }
     var snoozed by rememberSaveable(selected.scope) { mutableStateOf(false) }

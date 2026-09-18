@@ -35,6 +35,32 @@ class SharedJourneyTest {
         assertEquals(true, enabled)
     }
 
+    @Test fun failedJourneyActivationStillSyncsLaterPrivateTasksAndRequestsRetry() = runBlocking {
+        val household = adventureWorkspace()
+        val personal = adventureWorkspace().copy(personal = true)
+        val synchronized = mutableListOf<String>()
+        val activated = mutableListOf<String>()
+        val finished = syncWorkspacePass(listOf(household, personal), sync = {
+            synchronized += it.scope; true
+        }, activateJourney = {
+            activated += it.scope
+            throw java.io.IOException("Journey unavailable")
+        })
+        assertFalse(finished)
+        assertEquals(listOf(household.scope, personal.scope), synchronized)
+        assertEquals(listOf(household.scope), activated)
+    }
+
+    @Test fun cancelledJourneyActivationStopsTheSyncPass() = runBlocking {
+        var synchronized = 0
+        val result = runCatching {
+            syncWorkspacePass(listOf(adventureWorkspace(), adventureWorkspace()), sync = { synchronized++; true },
+                activateJourney = { throw CancellationException("Account revoked") })
+        }
+        assertTrue(result.exceptionOrNull() is CancellationException)
+        assertEquals(1, synchronized)
+    }
+
     @Test fun existingJourneyIsReadWithoutRestartingAndPrivateWorkNeverEnablesIt() = fixture { db, state, _, repository ->
         val request = repository.prepareJourney(1, 1)!!
         repository.applyJourney(request, journeyFixture()); repository.release(request)

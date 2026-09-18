@@ -258,3 +258,17 @@ private fun AdventureRequestFeedback(busy: Boolean, failed: Boolean) {
     if (failed) Text(stringResource(R.string.adventure_failed), color = MaterialTheme.colorScheme.error,
         modifier = Modifier.testTag("adventure-dialog-error"))
 }
+
+@Composable
+internal fun AdventureVisitRefresh(scope: String, pending: Boolean, onVisit: () -> Unit) {
+    val owner = LocalLifecycleOwner.current
+    val visit by rememberUpdatedState(onVisit)
+    LaunchedEffect(owner, scope, pending) {
+        owner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                visit()
+                kotlinx.coroutines.delay(if (pending) 5_000L else 30_000L)
+            }
+        }
+    }
+}

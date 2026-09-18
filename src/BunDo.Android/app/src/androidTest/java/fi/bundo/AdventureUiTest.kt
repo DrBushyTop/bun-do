@@ -60,6 +60,33 @@ class AdventureUiTest {
         compose.onNodeWithText("Back").assertDoesNotExist()
         compose.onNodeWithTag("adventure-edit").performScrollTo().assertIsEnabled()
     }
+    @Test fun pendingAdventureRefreshesWhileVisibleAndImmediatelyAfterResume() {
+        lateinit var owner: androidx.lifecycle.LifecycleOwner
+        var calls = 0
+        compose.mainClock.autoAdvance = false
+        compose.runOnUiThread {
+            owner = object : androidx.lifecycle.LifecycleOwner {
+                override val lifecycle = androidx.lifecycle.LifecycleRegistry(this).apply {
+                    currentState = androidx.lifecycle.Lifecycle.State.STARTED
+                }
+            }
+            compose.activity.setContent {
+                CompositionLocalProvider(androidx.lifecycle.compose.LocalLifecycleOwner provides owner) {
+                    AdventureVisitRefresh("household", pending = true) { calls++ }
+                }
+            }
+        }
+        compose.mainClock.advanceTimeBy(100)
+        compose.runOnIdle { assertEquals(1, calls) }
+        compose.mainClock.advanceTimeBy(5_100)
+        compose.runOnIdle { assertEquals(2, calls) }
+        compose.runOnUiThread { (owner.lifecycle as androidx.lifecycle.LifecycleRegistry).currentState = androidx.lifecycle.Lifecycle.State.CREATED }
+        compose.mainClock.advanceTimeBy(10_100)
+        compose.runOnIdle { assertEquals(2, calls) }
+        compose.runOnUiThread { (owner.lifecycle as androidx.lifecycle.LifecycleRegistry).currentState = androidx.lifecycle.Lifecycle.State.STARTED }
+        compose.mainClock.advanceTimeBy(100)
+        compose.runOnIdle { assertEquals(3, calls) }
+    }
     @Test fun emptyAdventureKeepsCreationVisibleWithoutBackOrRefreshClutter() {
         val json = adventureFixture(state, root, active = false)
         json.getJSONObject("board").getJSONObject("batch").put("status", "EMPTY").put("proposals", JSONObject.NULL)

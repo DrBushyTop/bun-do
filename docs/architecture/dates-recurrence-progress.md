@@ -74,6 +74,8 @@ Verify capture-relative dates, date-only and Helsinki DST behavior, repeated wor
 On Android, household sync starts a missing journey automatically. A manual
 progress refresh also starts it if needed. Activation is safe to retry after a
 lost response and never applies to private workspaces.
+An activation failure remains retryable without stopping later workspaces from
+synchronizing their ordinary tasks.
 The ordinary sync-worker lease fences dedicated journey replies, without freezing
 or submitting queued task edits. The cache accepts validated server progress only,
 rejects older or reset journey snapshots and clears on lost household access.
