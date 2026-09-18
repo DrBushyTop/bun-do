@@ -294,3 +294,22 @@ inbox tasks. Family import remains a separate decision. Originals are retained.
 Backup/export warnings appear before the file picker, while connection details
 and storage formats remain available on request. Sign-out, switching accounts,
 local deletion and disconnecting an old device use distinct confirmations.
+
+## Compact task controls
+
+[Condense task controls](https://github.com/DrBushyTop/bun-do/issues/82) applies the
+owner's earlier clean queue prototype to the native screen. Preserve the Bun
+scene, compact adventure entry, task rows and bottom capture actions. Tasks,
+Lists, Together and Activity remain in that order.
+
+Keep audience, filter and overflow in one toolbar row. Show the selected view,
+assignment filter when active, and count below it. Status and assignment choices
+share one menu; do not expand them into the task area. Reorder, refresh, local
+import and pending private transfers belong in the overflow menu. On this device
+belongs in the queue audience picker and remains distinct from account-private
+Only me. Existing recovery notices remain visible when action is required.
+
+Use the existing Material menu, icon button and typography styles. Show ordering
+help only during reorder mode. Empty queues use a short text message instead of
+another illustration, large heading and explanatory paragraph. The capture
+buttons retain their existing emphasis, with the shorter Write / Kirjoita label.

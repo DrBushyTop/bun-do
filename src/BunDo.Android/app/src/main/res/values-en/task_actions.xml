@@ -21,4 +21,10 @@
     <string name="visibility_open">Open</string>
     <string name="visibility_completed">Completed</string>
     <string name="visibility_cancelled">Cancelled</string>
+    <string name="queue_filter">Filter tasks</string>
+    <string name="queue_status">Status</string>
+    <string name="queue_assignment">Assignment</string>
+    <string name="queue_active">Active</string>
+    <string name="queue_empty">No open tasks.</string>
+    <string name="queue_empty_filtered">No tasks match these filters.</string>
 </resources>

@@ -318,25 +318,7 @@ private fun Queue(
                 }
             } else if (state.tasks.isEmpty()) {
                 item {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = gutter, vertical = 32.dp)) {
-                        Icon(
-                            painterResource(R.drawable.bun_do),
-                            contentDescription = null,
-                            tint = if (MaterialTheme.colorScheme.surface == Color(0xFF111511)) Color(0xFFF8F9F4) else Color(0xFF245B48),
-                            modifier = Modifier.size(80.dp),
-                        )
-                        Text(
-                            stringResource(R.string.empty_title),
-                            style = MaterialTheme.typography.headlineSmall,
-                            modifier = Modifier.padding(top = 24.dp).semantics { heading() },
-                        )
-                        Text(
-                            stringResource(R.string.empty_body),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 8.dp),
-                        )
-                    }
+                    QueueEmptyState()
                 }
             } else {
                 item {
@@ -380,14 +362,14 @@ private fun Queue(
             OutlinedButton(
                 onClick = onType,
                 enabled = canEdit && state.loaded && !state.working && !state.readFailed,
-                modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("capture"),
+                modifier = Modifier.weight(if (onVoice == null) 1f else 0.85f).heightIn(min = 48.dp).testTag("capture"),
             ) {
                 Icon(Icons.Outlined.Add, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(if (hasDraft) R.string.resume_draft else R.string.type_task))
             }
             if (onVoice != null) {
-                Button(onClick = onVoice, modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("voice")) {
+                Button(onClick = onVoice, modifier = Modifier.weight(1.15f).heightIn(min = 48.dp).testTag("voice")) {
                     Icon(painterResource(R.drawable.microphone), null, Modifier.size(24.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.speak_task))
@@ -605,4 +587,11 @@ private fun Choices(selected: String, options: List<Pair<String, Int>>, onSelect
             SettingChoiceRow(stringResource(label), selected == key, { onSelect(key) })
         }
     }
+}
+
+@Composable
+internal fun QueueEmptyState(filtered: Boolean = false) {
+    Text(stringResource(if (filtered) R.string.queue_empty_filtered else R.string.queue_empty),
+        Modifier.fillMaxWidth().padding(24.dp).testTag("queue-empty"),
+        style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }

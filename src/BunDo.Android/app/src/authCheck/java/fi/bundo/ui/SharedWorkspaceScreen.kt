@@ -1,5 +1,8 @@
 package fi.bundo.ui
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ArrowDropDown
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -74,8 +77,6 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
     val membership = current?.membership?.let(::JSONObject)
     var feedback by remember { mutableStateOf<HouseholdFeedback?>(null) }
     var completionTurn by rememberSaveable { mutableLongStateOf(0L) }
-    var views by remember { mutableStateOf(false) }
-    var tools by rememberSaveable { mutableStateOf(false) }
     var destinations by rememberSaveable(selected.scope) { mutableStateOf(listOf("queue")) }
     val destination = destinations.last()
     fun navigate(next: String) {
@@ -256,11 +257,17 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
     }
     @Composable fun Audience(editing: Boolean = false) {
         Box {
-            TextButton(onClick = { audienceMenu = true }, enabled = !busy && !state.working,
+            TextButton(onClick = { audienceMenu = true }, enabled = !busy && !state.working && !reordering,
                 modifier = Modifier.testTag("task-audience")) {
-                Text(stringResource(if (selected.personal) R.string.visibility_only_me else R.string.visibility_household))
+                Text(if (selected.personal) stringResource(R.string.visibility_only_me) else selected.name,
+                    maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.ArrowDropDown, null)
             }
             DropdownMenu(audienceMenu, { audienceMenu = false }) {
+                if (!editing) DropdownMenuItem(text = { Text(stringResource(R.string.shared_local)) }, onClick = {
+                    audienceMenu = false
+                    run { data.selectHousehold(null) }
+                }, modifier = Modifier.testTag("shared-local"))
                 DropdownMenuItem(text = { Text(stringResource(R.string.visibility_only_me)) }, onClick = {
                     audienceMenu = false
                     if (!selected.personal) privateAudience(editing)
@@ -352,8 +359,11 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
         queueSideNavigation = { SharedHouseholdNavigation(if (destination in listOf("journey", "adventure", "creator")) "together" else destination, rail = true) { selectDestination(it) } },
         queueContent = if (destination != "queue") ({ onOpen ->
             val progress = current?.progress?.takeIf { current?.blocked == null && recovery == null }
-            if (destination == "lists") SharedListsScreen(repository, data, current, byId,
-                current != null && current?.blocked == null && recovery == null && !busy, onOpen, ::act)
+            if (destination == "lists") SharedListsScreen(repository, current, byId,
+                current != null && current?.blocked == null && recovery == null && !busy,
+                { id -> SharedSyncWorker.request(context, data); onOpen(id) }, ::act) { command, retry ->
+                    (context.applicationContext as BunDoApplication).withAccountToken(data) { token -> SharedLists.send(repository, token, command, retry) }
+                }
             else if (destination == "creator") GuidedAdventureScreen(creation, adventure?.creation, adventureBusy, adventureFailed, byId,
                 current != null && current?.blocked == null && recovery == null && adventure?.active == null,
                 { outcome, minutes -> guidedAction { token -> GuidedAdventure.plan(context, repository, token, outcome, minutes) } },
@@ -438,28 +448,32 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
             !busy && current?.blocked == null && recovery == null, onOpen, ::act,
             onReorder = { reordering = it },
             onFullQueue = { history = false; deleted = false; snoozed = false; dueOnly = false },
-            toolbar = {
-                Column(Modifier.fillMaxWidth()) {
-                    Audience()
-                    Row(Modifier.fillMaxWidth()) {
-                    Box {
-                        TextButton(onClick = { views = true }, modifier = Modifier.testTag("queue-views")) {
-                            Text(stringResource(when { dueOnly -> R.string.reminders_due; deleted -> R.string.task_deleted_view
-                                history -> R.string.task_history_view; snoozed -> R.string.task_snoozed_view; else -> R.string.task_active_view }))
-                        }
-                        DropdownMenu(views, { views = false }) {
-                            listOf("active" to R.string.task_active_view, "history" to R.string.task_history_view,
-                                "deleted" to R.string.task_deleted_view, "snoozed" to R.string.task_snoozed_view,
-                                "due" to R.string.reminders_due).forEach { (view, label) ->
-                                DropdownMenuItem(text = { Text(stringResource(label)) }, modifier = Modifier.testTag("task-$view-view"), onClick = {
-                                    history = view == "history"; deleted = view == "deleted"; snoozed = view == "snoozed"; dueOnly = view == "due"; views = false
-                                })
-                            }
-                        }
-                    }
-                    TextButton(onClick = { tools = !tools }, modifier = Modifier.testTag("queue-tools")) { Text(stringResource(R.string.queue_tools)) }
-                    }
+            audience = { Audience() },
+            personal = selected.personal,
+            defaultView = !dueOnly && !deleted && !history && !snoozed,
+            viewLabel = stringResource(when { dueOnly -> R.string.reminders_due; deleted -> R.string.task_deleted_view
+                history -> R.string.task_history_view; snoozed -> R.string.task_snoozed_view; else -> R.string.queue_active }),
+            viewChoices = { dismiss ->
+                val chosenView = when { dueOnly -> "due"; deleted -> "deleted"; history -> "history"; snoozed -> "snoozed"; else -> "active" }
+                listOf("active" to R.string.queue_active, "history" to R.string.task_history_view,
+                    "deleted" to R.string.task_deleted_view, "snoozed" to R.string.task_snoozed_view,
+                    "due" to R.string.reminders_due).forEach { (view, label) ->
+                    DropdownMenuItem(text = { Text(stringResource(label)) }, modifier = Modifier.testTag("task-$view-view"),
+                        trailingIcon = { if (view == chosenView) androidx.compose.material3.Icon(Icons.Outlined.Check, null) }, onClick = {
+                            history = view == "history"; deleted = view == "deleted"; snoozed = view == "snoozed"; dueOnly = view == "due"; dismiss()
+                        })
                 }
+            },
+            moreActions = { dismiss ->
+                if (selected.personal) DropdownMenuItem(text = { Text(stringResource(R.string.visibility_pending_title)) }, enabled = !busy,
+                    onClick = { dismiss(); refreshVisibility() }, modifier = Modifier.testTag("visibility-pending"))
+                if (!busy && current?.blocked == null) DropdownMenuItem(text = { Text(stringResource(R.string.shared_import)) },
+                    modifier = Modifier.testTag("shared-import"), onClick = { dismiss(); run {
+                        imports = (context.applicationContext as BunDoApplication).accounts.sharedImportPreview(data)
+                        chosen = emptySet()
+                    } })
+                if (current?.blocked == null) DropdownMenuItem(text = { Text(stringResource(R.string.household_refresh)) },
+                    modifier = Modifier.testTag("shared-refresh"), onClick = { dismiss(); SharedSyncWorker.request(context, data) })
             }, notices = {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
             if (dueOnly && queueRows.isEmpty()) Text(stringResource(R.string.reminders_due_empty))
@@ -476,27 +490,10 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
             }
             if (current?.blocked != null) Text(stringResource(R.string.shared_access_lost),
                 color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 8.dp).testTag("shared-blocked"))
-            if (selected.personal && tools) TextButton(onClick = { refreshVisibility() }, enabled = !busy,
-                modifier = Modifier.testTag("visibility-pending")) { Text(stringResource(R.string.visibility_pending_title)) }
-            if (tools) {
-            Row(Modifier.fillMaxWidth()) {
-                TextButton(onClick = { run { data.selectHousehold(null) } }, enabled = !busy,
-                    modifier = Modifier.testTag("shared-local")) { Text(stringResource(R.string.shared_local)) }
-                TextButton(onClick = { run {
-                    imports = (context.applicationContext as BunDoApplication).accounts.sharedImportPreview(data)
-                    chosen = emptySet()
-                } }, enabled = !busy && current?.blocked == null,
-                    modifier = Modifier.testTag("shared-import")) { Text(stringResource(R.string.shared_import)) }
+            if (problems.isNotEmpty()) androidx.compose.material3.OutlinedButton(onClick = { showProblems = true },
+                modifier = Modifier.testTag("shared-recovery")) {
+                Text(stringResource(R.string.shared_review, problems.size))
             }
-            Row {
-                TextButton(onClick = { SharedSyncWorker.request(context, data) }, enabled = current?.blocked == null,
-                    modifier = Modifier.testTag("shared-refresh")) { Text(stringResource(R.string.household_refresh)) }
-            }
-            }
-                if (problems.isNotEmpty()) androidx.compose.material3.OutlinedButton(onClick = { showProblems = true },
-                    modifier = Modifier.testTag("shared-recovery")) {
-                    Text(stringResource(R.string.shared_review, problems.size))
-                }
             if (failed) Text(stringResource(R.string.shared_action_failed), color = MaterialTheme.colorScheme.error)
         }
     }) })

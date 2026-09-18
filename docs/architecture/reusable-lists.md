@@ -57,3 +57,16 @@ different or newly edited adventure.
 Starting a list does not start or replace an adventure. The adventure editor can
 link it as existing work. Voice matching of saved names, saved content inside AI
 planning and saving entire adventures remain follow-up work.
+
+## Active view and refresh
+
+Your lists opens on active instances only. Completed finite checklists leave that
+view and remain available through its Completed filter and ordinary task history.
+Standing lists remain active when their items are checked. Saved reusable
+content is independent of both views and is never hidden by instance completion.
+
+Opening Lists renders cached content while refreshing saved definitions in the
+background. That read does not disable cached actions or show a page-wide loading
+bar. With no saved library cached yet, its section shows an initial loading
+message without blocking local list creation. Failed reads retain cached content
+and offer Refresh. Explicit writes keep their busy, conflict and retry feedback.
