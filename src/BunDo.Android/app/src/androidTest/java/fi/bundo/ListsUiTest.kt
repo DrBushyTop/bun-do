@@ -209,6 +209,38 @@ class ListsUiTest {
         Unit
     }
 
+    @Test fun listTypeChoicesReuseIconsAndHideUnrelatedListsEnglish() = types("en", 1f)
+    @Test fun listTypeChoicesRemainUsableFinnishLargeText() = types("fi", 1.5f)
+    private fun types(language: String, scale: Float) {
+        val data = (compose.activity.application as BunDoApplication).accounts.active.value!!
+        val state = adventureWorkspace()
+        runBlocking { data.database.shared().saveWorkspace(state) }
+        val repository = SharedRepository(data.database, data.lease, state.scope, state.registration)
+        val config = Configuration(compose.activity.resources.configuration).apply { setLocale(Locale.forLanguageTag(language)); fontScale = scale }
+        val translated = compose.activity.createConfigurationContext(config)
+        compose.runOnUiThread { compose.activity.setContent {
+            CompositionLocalProvider(LocalContext provides translated, LocalResources provides translated.resources, LocalConfiguration provides config) {
+                val density = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides Density(density.density, scale)) {
+                    BunDoTheme("light") { Surface { Box(Modifier.safeDrawingPadding()) {
+                        SharedListsScreen(repository, state, emptyMap(), true, {}, {}) { _, _ -> }
+                    } } }
+                }
+            }
+        } }
+        compose.waitUntil(5_000) { compose.onAllNodes(hasTestTag("lists-new") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("lists-new").performClick()
+        compose.onNodeWithTag("list-types").assertExists()
+        compose.onNodeWithTag("lists-screen").assertDoesNotExist()
+        screenshot("list-types-$language.png")
+        for (index in 0..5) {
+            compose.onNodeWithTag("list-type-$index").performScrollTo().assertHasClickAction()
+            compose.onNodeWithTag("list-type-icon-$index", useUnmergedTree = true).assertIsDisplayed()
+        }
+        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+        compose.onNodeWithTag("lists-new").assertExists()
+    }
+
     private fun screenshot(name: String) {
         compose.waitForIdle()
         val image = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()

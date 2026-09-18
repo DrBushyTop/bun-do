@@ -33,7 +33,6 @@ import java.util.Locale
 class JourneyUiTest {
     private val compose = createAndroidComposeRule<MainActivity>()
     @get:Rule val rules: RuleChain = RuleChain.outerRule(IsolatedUiAccountRule()).around(compose)
-    private var starts = 0
     private var refreshes = 0
     private var backs = 0
     private fun screen(language: String = "en", scale: Float = 1f, snapshot: JSONObject? = journeyFixture(),
@@ -46,18 +45,17 @@ class JourneyUiTest {
                 val density = LocalDensity.current
                 CompositionLocalProvider(LocalDensity provides Density(density.density, scale)) {
                     BunDoTheme(if (dark) "dark" else "light") { Surface { Box(Modifier.safeDrawingPadding().then(if (short) Modifier.height(360.dp) else Modifier)) {
-                        SharedJourneyScreen(snapshot?.toString(), busy, failed, allowed, { starts++ }, { refreshes++ }, { backs++ })
+                        SharedJourneyScreen(snapshot?.toString(), busy, failed, allowed, { refreshes++ }, { backs++ })
                     } } }
                 }
             }
         } }
     }
-    @Test fun startIsExplicitAndExplainsFamilyBaseline() {
+    @Test fun automaticJourneyHasNoStartButtonOrPermanentConnectionWarning() {
         screen(snapshot = journeyFixture().put("journey", JSONObject.NULL))
-        assertEquals(0, starts)
-        compose.onNodeWithTag("journey-start").performScrollTo().performClick()
-        assertEquals(1, starts)
-        compose.onNodeWithText("Starts online for the whole family.", substring = true).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("journey-start").assertDoesNotExist()
+        compose.onNodeWithText("Starts online for the whole family.", substring = true).assertDoesNotExist()
+        compose.onNodeWithTag("journey-busy").assertDoesNotExist()
         screenshot("journey-en-start")
     }
     @Test fun cachedProgressAndRetryStayVisibleAfterConnectionFailure() {
@@ -65,7 +63,8 @@ class JourneyUiTest {
         compose.onNodeWithTag("journey-progress").performScrollTo().assertTextEquals("2 of 5 tasks toward the next stop")
         screenshot("journey-en-progress")
         compose.onNodeWithText("Here now").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithTag("journey-refresh").performScrollTo().performClick()
+        compose.onNodeWithTag("page-options").performScrollTo().performClick()
+        compose.onNodeWithTag("page-refresh").performClick()
         assertEquals(1, refreshes)
         compose.onNodeWithTag("journey-start").assertDoesNotExist()
     }
@@ -76,16 +75,19 @@ class JourneyUiTest {
         screenshot("journey-fi-large-rest")
         compose.onNodeWithTag("journey-history-dojo-garden").performScrollTo().assertTextEquals("Dojolta puutarhaan")
         screenshot("journey-fi-large-history")
-        compose.onNodeWithTag("journey-refresh").performScrollTo().performClick()
+        compose.onNodeWithTag("page-options").performScrollTo().performClick()
+        compose.onNodeWithTag("page-refresh").performClick()
         assertEquals(1, refreshes)
     }
     @Test fun unavailableAndBusyStatesDoNotInventProgressOrOfferInvalidStart() {
         screen(snapshot = null, allowed = false)
         compose.onNodeWithTag("journey-progress").assertDoesNotExist()
         compose.onNodeWithTag("journey-start").assertDoesNotExist()
-        compose.onNodeWithTag("journey-refresh").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("page-options").performClick()
+        compose.onNodeWithTag("page-refresh").assertIsNotEnabled()
+        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
         screen(snapshot = journeyFixture().put("journey", JSONObject.NULL), busy = true)
-        compose.onNodeWithTag("journey-start").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("journey-start").assertDoesNotExist()
     }
     @Test fun futureRouteHasReadableFallbackAndDarkMode() {
         screen(snapshot = journeyFixture().apply { getJSONObject("journey").put("routeId", "future-route").put("locationId", "future-stop") }, dark = true)
@@ -93,11 +95,11 @@ class JourneyUiTest {
         compose.onNodeWithText("Stop 2").performScrollTo().assertIsDisplayed()
         screenshot("journey-en-dark-future")
     }
-    @Test fun shortContentAreaStillScrollsToStartAndBack() {
+    @Test fun shortContentAreaKeepsSystemBackAndNoTextBackButton() {
         screen(snapshot = journeyFixture().put("journey", JSONObject.NULL), short = true)
-        compose.onNodeWithTag("journey-start").performScrollTo().assertIsDisplayed().performClick()
-        assertEquals(1, starts)
-        compose.onNodeWithText("Back").performScrollTo().performClick()
+        compose.onNodeWithText("Back").assertDoesNotExist()
+        compose.waitForIdle()
+        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
         assertEquals(1, backs)
     }
     @Test fun hiddenWorldDoesNotHideJourneyOrResetItsProgress() {

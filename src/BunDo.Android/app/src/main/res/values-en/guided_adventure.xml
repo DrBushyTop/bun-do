@@ -18,7 +18,7 @@
     <string name="guided_discard">Discard draft</string>
     <string name="guided_outcome">What would you like to get done?</string>
     <string name="guided_time">Time available, optional</string>
-    <string name="guided_preview_hint">Bun will suggest a draft online. Nothing enters the queue until you approve it.</string>
+    <string name="guided_preview_hint">Bun will suggest a draft. Nothing enters the queue until you approve it.</string>
     <string name="guided_plan">Preview plan</string>
     <string name="guided_ended">This start attempt has ended. Tasks already added or waiting to sync stay in your queue.</string>
     <string name="guided_acknowledge">Got it</string>

@@ -194,7 +194,13 @@ class SharedTaskUiTest {
     @Test fun journeyOpensFromTogetherAndReturnsToTasksWithoutChangingThem() {
         val (data, state) = fixture("en", "light", fontScale = 2f)
         runBlocking { data.database.shared().saveWorkspace(state.copy(progress = journeyFixture().toString())) }
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("journey-home").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("journey-home").assertIsDisplayed()
+        compose.onNodeWithTag("capture").assertIsDisplayed()
+        screenshot("journey-native-home-large")
         compose.onNodeWithTag("household-together").performClick()
+        compose.onNodeWithTag("adventure-open").performScrollTo().assertIsDisplayed()
+        screenshot("together-native-navigation-large")
         compose.onNodeWithTag("journey-open").performScrollTo().performClick()
         compose.onNodeWithTag("journey-progress").performScrollTo().assertTextEquals("2 of 5 tasks toward the next stop")
         compose.onNodeWithTag("household-queue").performClick()

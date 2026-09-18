@@ -123,37 +123,53 @@ internal data class AdventureSnapshot(val workspaceId: String, val epoch: String
 internal object SharedAdventure {
     suspend fun send(context: Context, repository: SharedRepository, token: String, action: JSONObject,
         sendRequest: suspend (String, SharedWorkspace, JSONObject) -> JSONObject = AdventureEndpoint()::send) {
+        if (action.getString("action") == "visit") {
+            val state = repository.prepareAdventureRead() ?: throw SyncFailure("WORKSPACE_UNAVAILABLE")
+            if (!action.optBoolean("force") && fresh(state)) return
+            try {
+                val read = sendRequest(token, state, JSONObject().put("action", "read"))
+                check(repository.applyAdventureRead(state, read))
+                val snapshot = AdventureSnapshot.read(read)
+                if (snapshot.active == null && snapshot.creation == null && snapshot.batchStatus(Instant.now()) in listOf(null, "EMPTY", "EXPIRED", "CONSUMED"))
+                    send(context, repository, token, JSONObject().put("action", "refresh").put("batchId", snapshot.batchId ?: JSONObject.NULL), sendRequest)
+            } catch (failure: SyncFailure) {
+                if (failure.code in listOf("FORBIDDEN", "REGISTRATION_RETIRED", "EPOCH_CHANGED")) repository.blockAdventureRead(state, failure.code)
+                throw failure
+            }
+            return
+        }
         val request = checkNotNull(repository.prepareJourney(SystemClock.elapsedRealtime(),
             Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT, 0))) { "Sync busy" }
         try {
-            if (action.getString("action") == "visit") {
-                val read = sendRequest(token, request.workspace, JSONObject().put("action", "read"))
-                check(repository.applyAdventure(request, read))
-                val snapshot = AdventureSnapshot.read(read)
-                if (snapshot.active == null && snapshot.creation == null && snapshot.batchStatus(Instant.now()) in listOf(null, "EMPTY", "EXPIRED", "CONSUMED"))
-                    check(repository.applyAdventure(request, sendRequest(token, request.workspace, JSONObject().put("action", "refresh")
-                        .put("batchId", snapshot.batchId ?: JSONObject.NULL))))
-            } else {
-                try {
-                    val result = sendRequest(token, request.workspace, action)
-                    check(repository.applyAdventure(request, result))
-                    if (action.getString("action") in listOf("leave", "dismiss", "finish")) {
-                        val closed = AdventureSnapshot.read(result)
-                        if (closed.active == null) check(repository.applyAdventure(request,
-                            sendRequest(token, request.workspace, JSONObject().put("action", "refresh").put("batchId", closed.batchId ?: JSONObject.NULL))))
-                    }
+            try {
+                val result = sendRequest(token, request.workspace, action)
+                check(repository.applyAdventure(request, result))
+                if (action.getString("action") in listOf("leave", "dismiss", "finish")) {
+                    val closed = AdventureSnapshot.read(result)
+                    if (closed.active == null) check(repository.applyAdventure(request,
+                        sendRequest(token, request.workspace, JSONObject().put("action", "refresh").put("batchId", closed.batchId ?: JSONObject.NULL))))
                 }
-                catch (failure: SyncFailure) {
-                    if (failure.code in listOf("ADVENTURE_CHANGED", "ADVENTURE_ACTIVE", "SUGGESTIONS_UNAVAILABLE", "SOURCE_UNAVAILABLE", "ADVENTURE_NOT_COMPLETE"))
-                        repository.applyAdventure(request, sendRequest(token, request.workspace, JSONObject().put("action", "read")))
-                    throw failure
-                }
+            }
+            catch (failure: SyncFailure) {
+                if (failure.code in listOf("ADVENTURE_CHANGED", "ADVENTURE_ACTIVE", "SUGGESTIONS_UNAVAILABLE", "SOURCE_UNAVAILABLE", "ADVENTURE_NOT_COMPLETE"))
+                    repository.applyAdventure(request, sendRequest(token, request.workspace, JSONObject().put("action", "read")))
+                throw failure
             }
         } catch (failure: SyncFailure) {
             if (failure.code in listOf("FORBIDDEN", "REGISTRATION_RETIRED", "EPOCH_CHANGED")) repository.block(request, failure.code)
             throw failure
         } finally { repository.release(request) }
     }
+
+    fun fresh(state: SharedWorkspace, now: Long = System.currentTimeMillis()): Boolean {
+        val cached = state.adventure?.let { AdventureSnapshot.read(JSONObject(it)) } ?: return false
+        if (state.blocked != null || state.adventureFetchedAt <= 0) return false
+        val age = now - state.adventureFetchedAt
+        val status = cached.batchStatus(Instant.ofEpochMilli(now))
+        val lifetime = if (status == "RUNNING") 5_000L else 5 * 60_000L
+        return age in 0 until lifetime && status != "EXPIRED"
+    }
+
 }
 
 internal class AdventureEndpoint(private val route: String = "adventure") {

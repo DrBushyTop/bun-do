@@ -29,6 +29,20 @@ class SharedJourneyTest {
         } finally { db.close(); context.deleteDatabase(name) }
     }
 
+    @Test fun firstHouseholdRefreshStartsJourneyWithoutSeparateConsent() = fixture { _, _, _, repository ->
+        var enabled: Boolean? = null
+        SharedJourney.refresh(context, repository, "token", false) { _, _, enable -> enabled = enable; journeyFixture() }
+        assertEquals(true, enabled)
+    }
+
+    @Test fun existingJourneyIsReadWithoutRestartingAndPrivateWorkNeverEnablesIt() = fixture { db, state, _, repository ->
+        val request = repository.prepareJourney(1, 1)!!
+        repository.applyJourney(request, journeyFixture()); repository.release(request)
+        SharedJourney.refresh(context, repository, "token", false) { _, _, enable -> assertFalse(enable); journeyFixture() }
+        db.shared().saveWorkspace(repository.workspace.first()!!.copy(personal = true))
+        SharedJourney.refresh(context, repository, "token", false) { _, _, _ -> error("Private workspace must not request a journey") }
+    }
+
     @Test fun acceptedJourneySurvivesRepositoryRestartWithoutSubmittingPendingTextOrAdvancingSyncCursor() = fixture { db, state, _, repository ->
         repository.copyText("Still pending", "")
         val request = repository.prepareJourney(1000, 1)!!

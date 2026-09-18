@@ -32,6 +32,7 @@ data class SharedWorkspace(
     val membership: String? = null,
     val progress: String? = null,
     val adventure: String? = null,
+    @ColumnInfo(defaultValue = "0") val adventureFetchedAt: Long = 0,
     val adventureBow: String? = null,
     val adventureSeal: String? = null,
     val adventureCreation: String? = null,

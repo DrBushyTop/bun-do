@@ -168,7 +168,8 @@ pacing is five locations per journey and five new first root-task completions
 per location. This is a tunable presentation choice, not XP or task-size
 weighting. Completions outside adventures count too.
 
-Start from credits accepted after the household enables the journey, not its
+Start the journey automatically after household sync. Existing journeys keep
+their progress. Start from credits accepted after activation, not the household's
 historical total. Reuse canonical first-completion identities and server
 acceptance semantics. Checklist items, retrying on another device and
 reopening/recompleting a task never grant extra credit. Pending offline feedback

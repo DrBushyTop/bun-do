@@ -130,9 +130,24 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
     val adventure by repository.adventure.collectAsStateWithLifecycle(null)
     var adventureBusy by remember(data.lease.generation, selected.scope) { mutableStateOf(false) }
     var adventureFailed by remember(data.lease.generation, selected.scope) { mutableStateOf(false) }
+    var adventureRefreshing by remember(data.lease.generation, selected.scope) { mutableStateOf(false) }
+    var adventureRefreshFailed by remember(data.lease.generation, selected.scope) { mutableStateOf(false) }
+    fun refreshAdventure(force: Boolean = false) {
+        if (selected.personal || current == null || current?.blocked != null || recovery != null || adventureRefreshing || adventureBusy) return
+        if (!force && SharedAdventure.fresh(current!!)) return
+        adventureRefreshing = true; adventureRefreshFailed = false
+        scope.launch {
+            try { (context.applicationContext as BunDoApplication).withAccountToken(data) { token ->
+                SharedAdventure.send(context, repository, token, JSONObject().put("action", "visit").put("force", force))
+            } } catch (error: CancellationException) { throw error }
+            catch (_: Exception) { adventureRefreshFailed = true }
+            finally { adventureRefreshing = false }
+        }
+    }
     fun adventureAction(action: JSONObject) {
+        if (action.optString("action") == "visit") { refreshAdventure(action.optBoolean("force")); return }
         if (adventureBusy) return
-        adventureBusy = true; adventureFailed = false
+        adventureBusy = true; adventureFailed = false; adventureRefreshFailed = false
         scope.launch {
             try { (context.applicationContext as BunDoApplication).withAccountToken(data) { token ->
                 SharedAdventure.send(context, repository, token, action)
@@ -164,8 +179,8 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
     LaunchedEffect(adventure?.active?.id) {
         if (destination == "creator" && adventure?.active != null) { back(); if (destinations.last() != "adventure") navigate("adventure") }
     }
-    LaunchedEffect(destination, selected.scope) {
-        if (destination == "adventure") adventureAction(JSONObject().put("action", "visit"))
+    LaunchedEffect(destination, selected.scope, current == null) {
+        if (destination == "adventure") refreshAdventure()
     }
     var history by rememberSaveable(selected.scope) { mutableStateOf(false) }
     var deleted by rememberSaveable(selected.scope) { mutableStateOf(false) }
@@ -351,10 +366,15 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
     } }
     CompositionLocalProvider(LocalTaskArtwork provides taskArtworkLoader) {
     InboxApp(state, model, appearance, onAppearance, voice = data.voice, voiceTarget = VoiceTarget(selected.scope), onAccount = onAccount, onWelcome = onWelcome, onReminders = onReminders, onRecovery = onRecovery, queueTitle = if (selected.personal) stringResource(R.string.visibility_only_me) else selected.name, captureAudience = { Audience(true) }, onHomeBack = ::back,
-        queueTopBar = { bar -> HouseholdScene(
+        queueTopBar = { bar -> Column { HouseholdScene(
             if (joy) "joy" else if (current?.blocked != null || recovery != null || current == null) "dojo" else sceneActivity(canonical.values.map(::JSONObject), now),
             !reordering, adventure?.takeUnless { selected.personal }?.takeIf { current?.blocked == null && recovery == null },
-            { navigate("adventure") }, { repository.acknowledgeAdventure(it, true) }, bar) },
+            { navigate("adventure") }, { repository.acknowledgeAdventure(it, true) }, bar)
+            if (!selected.personal && !reordering && current?.blocked == null && recovery == null)
+                current?.progress?.let { JourneyProgress.read(JSONObject(it)) }?.let { progress ->
+                    JourneyHomeProgress(progress) { navigate("journey") }
+                }
+        } },
         queueNavigation = { SharedHouseholdNavigation(if (destination in listOf("journey", "adventure", "creator")) "together" else destination) { selectDestination(it) } },
         queueSideNavigation = { SharedHouseholdNavigation(if (destination in listOf("journey", "adventure", "creator")) "together" else destination, rail = true) { selectDestination(it) } },
         queueContent = if (destination != "queue") ({ onOpen ->
@@ -381,12 +401,13 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
                     guidedAction { token -> ideaTexts = GuidedAdventure.ideas(repository, token, language) }
                 })
             else if (destination == "adventure") SharedAdventureScreen(adventure?.takeIf { recovery == null && current?.blocked == null },
-                adventureBusy, adventureFailed, current != null && current?.blocked == null && recovery == null,
-                byId, ::adventureAction, onOpen, ::back, { repository.acknowledgeAdventure(it, false) }, { navigate("creator") }, { navigate("queue"); model.openEditor() })
+                adventureBusy, adventureFailed || adventureRefreshFailed, current != null && current?.blocked == null && recovery == null,
+                byId, ::adventureAction, onOpen, ::back, { repository.acknowledgeAdventure(it, false) }, { navigate("creator") }, { navigate("queue"); model.openEditor() },
+                refreshing = adventureRefreshing, onRefresh = { refreshAdventure(true) })
             else if (destination == "journey") SharedJourneyScreen(progress, journeyBusy, journeyFailed,
-                current != null && current?.blocked == null && recovery == null, { journey(true) }, { journey(false) }, ::back)
+                current != null && current?.blocked == null && recovery == null, { journey(false) }, ::back)
             else SharedProgressScreen(progress, destination == "activity", byId, membership,
-                { SharedSyncWorker.request(context, data) }, onOpen, { navigate("journey") }, { navigate("adventure") }, { navigate("queue") })
+                { journey(false) }, onOpen, { navigate("journey") }, { navigate("adventure") }, { navigate("queue") }, refreshing = journeyBusy, failed = journeyFailed, allowed = current != null && current?.blocked == null && recovery == null)
         }) else null,
         canEdit = current?.blocked == null, queueTasks = queueRows,
         onSplit = if (state.editor?.let { it.key == InboxRepository.NEW_DRAFT || byId[it.key]?.let { task ->

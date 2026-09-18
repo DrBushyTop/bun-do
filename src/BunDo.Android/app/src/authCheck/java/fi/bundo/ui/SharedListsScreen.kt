@@ -10,6 +10,8 @@ import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -115,9 +117,35 @@ internal fun SharedListsScreen(repository: SharedRepository, workspace: SharedWo
         }
         return
     }
+    if (starters) {
+        BackHandler { starters = false }
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp).testTag("list-types"),
+            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.lists_choose_type), style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.semantics { heading() })
+            val names = listOf(R.string.lists_groceries, R.string.lists_cottage, R.string.lists_cleaning, R.string.lists_hosting, R.string.lists_seasonal, R.string.lists_blank)
+            val contents = listOf(R.string.lists_groceries_items, R.string.lists_cottage_items, R.string.lists_cleaning_items, R.string.lists_hosting_items, R.string.lists_seasonal_items, R.string.lists_blank_items)
+            val descriptions = listOf(R.string.lists_groceries_hint, R.string.lists_cottage_hint, R.string.lists_cleaning_hint,
+                R.string.lists_hosting_hint, R.string.lists_seasonal_hint, R.string.lists_blank_hint)
+            names.forEachIndexed { index, name ->
+                val title = stringResource(name)
+                val items = stringResource(contents[index]).split("\n").filter { it.isNotBlank() }.map { HouseholdListItem(it) }
+                SettingsNavigationRow(title, { prepare(SavedHouseholdList(UUID.randomUUID().toString(), if (index == 5) "" else title, null, items), "start", index == 0) },
+                    Modifier.testTag("list-type-$index"), value = stringResource(descriptions[index]), leading = {
+                        Box(Modifier.testTag("list-type-icon-$index")) {
+                            TaskCue(title, if (index == 0 || index == 3) "shop" else "storage",
+                                when (index) { 3 -> Icons.Outlined.Person; 5 -> Icons.Outlined.Add; else -> null })
+                        }
+                    })
+            }
+        }
+        return
+    }
+    val refreshLabel = stringResource(R.string.lists_refresh)
+    RefreshPage(refreshLabel, refreshing, enabled && !busy, ::refresh, Modifier.testTag("lists-page")) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp).testTag("lists-screen"),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(stringResource(R.string.lists_title), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
+        RefreshHeading(stringResource(R.string.lists_title), refreshLabel, enabled && !busy && !refreshing, ::refresh)
         Text(stringResource(R.string.lists_intro), color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth().testTag("lists-action-progress"))
         if (error != null) Text(stringResource(if (error == "LIST_CHANGED") R.string.lists_changed else R.string.lists_failed), color = MaterialTheme.colorScheme.error)
@@ -134,15 +162,6 @@ internal fun SharedListsScreen(repository: SharedRepository, workspace: SharedWo
         }
         Button(onClick = { starters = !starters }, enabled = enabled && !busy && !loadingDraft && currentPreview == null, modifier = Modifier.testTag("lists-new")) {
             Text(stringResource(R.string.lists_new))
-        }
-        if (starters) {
-            val names = listOf(R.string.lists_groceries, R.string.lists_cottage, R.string.lists_cleaning, R.string.lists_hosting, R.string.lists_seasonal, R.string.lists_blank)
-            val contents = listOf(R.string.lists_groceries_items, R.string.lists_cottage_items, R.string.lists_cleaning_items, R.string.lists_hosting_items, R.string.lists_seasonal_items, R.string.lists_blank_items)
-            names.forEachIndexed { index, name ->
-                val title = stringResource(name)
-                val items = stringResource(contents[index]).split("\n").filter { it.isNotBlank() }.map { HouseholdListItem(it) }
-                SettingsNavigationRow(title, { prepare(SavedHouseholdList(UUID.randomUUID().toString(), if (index == 5) "" else title, null, items), "start", index == 0) })
-            }
         }
         val lifecycle = if (showCompleted) "COMPLETED" else "OPEN"
         val roots = tasks.values.filter {
@@ -188,7 +207,6 @@ internal fun SharedListsScreen(repository: SharedRepository, workspace: SharedWo
             HorizontalDivider()
         }
         Text(stringResource(R.string.lists_saved), style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
-        Text(stringResource(R.string.lists_online), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (refreshing && workspace?.listLibrary == null) Text(stringResource(R.string.lists_loading),
             style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("lists-initial-loading"))
         else if (saved.isEmpty() && workspace?.listLibrary != null) Text(stringResource(R.string.lists_saved_empty))
@@ -213,7 +231,9 @@ internal fun SharedListsScreen(repository: SharedRepository, workspace: SharedWo
                 }
             }
         }
-        TextButton(onClick = ::refresh, enabled = enabled && !busy && !refreshing, modifier = Modifier.testTag("lists-refresh")) { Text(stringResource(R.string.lists_refresh)) }
+        if (refreshFailed) TextButton(onClick = ::refresh, enabled = enabled && !busy && !refreshing,
+            modifier = Modifier.testTag("lists-refresh")) { Text(refreshLabel) }
+    }
     }
     if (discard) AlertDialog(onDismissRequest = { discard = false },
         title = { Text(stringResource(R.string.voice_discard_draft)) },
@@ -258,7 +278,7 @@ internal fun ListPreview(json: String, enabled: Boolean, error: String?, pending
                 }
             } else if (error != null && error != "LIST_CHANGED") Text(stringResource(R.string.lists_failed), color = MaterialTheme.colorScheme.error)
             if (pending) OutlinedButton(onClick = onRetry, enabled = enabled) { Text(stringResource(R.string.lists_retry_save)) }
-            Text(stringResource(if (mode == "save") R.string.lists_online else R.string.lists_copy_hint))
+            if (mode != "save") Text(stringResource(R.string.lists_copy_hint))
             OutlinedTextField(value.title, { if (InboxLimits.length(it) <= 160) update(value.copy(title = it)) }, enabled = enabled,
                 label = { Text(stringResource(R.string.lists_name)) }, modifier = Modifier.fillMaxWidth().testTag("list-name"))
             OutlinedTextField(value.notes.orEmpty(), { if (InboxLimits.length(it) <= 4000) update(value.copy(notes = it)) }, enabled = enabled,

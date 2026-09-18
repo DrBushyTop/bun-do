@@ -50,6 +50,30 @@ class AdventureUiTest {
             }
         } }
     }
+    @Test fun backgroundRefreshKeepsCachedAdventureUsableWithoutPageLoadingOrTextBack() {
+        compose.runOnUiThread { compose.activity.setContent { BunDoTheme("light") {
+            SharedAdventureScreen(AdventureSnapshot.read(adventureFixture(state, root)).project(state, listOf(root), emptyList()),
+                false, false, true, mapOf(root.getString("id") to root), {}, {}, {}, refreshing = true)
+        } } }
+        compose.onNodeWithTag("adventure-busy").assertDoesNotExist()
+        compose.onNodeWithTag("adventure-refresh").assertDoesNotExist()
+        compose.onNodeWithText("Back").assertDoesNotExist()
+        compose.onNodeWithTag("adventure-edit").performScrollTo().assertIsEnabled()
+    }
+    @Test fun emptyAdventureKeepsCreationVisibleWithoutBackOrRefreshClutter() {
+        val json = adventureFixture(state, root, active = false)
+        json.getJSONObject("board").getJSONObject("batch").put("status", "EMPTY").put("proposals", JSONObject.NULL)
+        compose.runOnUiThread { compose.activity.setContent { BunDoTheme("light") { Surface {
+            SharedAdventureScreen(AdventureSnapshot.read(json).project(state, listOf(root), emptyList()),
+                false, false, true, emptyMap(), {}, {}, {}, onCreate = {}, onQueue = {}, refreshing = true)
+        } } } }
+        compose.onNodeWithTag("adventure-busy").assertDoesNotExist()
+        compose.onNodeWithTag("adventure-refresh").assertDoesNotExist()
+        compose.onNodeWithText("Back").assertDoesNotExist()
+        compose.onNodeWithTag("adventure-create").assertIsDisplayed()
+        screenshot("adventure-empty-quiet")
+    }
+
     @Test fun explicitFinishConfirmsWithoutCheckingTasks() {
         screen()
         compose.onNodeWithTag("adventure-finish").performScrollTo().performClick()

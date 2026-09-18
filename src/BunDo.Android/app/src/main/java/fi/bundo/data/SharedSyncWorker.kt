@@ -122,6 +122,9 @@ class SharedSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
                     val recovery = SharedSnapshotRecovery(data.database, data.lease, scope.scope)
                     val finished = runScope(repository, recovery, checkNotNull(data.database.openHelper.writableDatabase.path), token)
                     if (!finished) return@withAccountToken false
+                    val current = repository.prepareAdventureRead()
+                    if (current != null && !current.personal && current.progress?.let { JourneyProgress.read(JSONObject(it)) } == null)
+                        SharedJourney.refresh(applicationContext, repository, token, false)
                 }
                 true
             }.let { if (it) Result.success() else Result.retry() }

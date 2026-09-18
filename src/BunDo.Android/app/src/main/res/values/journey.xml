@@ -1,12 +1,6 @@
 <resources>
     <string name="journey_title">Bunin matka</string>
-    <string name="journey_back">Takaisin</string>
-    <string name="journey_intro">Pieni matka yhdessä</string>
-    <string name="journey_start_body">Kun perhe saa tehtäviä valmiiksi, Bun tutkii dojon polkuja. Kiirettä ei ole.</string>
-    <string name="journey_start">Aloita yhteinen matka</string>
-    <string name="journey_start_hint">Aloitus tarvitsee verkkoyhteyden ja koskee koko perhettä. Aiemmat valmistumiset säilyvät tilastoissa.</string>
     <string name="journey_open">Katso Bunin matkaa</string>
-    <string name="journey_unavailable">Yhdistä verkkoon ja päivitä, niin näet perheenne matkan.</string>
     <string name="journey_failed">Perheeseen ei saatu juuri nyt yhteyttä. Tarkista verkkoyhteys ja yritä uudelleen.</string>
     <plurals name="journey_progress">
         <item quantity="one">%1$d / %2$d tehtävä kohti seuraavaa pysäkkiä</item>

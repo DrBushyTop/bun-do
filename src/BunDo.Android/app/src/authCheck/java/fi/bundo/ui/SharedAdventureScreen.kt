@@ -35,7 +35,8 @@ import java.time.Instant
 @Composable
 internal fun SharedAdventureScreen(snapshot: AdventureSnapshot?, busy: Boolean, failed: Boolean, allowed: Boolean,
     tasks: Map<String, JSONObject>, onAction: (JSONObject) -> Unit, onOpen: (String) -> Unit, onBack: () -> Unit,
-    onAcknowledge: suspend (String) -> Boolean = { false }, onCreate: (() -> Unit)? = null, onQueue: (() -> Unit)? = null) {
+    onAcknowledge: suspend (String) -> Boolean = { false }, onCreate: (() -> Unit)? = null, onQueue: (() -> Unit)? = null,
+    refreshing: Boolean = false, onRefresh: () -> Unit = { onAction(JSONObject().put("action", "visit").put("force", true)) }) {
     BackHandler(onBack = onBack)
     var now by remember { mutableStateOf(Instant.now()) }
     LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(1000); now = Instant.now() } }
@@ -46,10 +47,11 @@ internal fun SharedAdventureScreen(snapshot: AdventureSnapshot?, busy: Boolean, 
     val active = snapshot?.active
     val status = snapshot?.batchStatus(now)
     fun action(name: String) = JSONObject().put("action", name).put("adventureId", active!!.id).put("version", active.version)
+    val refreshLabel = stringResource(R.string.refresh_adventures)
+    RefreshPage(refreshLabel, refreshing, allowed && !busy, onRefresh, Modifier.testTag("adventure-page")) {
     Column(Modifier.fillMaxSize().widthIn(max = 640.dp).verticalScroll(rememberScrollState()).padding(24.dp).testTag("adventure-screen"),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        TextButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.adventure_back)) }
-        Text(stringResource(R.string.adventure_title), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
+        RefreshHeading(stringResource(R.string.adventure_title), refreshLabel, allowed && !busy && !refreshing, onRefresh)
         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth().testTag("adventure-busy"))
         if (failed) Text(stringResource(R.string.adventure_failed), color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("adventure-error"))
         if (!allowed) Text(stringResource(R.string.adventure_unavailable))
@@ -64,7 +66,6 @@ internal fun SharedAdventureScreen(snapshot: AdventureSnapshot?, busy: Boolean, 
                 AdventureBow(active.id, onAcknowledge)
                 Text(stringResource(R.string.adventure_complete), style = MaterialTheme.typography.titleMedium)
             }
-            if (!allowed) Text(stringResource(R.string.adventure_offline_hint), style = MaterialTheme.typography.bodySmall)
             AdventurePhases(active.draft, snapshot.tasks, tasks, onOpen)
             OutlinedButton(onClick = { edit = true }, enabled = allowed && !busy, modifier = Modifier.testTag("adventure-edit")) { Text(stringResource(R.string.adventure_edit)) }
             if (snapshot.complete) Button(onClick = { onAction(action("dismiss")) }, enabled = allowed && !busy,
@@ -89,7 +90,7 @@ internal fun SharedAdventureScreen(snapshot: AdventureSnapshot?, busy: Boolean, 
                         Text(stringResource(R.string.adventure_preview), color = MaterialTheme.colorScheme.primary)
                     }
                 }
-            } else if (!busy) Text(stringResource(when (status) {
+            } else if (!busy && !(snapshot == null && refreshing)) Text(stringResource(when (status) {
                 "EMPTY" -> R.string.adventure_empty; "RUNNING" -> R.string.adventure_generating
                 "FAILED" -> R.string.adventure_generation_failed; "EXPIRED" -> R.string.adventure_expired
                 else -> R.string.adventure_unavailable
@@ -102,12 +103,13 @@ internal fun SharedAdventureScreen(snapshot: AdventureSnapshot?, busy: Boolean, 
             onClick = onQueue, modifier = Modifier.fillMaxWidth().testTag("adventure-add-tasks")) { Text(stringResource(R.string.adventure_add_tasks)) }
         HelpDisclosure(stringResource(R.string.adventure_how)) {
             Text(stringResource(R.string.adventure_how_body))
-            Text(stringResource(R.string.adventure_offline_hint))
         }
-        OutlinedButton(onClick = { onAction(if (status == "FAILED") JSONObject().put("action", "retry").put("batchId", snapshot?.batchId)
-            else JSONObject().put("action", "visit")) }, enabled = allowed && !busy, modifier = Modifier.testTag("adventure-refresh")) {
-            Text(stringResource(if (status == "FAILED") R.string.adventure_retry else R.string.household_refresh))
+        if (failed || status == "FAILED" || status == "EXPIRED") OutlinedButton(onClick = {
+            if (status == "FAILED") onAction(JSONObject().put("action", "retry").put("batchId", snapshot?.batchId)) else onRefresh()
+        }, enabled = allowed && !busy && !refreshing, modifier = Modifier.testTag("adventure-retry")) {
+            Text(stringResource(R.string.adventure_retry))
         }
+    }
     }
     if (preview != null && active == null) Dialog(onDismissRequest = { preview = null }) {
         Surface(shape = MaterialTheme.shapes.large) {

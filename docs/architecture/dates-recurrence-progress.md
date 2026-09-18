@@ -44,13 +44,15 @@ Historical clearance, exact queue trends and alternate late-sync/streak semantic
 
 ## Shared Bun journey
 
-The [Bun world contract](../design/bun-world-and-quests.md) adds an optional
-journey without changing these statistics. An explicit online enable request
-records the current distinct canonical root-credit count in workspace metadata.
+The [Bun world contract](../design/bun-world-and-quests.md) adds a persistent
+journey without changing these statistics. An automatic online enable request
+after household sync records the current distinct canonical root-credit count
+in workspace metadata.
 The credit scan and enable commit share the workspace ETag, so a concurrent
 completion either belongs to the baseline or advances the journey, never both.
-Repeated enable requests preserve the original start. Reading progress, hiding
-the world and reinstalling the client do not enable or reset it.
+Repeated enable requests preserve the original start. Hiding the world and
+reinstalling the client never reset accepted progress. Private workspaces do not
+enable or advance the household journey.
 
 The journey subtracts that baseline from the same lifetime count used by
 statistics. This relies on immutable root credits surviving content purge;
@@ -62,16 +64,19 @@ and current position derive from accepted credits along those routes. After the
 last authored destination, the journey rests while credits continue to count.
 Calendar boundaries have no effect. Shared progress includes the optional
 journey snapshot, with the same revision and account boundaries as statistics.
-Older households have no journey until a member enables it.
+Older households start automatically after their next successful household sync
+on a client supporting automatic activation.
 
 ## Required proof
 
 Verify capture-relative dates, date-only and Helsinki DST behavior, repeated worker delivery, offline completion followed by reconnection, schedule edit/stop races, delete/undo and older-occurrence reopen. Verify that checklist completion and reopen/recomplete grant one credit, purged task content does not erase totals, week/month boundaries use acceptance time, and an unfinished current week does not prematurely erase the streak. Tests should exercise these behaviors rather than reproduce old scheduling or reconstruction machinery.
 
-On Android, Together opens the journey without enabling it. Starting requires an
-explicit online action; the same action is safe to retry after a lost response.
+On Android, household sync starts a missing journey automatically. A manual
+progress refresh also starts it if needed. Activation is safe to retry after a
+lost response and never applies to private workspaces.
 The ordinary sync-worker lease fences dedicated journey replies, without freezing
 or submitting queued task edits. The cache accepts validated server progress only,
 rejects older or reset journey snapshots and clears on lost household access.
-Cached progress remains readable offline, with its last update time and a retry
-control. The existing world-visibility setting also controls journey decoration.
+Cached progress remains readable offline. Pull-to-refresh and a named overflow
+action retry reads; automatic refresh does not show page-loading progress.
+The existing world-visibility setting also controls journey decoration.
