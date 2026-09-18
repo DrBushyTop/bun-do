@@ -22,7 +22,7 @@ class SharedRepository(
         SharedTaskActions.ordered(rows, intents, state)
     }
     override val tasks = taskStates.map { rows -> rows.map(SharedProtocol::inbox) }
-    override val drafts = dao.drafts(scope).map { rows -> rows.filterNot { it.key.startsWith("checklist:") || it.key.startsWith("lists:") }.map { EditorDraft(it.key, it.title, it.description, it.savedAt, it.details) } }
+    override val drafts = dao.drafts(scope).map { rows -> rows.filterNot { it.key.startsWith("checklist:") || it.key.startsWith("lists:") || it.key.startsWith("visibility:") }.map { EditorDraft(it.key, it.title, it.description, it.savedAt, it.details) } }
     internal val adventure = combine(dao.observeWorkspace(scope), dao.observeBase(scope), dao.observeAllIntents()) { state, base, intents ->
         state?.takeIf { it.blocked == null }?.adventure?.let { saved ->
             AdventureSnapshot.read(JSONObject(saved)).project(state, base.map { JSONObject(it.snapshot) }, intents.filter { it.scope == scope }.sortedBy { it.sequence.toULong() })
@@ -465,6 +465,35 @@ class SharedRepository(
                 dao.saveWorkspace(state.copy(listLibrary = library.toString()))
             lease.check()
             true
+        }
+    }
+
+    internal suspend fun visibilityPreview(id: String, target: SharedWorkspace): VisibilityPreview = lease.access {
+        database.withTransaction {
+            val state = current()
+            check(state.blocked == null && dao.recoveryState(scope) == null)
+            check(dao.intents(scope).none { SharedTaskActions.pending(it, state.revision) })
+            val root = JSONObject(checkNotNull(dao.baseTask(scope, state.baseGeneration, id)).snapshot)
+            val childIds = root.optJSONArray("childOrder")?.let { items -> (0 until items.length()).map(items::getString) }.orEmpty()
+            val ids = listOf(id) + childIds
+            check(dao.allDrafts().none { it.scope == scope && (it.key in ids || it.key.removePrefix("checklist:") in ids) })
+            val tasks = ids.map { taskId -> JSONObject(checkNotNull(dao.baseTask(scope, state.baseGeneration, taskId)).snapshot) }
+            VisibilityPreview(state, target, tasks)
+        }
+    }
+
+    internal suspend fun saveVisibilityRequest(request: JSONObject) = lease.access {
+        database.withTransaction {
+            val key = "visibility:${request.getString("transferId")}"
+            val existing = dao.draft(scope, key)
+            if (existing != null) {
+                check(sameJson(JSONObject(existing.description), request))
+                return@withTransaction
+            }
+            val state = current()
+            check(state.revision == request.getString("expectedRevision") && state.blocked == null)
+            check(dao.intents(scope).none { SharedTaskActions.pending(it, state.revision) })
+            dao.saveDraft(SharedDraft(scope, key, "", request.toString(), System.currentTimeMillis()))
         }
     }
 

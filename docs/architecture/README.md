@@ -65,3 +65,5 @@ V2 owns deeper subtasks/dependencies, notes/areas, AI clarify, advanced scheduli
 
 [Reusable household lists](reusable-lists.md) defines saved starting content,
 standing lists, fresh copies and permissive adventure finishing.
+
+[Private tasks](private-tasks.md) defines account-only tasks, creator-owned audience changes and household-only adventures.

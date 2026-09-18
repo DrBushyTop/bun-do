@@ -114,6 +114,9 @@ class SharedSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
             val scopes = data.lease.access { data.database.shared().workspaces(data.registrationId) }
             if (scopes.none { it.blocked == null }) return Result.success()
             app.withAccountToken(data) { token ->
+                try { SharedVisibility.retry(data, token) }
+                catch (error: CancellationException) { throw error }
+                catch (_: Exception) { /* Saved visibility requests remain retryable. Ordinary tasks can still sync. */ }
                 for (scope in scopes.filter { it.blocked == null }) {
                     val repository = SharedRepository(data.database, data.lease, scope.scope, data.registrationId)
                     val recovery = SharedSnapshotRecovery(data.database, data.lease, scope.scope)

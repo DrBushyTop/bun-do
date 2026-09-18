@@ -58,6 +58,12 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
     val model: InboxViewModel = viewModel(key = "${data.lease.generation}/${selected.scope}", factory = viewModelFactory {
         initializer { InboxViewModel(repository, createSavedStateHandle()) }
     })
+    val workspaces by remember(data) { data.database.shared().observeWorkspaces(checkNotNull(data.registrationId)) }.collectAsStateWithLifecycle(emptyList())
+    var resumeCapture by rememberSaveable { mutableStateOf<String?>(null) }
+    var resumeDestination by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(selected.scope, resumeCapture) {
+        if (resumeCapture == selected.scope) { model.openEditor(); resumeCapture = null }
+    }
     val state by model.state.collectAsStateWithLifecycle()
     val problems by repository.problems.collectAsStateWithLifecycle(emptyList())
     val current by repository.workspace.collectAsStateWithLifecycle(selected)
@@ -74,6 +80,9 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
     val destination = destinations.last()
     fun navigate(next: String) {
         if (next != destination) destinations = if (next == "queue") listOf("queue") else destinations + next
+    }
+    LaunchedEffect(selected.scope, resumeDestination) {
+        if (!selected.personal && resumeDestination != null) { navigate(resumeDestination!!); resumeDestination = null }
     }
     fun back() { if (destinations.size > 1) destinations = destinations.dropLast(1) }
     var reordering by remember(selected.scope) { mutableStateOf(false) }
@@ -173,7 +182,7 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
     val dueIds = fi.bundo.reminders.ReminderPolicy.candidates(taskStates.map {
         ReminderCoordinator.fromProjection(selected.scope, it, reminderSettings?.dateOnlyTime ?: "09:00", emptySet())
     }, "", true, 0).filter { it.at <= now }.map { it.task.id }.toSet()
-    val queueRows = taskStates.filter { if (dueOnly) it.getString("id") in dueIds
+    val queueRows = taskStates.filter { it.isNull("visibilityTransferId") }.filter { if (dueOnly) it.getString("id") in dueIds
         else if (deleted) !it.isNull("deletion") &&
         (it.isNull("parentId") || byId[it.getString("parentId")]?.isNull("deletion") == true)
         else it.isNull("parentId") && it.isNull("deletion") && (it.optString("lifecycle", "OPEN") != "OPEN") == history &&
@@ -197,6 +206,73 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
             finally { busy = false }
         }
     }
+    var audienceMenu by remember { mutableStateOf(false) }
+    var visibilityPreview by remember(selected.scope) { mutableStateOf<VisibilityPreview?>(null) }
+    var visibilityError by remember(selected.scope) { mutableStateOf<String?>(null) }
+    var pendingVisibility by remember(selected.scope) { mutableStateOf<List<JSONObject>>(emptyList()) }
+    fun refreshVisibility() = run {
+        (context.applicationContext as BunDoApplication).withAccountToken(data) { token ->
+            pendingVisibility = SharedVisibility.pending(data, token)
+        }
+    }
+    var chooseShareTarget by remember(selected.scope) { mutableStateOf<String?>(null) }
+    val households = workspaces.filter { !it.personal && it.blocked == null }
+    fun switchAudience(target: SharedWorkspace, editing: Boolean) {
+        val change = { run {
+            if (editing) {
+                try { data.moveCaptureDraft(selected.scope, target); resumeCapture = target.scope }
+                catch (error: CancellationException) { throw error }
+                catch (_: IllegalStateException) { visibilityError = "DRAFT_CONFLICT"; return@run }
+            }
+            data.selectHousehold(target.workspaceId, target.epoch, target.name, target.personal)
+        } }
+        if (editing) model.closeEditor(false, onClosed = change) else change()
+    }
+    fun privateAudience(editing: Boolean) {
+        if (editing) model.closeEditor(false, onClosed = { run {
+            val target = data.personalWorkspace()
+            try { data.moveCaptureDraft(selected.scope, target) }
+            catch (error: CancellationException) { throw error }
+            catch (_: IllegalStateException) { visibilityError = "DRAFT_CONFLICT"; return@run }
+            resumeCapture = target.scope
+            data.selectHousehold(target.workspaceId, target.epoch, target.name, true)
+        } })
+        else run {
+            val target = data.personalWorkspace()
+            data.selectHousehold(target.workspaceId, target.epoch, target.name, true)
+        }
+    }
+    fun previewVisibility(id: String, target: SharedWorkspace) = run {
+        visibilityError = null
+        try { visibilityPreview = repository.visibilityPreview(id, target) }
+        catch (error: CancellationException) { throw error }
+        catch (_: Exception) { visibilityError = "SYNC_FIRST"; SharedSyncWorker.request(context, data) }
+    }
+    fun selectDestination(next: String) {
+        if (selected.personal && next != "queue") {
+            val home = households.firstOrNull()
+            if (home == null) onAccount() else { resumeDestination = next; switchAudience(home, false) }
+        } else navigate(next)
+    }
+    @Composable fun Audience(editing: Boolean = false) {
+        Box {
+            TextButton(onClick = { audienceMenu = true }, enabled = !busy && !state.working,
+                modifier = Modifier.testTag("task-audience")) {
+                Text(stringResource(if (selected.personal) R.string.visibility_only_me else R.string.visibility_household))
+            }
+            DropdownMenu(audienceMenu, { audienceMenu = false }) {
+                DropdownMenuItem(text = { Text(stringResource(R.string.visibility_only_me)) }, onClick = {
+                    audienceMenu = false
+                    if (!selected.personal) privateAudience(editing)
+                }, modifier = Modifier.testTag("audience-private"))
+                households.forEach { home -> DropdownMenuItem(text = { Text(home.name) }, onClick = {
+                    audienceMenu = false
+                    if (home.scope != selected.scope) switchAudience(home, editing)
+                }, modifier = Modifier.testTag("audience-household")) }
+            }
+        }
+    }
+
     fun act(action: SharedTaskAction) {
         run {
             val sequence = repository.act(action.kind, action.displayed, action.confirmedClaimant, action.after, action.before, action.until, expectedOrder = action.expectedOrder)
@@ -267,13 +343,13 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
         }
     } }
     CompositionLocalProvider(LocalTaskArtwork provides taskArtworkLoader) {
-    InboxApp(state, model, appearance, onAppearance, voice = data.voice, voiceTarget = VoiceTarget(selected.scope), onAccount = onAccount, onWelcome = onWelcome, onReminders = onReminders, onRecovery = onRecovery, queueTitle = selected.name, onHomeBack = ::back,
+    InboxApp(state, model, appearance, onAppearance, voice = data.voice, voiceTarget = VoiceTarget(selected.scope), onAccount = onAccount, onWelcome = onWelcome, onReminders = onReminders, onRecovery = onRecovery, queueTitle = if (selected.personal) stringResource(R.string.visibility_only_me) else selected.name, captureAudience = { Audience(true) }, onHomeBack = ::back,
         queueTopBar = { bar -> HouseholdScene(
             if (joy) "joy" else if (current?.blocked != null || recovery != null || current == null) "dojo" else sceneActivity(canonical.values.map(::JSONObject), now),
-            !reordering, adventure?.takeIf { current?.blocked == null && recovery == null },
+            !reordering, adventure?.takeUnless { selected.personal }?.takeIf { current?.blocked == null && recovery == null },
             { navigate("adventure") }, { repository.acknowledgeAdventure(it, true) }, bar) },
-        queueNavigation = { SharedHouseholdNavigation(if (destination in listOf("journey", "adventure", "creator")) "together" else destination) { navigate(it) } },
-        queueSideNavigation = { SharedHouseholdNavigation(if (destination in listOf("journey", "adventure", "creator")) "together" else destination, rail = true) { navigate(it) } },
+        queueNavigation = { SharedHouseholdNavigation(if (destination in listOf("journey", "adventure", "creator")) "together" else destination) { selectDestination(it) } },
+        queueSideNavigation = { SharedHouseholdNavigation(if (destination in listOf("journey", "adventure", "creator")) "together" else destination, rail = true) { selectDestination(it) } },
         queueContent = if (destination != "queue") ({ onOpen ->
             val progress = current?.progress?.takeIf { current?.blocked == null && recovery == null }
             if (destination == "lists") SharedListsScreen(repository, data, current, byId,
@@ -332,6 +408,21 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
                 if (section == TaskDetailSection.MORE || section == TaskDetailSection.SCHEDULE) closeMenu()
                 act(action)
             }, section)
+            if (section == TaskDetailSection.MORE && task.isNull("parentId") && task.isNull("deletion") &&
+                task.optJSONObject("creation")?.optString("actorId") == membership?.optString("me")) {
+                SettingsNavigationRow(stringResource(if (selected.personal) R.string.visibility_share else R.string.visibility_make_private), {
+                    closeMenu()
+                    if (selected.personal) {
+                        if (households.size == 1) previewVisibility(id, households.single()) else chooseShareTarget = id
+                    } else run {
+                        val target = data.personalWorkspace()
+                        try { visibilityPreview = repository.visibilityPreview(id, target); visibilityError = null }
+                        catch (error: CancellationException) { throw error }
+                        catch (_: Exception) { visibilityError = "SYNC_FIRST"; SharedSyncWorker.request(context, data) }
+                    }
+                }, enabled = !busy && current?.blocked == null && recovery == null,
+                    modifier = Modifier.testTag("task-change-visibility"))
+            }
             if (section == TaskDetailSection.SCHEDULE) SharedRepeatControls(task, membership, !busy && current?.blocked == null && recovery == null) { displayed, blueprint ->
                 run {
                     repository.changeRepeat(displayed, blueprint) {
@@ -348,7 +439,9 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
             onReorder = { reordering = it },
             onFullQueue = { history = false; deleted = false; snoozed = false; dueOnly = false },
             toolbar = {
-                Row(Modifier.fillMaxWidth()) {
+                Column(Modifier.fillMaxWidth()) {
+                    Audience()
+                    Row(Modifier.fillMaxWidth()) {
                     Box {
                         TextButton(onClick = { views = true }, modifier = Modifier.testTag("queue-views")) {
                             Text(stringResource(when { dueOnly -> R.string.reminders_due; deleted -> R.string.task_deleted_view
@@ -365,6 +458,7 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
                         }
                     }
                     TextButton(onClick = { tools = !tools }, modifier = Modifier.testTag("queue-tools")) { Text(stringResource(R.string.queue_tools)) }
+                    }
                 }
             }, notices = {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
@@ -382,6 +476,8 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
             }
             if (current?.blocked != null) Text(stringResource(R.string.shared_access_lost),
                 color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 8.dp).testTag("shared-blocked"))
+            if (selected.personal && tools) TextButton(onClick = { refreshVisibility() }, enabled = !busy,
+                modifier = Modifier.testTag("visibility-pending")) { Text(stringResource(R.string.visibility_pending_title)) }
             if (tools) {
             Row(Modifier.fillMaxWidth()) {
                 TextButton(onClick = { run { data.selectHousehold(null) } }, enabled = !busy,
@@ -405,6 +501,73 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
         }
     }) })
     }
+    if (pendingVisibility.isNotEmpty()) AlertDialog(onDismissRequest = { if (!busy) pendingVisibility = emptyList() },
+        title = { Text(stringResource(R.string.visibility_pending_title)) },
+        text = { Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+            Text(stringResource(R.string.visibility_pending))
+            pendingVisibility.forEach { journal ->
+                val request = journal.getJSONObject("request")
+                val tasks = journal.getJSONObject("content").getJSONArray("tasks")
+                for (index in 0 until tasks.length()) {
+                    val task = tasks.getJSONObject(index)
+                    VisibilityTaskSummary(task)
+                }
+                if (request.getString("source") == selected.workspaceId) TextButton(enabled = !busy, onClick = { run {
+                    (context.applicationContext as BunDoApplication).withAccountToken(data) { token ->
+                        val code = SharedVisibility.cancel(data, token, request.getString("id"))
+                        if (code == "ACCEPTED") visibilityError = "ALREADY_SHARED"
+                        pendingVisibility = SharedVisibility.pending(data, token)
+                    }
+                    SharedSyncWorker.request(context, data)
+                } }) { Text(stringResource(R.string.visibility_keep_private)) }
+            }
+            if (failed) Text(stringResource(R.string.shared_action_failed), color = MaterialTheme.colorScheme.error)
+        } }, confirmButton = { TextButton(enabled = !busy, onClick = { run {
+            (context.applicationContext as BunDoApplication).withAccountToken(data) { token ->
+                SharedVisibility.retry(data, token)
+                pendingVisibility = SharedVisibility.pending(data, token)
+            }
+            SharedSyncWorker.request(context, data)
+        } }) { Text(stringResource(R.string.household_refresh)) } },
+        dismissButton = { TextButton(enabled = !busy, onClick = { pendingVisibility = emptyList() }) { Text(stringResource(R.string.back)) } })
+    chooseShareTarget?.let { id ->
+        AlertDialog(onDismissRequest = { chooseShareTarget = null }, title = { Text(stringResource(R.string.visibility_share)) },
+            text = { Column {
+                if (households.isEmpty()) Text(stringResource(R.string.visibility_no_household))
+                households.forEach { home -> SettingsNavigationRow(home.name, { chooseShareTarget = null; previewVisibility(id, home) }) }
+            } }, confirmButton = { TextButton(onClick = { chooseShareTarget = null }) { Text(stringResource(R.string.back)) } })
+    }
+    visibilityPreview?.let { preview ->
+        AlertDialog(onDismissRequest = { if (!busy) visibilityPreview = null },
+            title = { Text(stringResource(if (preview.target.personal) R.string.visibility_make_private else R.string.visibility_share)) },
+            text = { Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+                Text(if (preview.target.personal) stringResource(R.string.visibility_private_warning) else stringResource(R.string.visibility_share_warning, preview.target.name))
+                preview.tasks.filter { it.isNull("deletion") }.forEach { task ->
+                    VisibilityTaskSummary(task)
+                }
+                preview.tasks.first().optJSONObject("repeat")?.takeIf { it.optBoolean("active") }?.let { repeat ->
+                    Text(stringResource(R.string.visibility_repeat_warning), Modifier.padding(top = 12.dp))
+                    Text(repeat.getString("title"))
+                    repeat.nullableString("description")?.let { Text(it) }
+                }
+                if (visibilityError != null || failed) Text(stringResource(visibilityMessage(visibilityError)), color = MaterialTheme.colorScheme.error)
+            } },
+            confirmButton = { TextButton(enabled = !busy, onClick = { run {
+                try {
+                    val code = (context.applicationContext as BunDoApplication).withAccountToken(data) { token ->
+                        SharedVisibility.send(context, data, repository, preview, token)
+                    }
+                    if (code == "ACCEPTED") { visibilityPreview = null; visibilityError = null }
+                    else visibilityError = code
+                } catch (error: CancellationException) { throw error }
+                catch (error: fi.bundo.household.HouseholdFailure) { visibilityError = error.code }
+                catch (_: Exception) { visibilityError = "PENDING" }
+            } }) { Text(stringResource(if (preview.target.personal) R.string.visibility_make_private else R.string.visibility_share)) } },
+            dismissButton = { TextButton(enabled = !busy, onClick = { visibilityPreview = null }) { Text(stringResource(R.string.back)) } })
+    }
+    if (visibilityPreview == null && visibilityError != null) AlertDialog(onDismissRequest = { visibilityError = null },
+        title = { Text(stringResource(R.string.task_title)) }, text = { Text(stringResource(visibilityMessage(visibilityError))) },
+        confirmButton = { TextButton(onClick = { visibilityError = null }) { Text(stringResource(R.string.back)) } })
     checklistDraft?.takeUnless { dictatingSteps || current?.blocked != null }?.let { draft -> ChecklistEditor(draft, busy || current?.blocked != null, failed,
         repository::saveChecklistDraft,
         onSave = { latest -> run {
@@ -512,4 +675,14 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
             dismissButton = { TextButton(enabled = !busy, onClick = { reapply = null }) { Text(stringResource(R.string.back)) } })
     }
 }
+}
+
+private fun visibilityMessage(code: String?): Int = when (code) {
+    "ALREADY_SHARED" -> R.string.visibility_already_shared
+    "DRAFT_CONFLICT" -> R.string.visibility_draft_conflict
+    "ADVENTURE_ACTIVE" -> R.string.visibility_adventure
+    "NOT_CREATOR" -> R.string.visibility_creator
+    "SOURCE_CHANGED", "SYNC_FIRST" -> R.string.visibility_sync_first
+    "REPEAT_MOVED" -> R.string.visibility_repeat_moved
+    else -> R.string.visibility_pending
 }

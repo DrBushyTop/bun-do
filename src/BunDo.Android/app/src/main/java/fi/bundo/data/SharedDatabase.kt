@@ -36,6 +36,7 @@ data class SharedWorkspace(
     val adventureSeal: String? = null,
     val adventureCreation: String? = null,
     val listLibrary: String? = null,
+    @ColumnInfo(defaultValue = "0") val personal: Boolean = false,
 )
 
 @Entity(tableName = "shared_base", primaryKeys = ["scope", "generation", "id"])
@@ -82,6 +83,8 @@ data class SharedDraft(val scope: String, val key: String, val title: String, va
 interface SharedDao {
     @Query("SELECT * FROM shared_workspaces WHERE scope = :scope")
     suspend fun workspace(scope: String): SharedWorkspace?
+    @Query("SELECT * FROM shared_workspaces WHERE registration = :registration")
+    fun observeWorkspaces(registration: String): Flow<List<SharedWorkspace>>
     @Query("SELECT * FROM shared_workspaces WHERE registration = :registration")
     suspend fun workspaces(registration: String): List<SharedWorkspace>
     @Query("SELECT * FROM shared_workspaces")

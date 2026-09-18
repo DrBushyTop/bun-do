@@ -9,7 +9,13 @@ The app's name, meaning "the way of the bun." A bun is a bunny, with a martial-a
 _Avoid_: Shared Task Manager as the product name, bread or bakery branding.
 
 **Workspace**:
-The shared collection of tasks and members who work on them.
+A collection of tasks with one access audience. A household workspace belongs to its active members; a personal workspace belongs to one account.
+
+**Private task**:
+A task visible only to its creator, kept independently of their household membership.
+
+**Task audience**:
+The people allowed to see a task, either one account or a household. A checklist and its items have one audience.
 
 **Claim**:
 A member's intention to work on an available task. A claim made offline is provisional until the shared queue accepts it.

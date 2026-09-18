@@ -125,11 +125,12 @@ public static class TaskRepeats
         var task = new TaskSnapshot(repeat.CurrentTaskId, repeat.Title, repeat.Description, new(revision, revision), new(revision, revision),
             DeletionVersion: revision, LifecycleVersion: revision, ClaimVersion: revision, HierarchyVersion: revision,
             OrderIntentVersion: revision, Due: due, DueVersion: new(revision, revision), UrgencyVersion: revision,
-            Creation: new(null, now, now), InitialPlacement: "APPENDED", Repeat: repeat.Info);
+            Creation: new(repeat.CreatorId, now, now), InitialPlacement: "APPENDED", Repeat: repeat.Info);
         var order = RootOrdering.Current(state).Add(task.Id);
         return state with { Revision = revision, TaskCount = state.TaskCount + 1, RootOrder = order,
             Tasks = state.Tasks.Add(task.Id, task), Repeats = state.Repeats!.SetItem(repeat.Id, repeat),
-            RecentActivity = HouseholdProgress.Record(state.RecentActivity, revision, task.Id, null, "GenerateRepeat", now),
+            RecentActivity = state.Membership.PersonalOwnerId is null
+                ? HouseholdProgress.Record(state.RecentActivity, revision, task.Id, null, "GenerateRepeat", now) : state.RecentActivity,
             Changes = state.Changes.Add(new(revision, [task], now, RootOrder: order, Repeats: [repeat])) };
     }
 

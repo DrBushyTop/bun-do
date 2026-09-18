@@ -97,3 +97,15 @@ internal fun SharedSnoozePresets(task: JSONObject, membership: JSONObject?, enab
         Text(stringResource(R.string.detail_snooze_until, text), style = MaterialTheme.typography.bodySmall)
     }
 }
+
+@Composable
+internal fun VisibilityTaskSummary(task: JSONObject) {
+    Text(task.getString("title"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 12.dp))
+    task.nullableString("description")?.let { Text(it) }
+    Text(stringResource(when (task.optString("lifecycle", "OPEN")) {
+        "COMPLETED" -> R.string.visibility_completed
+        "CANCELLED" -> R.string.visibility_cancelled
+        else -> R.string.visibility_open
+    }), style = MaterialTheme.typography.bodySmall)
+    SharedDueSummary(task)
+}

@@ -147,7 +147,8 @@ public static class ChecklistTasks
                     LifecycleVersion = lifecycle == root.Lifecycle ? root.LifecycleVersion : revision,
                     LifecycleActorId = lifecycle == root.Lifecycle ? root.LifecycleActorId : actor,
                     LifecycleAt = lifecycle == root.Lifecycle ? root.LifecycleAt : now,
-                    FirstCompletion = root.FirstCompletion ?? (lifecycle == "COMPLETED" ? new(root.Id, actor, now) : null),
+                    FirstCompletion = root.FirstCompletion ?? (lifecycle == "COMPLETED" && state.Tasks.GetValueOrDefault(id)?.Lifecycle != "COMPLETED"
+                        ? new(root.Id, actor, now) : null),
                 };
             }
             effects = effects.SetItem(id, root);

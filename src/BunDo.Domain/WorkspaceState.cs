@@ -18,7 +18,8 @@ public sealed record TaskSnapshot(
     bool EmptyChecklist = false, CleanupRequest? Cleanup = null, string? ContentLanguage = null, TaskDue? Due = null, FieldVersion? DueVersion = null,
     bool Urgent = false, ulong UrgencyVersion = 0, TaskCreation? Creation = null, TaskChange? LastChange = null,
     string? InitialPlacement = null, RepeatInfo? Repeat = null, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] string? ListKind = null,
-    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] bool ListPinned = false);
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] bool ListPinned = false, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] Guid? VisibilityTransferId = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] SharedCompletion? PriorSharedCompletion = null);
 public sealed record DeviceRegistration(Guid DeviceId, Guid MemberId, ulong LastTerminalSequence = 0,
     ulong AcknowledgedThrough = 0, string? RegistryPartition = null);
 public sealed record OperationReceipt(
@@ -50,7 +51,7 @@ public sealed record WorkspaceState(
     int TaskCount = 0,
     ulong PrunedThrough = 0,
     ImmutableDictionary<Guid, SnapshotPin>? SnapshotPins = null, ImmutableArray<string>? RootOrder = null, string TimeZoneId = "Europe/Helsinki", ImmutableDictionary<string, RepeatSchedule>? Repeats = null,
-    ImmutableArray<HouseholdActivity>? RecentActivity = null, JourneyStart? Journey = null, AdventureBoard? Adventures = null, ListLibrary? ListLibrary = null);
+    ImmutableArray<HouseholdActivity>? RecentActivity = null, JourneyStart? Journey = null, AdventureBoard? Adventures = null, ListLibrary? ListLibrary = null, ImmutableArray<VisibilityReceipt>? VisibilityReceipts = null);
 
 /// <summary>The transaction seam; a failed compare-and-swap must have no effects.</summary>
 public interface IWorkspaceStore

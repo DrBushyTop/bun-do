@@ -122,6 +122,7 @@ fun InboxApp(
     onHomeBack: () -> Unit = {},
     onReminders: (() -> Unit)? = null,
     onRecovery: (() -> Unit)? = null,
+    captureAudience: (@Composable () -> Unit)? = null,
 ) {
     var feedback by remember { mutableStateOf<HouseholdFeedback?>(null) }
     var settings by rememberSaveable { mutableStateOf(false) }
@@ -211,7 +212,7 @@ fun InboxApp(
                 if (sideNavigation) queueSideNavigation?.invoke()
                 Box(Modifier.weight(1f).fillMaxSize()) {
                 when {
-                    editor != null -> Editor(state, model, onSplit, canEdit, onSave = {
+                    editor != null -> Editor(state, model, onSplit, canEdit, captureAudience, onSave = {
                         model.closeEditor(commit = true) {
                             if (onTaskSaved != null) onTaskSaved(it, editor.key == InboxRepository.NEW_DRAFT)
                             else feedback = HouseholdFeedback(System.nanoTime(), "file")
@@ -398,6 +399,7 @@ private fun Queue(
 
 @Composable
 private fun Editor(state: InboxUiState, model: InboxViewModel, onSplit: (() -> Unit)?, canEdit: Boolean,
+    captureAudience: (@Composable () -> Unit)?,
     onSave: () -> Unit, modifier: Modifier, onFooterHeight: (androidx.compose.ui.unit.Dp) -> Unit) {
     val draft = state.editor ?: return
     val focus = remember { FocusRequester() }
@@ -409,6 +411,7 @@ private fun Editor(state: InboxUiState, model: InboxViewModel, onSplit: (() -> U
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         if (state.writeFailed) ErrorNotice(R.string.write_failed, model::retry)
+        if (draft.key == fi.bundo.data.InboxRepository.NEW_DRAFT) captureAudience?.invoke()
         OutlinedTextField(
             value = draft.title,
             onValueChange = { model.change(it, draft.description) },
