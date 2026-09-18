@@ -14,7 +14,7 @@ const starters = {
 };
 const directions = {
  A:['Pinned beside tasks','Frequent lists sit above the queue. Everything else stays under All lists. Fast for two regular lists; many pins could crowd out tasks.'],
- B:['A place for lists','Tasks and Lists have separate destinations. A calmer queue, with one extra tap to reach groceries.'],
+ B:['A place for lists','Lists is the fourth bottom destination beside Tasks, Activity and Together. Adventures stay under Together.'],
  C:['Start with an activity','Choose what you are doing, then use an existing list or start one. Helpful on first use; repeat visits take more navigation.']
 };
 let variant = new URLSearchParams(location.search).get('variant') || 'A';
@@ -35,11 +35,13 @@ function row(title, sub, action, id='', name='list', color='') {
  return `<button class="row" data-action="${action}" data-id="${esc(id)}"><span class="cue ${color}">${icon(name)}</span><span class="words"><strong>${esc(title)}</strong><small>${esc(sub)}</small></span>${icon('arrow')}</button>`;
 }
 function listRow(l){const left=l.items.filter(i=>!i.done).length;return row(l.title,l.kind==='standing'?`${left} to buy · Stays open`:left?`${left} left`:'All done · Previous list','open',l.id,l.kind==='standing'?'bag':'home',l.kind==='standing'?'':'sand');}
-function nav(){return `<nav class="nav-links" aria-label="App destinations">${button(`${icon('list')}Tasks`,'tasks','',tab==='tasks'?'aria-current="page"':'')}${button(`${icon('book')}Lists`,'lists','',tab==='lists'?'aria-current="page"':'')}</nav>`;}
+function nav(){return `<nav class="nav-links app-nav" aria-label="App destinations">${[['tasks','Tasks','list'],['activity','Activity','check'],['together','Together','person'],['lists','Lists','book']].map(([id,label,glyph])=>button(`${icon(glyph)}<span>${label}</span>`,id,'',tab===id?'aria-current="page"':'')).join('')}</nav>`;}
+function existingDestination(){return `<h2>${tab==='activity'?'Activity':'Together'}</h2><p class="lead">${tab==='activity'?'Shared activity stays in its existing destination.':"Adventures and Bun's journey stay here."}</p><p class="hint">Navigation preview only. This study does not recreate the existing ${tab==='activity'?'activity feed':'adventure screens'}.</p>${button('Open lists','lists','button outline full')}`;}
+
 function tasks(){return `<div class="section"><div class="section-head"><h3>Tasks</h3><span>${taskChecks.filter(done=>!done).length} open</span></div>${['Book the bike service','Return library books'].map((t,i)=>`<div class="task"><input type="checkbox" id="task-${i}" data-task="${i}" ${taskChecks[i]?'checked':''} aria-label="Complete ${t}"><label for="task-${i}">${t}<small>${i?'This week':'Unclaimed'}</small></label></div>`).join('')}</div><p class="prototype-info">Task capture, Activity and Together stay unchanged. This study only exercises lists.</p>`;}
 function library(){return `<h2>Our lists</h2><p class="lead">Keep the everyday ones. Start fresh for a new occasion.</p>${lists.length?lists.map(listRow).join(''):'<p class="hint">No lists yet. Start with something you do often.</p>'}<div class="actions">${button('New list','new')}</div><div class="section"><div class="section-head"><h3>Saved for next time</h3></div>${saved.length?saved.map(s=>row(s.title,`${s.items.length} items · Choose before starting`,'saved',s.id,'book')).join(''):'<p>Save any checklist here when you want to use it again.</p>'}</div>`;}
 function home(){
- if(variant==='B') return `${nav()}${tab==='tasks'?`<h2>Our tasks</h2>${tasks()}`:library()}`;
+ if(variant==='B') return tab==='tasks'?`<h2>Our tasks</h2>${tasks()}`:tab==='lists'?library():existingDestination();
  if(variant==='C') return `<h2 class="activity-prompt">What are we doing?</h2><p>Use a list you know, or let a starter help.</p><div class="activity-options">${row('Going shopping','Keep one shared grocery list','shopping','','bag')}${row('Packing for a trip','Choose from your saved packing list','packing','','home','sand')}${row('Looking after home','Cleaning, hosting and seasonal jobs','new','','list')}</div>${button('All lists','library','button outline full')}${tasks()}`;
  return `<h2>Our tasks</h2><p class="lead">A little room for what needs doing.</p><section class="pinned"><div class="section-head"><h3>Pinned lists</h3>${button('All lists','library','text-button')}</div>${lists.filter(l=>l.pinned).map(listRow).join('')||'<p>No pinned lists yet.</p>'}${!lists.length?button('Make your first list','new','text-button'):''}</section>${tasks()}`;
 }
@@ -53,7 +55,10 @@ function render(focus=false){
  $('#variant-label').innerHTML=`<strong>Option ${variant}</strong>${directions[variant][0]}`;
  let content=screen==='home'?home():screen==='library'?library():screen==='new'?newList():screen==='preview'?preview():screen==='detail'?detail():screen==='edit'?edit():`<h2>Delete ${esc(current().title)}?</h2><p class="lead">This removes the shared list for everyone in this demo. Saved reusable copies stay unchanged. Native retention and restore policy still need a decision.</p><div class="actions">${button('Delete list','delete')}${button('Keep list','back','button outline')}</div>`;
  $('#app').innerHTML=(screen!=='home'?button(`${icon('back')}Back`,'back','back'):'')+content;
- $('#state').textContent=JSON.stringify({variant,screen,lists,saved,draft},null,2);
+ $('.phone').classList.toggle('bottom-tabs',variant==='B');
+ $('.app-nav')?.remove();
+ if(variant==='B')$('.phone').insertAdjacentHTML('beforeend',nav());
+ $('#state').textContent=JSON.stringify({variant,screen,tab,lists,saved,draft},null,2);
  if(focus){const h=$('#app h2');if(h){h.tabIndex=-1;h.classList.add('screen-title');h.focus();h.scrollIntoView({block:'nearest'});}}
 }
 function switchVariant(delta){variant=['A','B','C'][(['A','B','C'].indexOf(variant)+delta+3)%3];const u=new URL(location.href);u.searchParams.set('variant',variant);window.history.replaceState(null,'',u);screen='home';history=[];draft=null;render(true);}
@@ -64,7 +69,7 @@ document.addEventListener('click', e=>{
  if(a==='back')return back();
  if(a==='reset'||a==='empty')return reset(a==='empty');
  if(a==='home'){screen='home';history=[];draft=null;return render(true);}
- if(a==='lists'||a==='tasks'){tab=a;screen='home';history=[];return render(true);}
+ if(['lists','tasks','activity','together'].includes(a)){tab=a;screen='home';history=[];draft=null;return render(true);}
  if(a==='library'||a==='new')return go(a);
  if(a==='open')return go('detail',id);
  if(a==='shopping') {const l=lists.find(l=>l.kind==='standing');if(l)return go('detail',l.id);draft={title:'Groceries',notes:'Keep this list for the next shop, too.',kind:'standing',items:[],mode:'new'};return go('preview');}
