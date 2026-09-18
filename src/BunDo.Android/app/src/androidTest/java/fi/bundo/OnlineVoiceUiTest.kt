@@ -31,7 +31,7 @@ import org.json.JSONObject
 @RunWith(AndroidJUnit4::class)
 class OnlineVoiceUiTest {
     private val compose = createAndroidComposeRule<MainActivity>()
-    @get:Rule val rules: RuleChain = RuleChain.outerRule(IsolatedUiAccountRule()).around(compose)
+    @get:Rule val rules: RuleChain = RuleChain.outerRule(IsolatedUiAccountRule()).around(IsolatedVoicePreferencesRule()).around(compose)
 
     @Test fun englishCloudCaptureWithoutModelAndTypedFallback() = screen("en", 1f, false)
     @Test fun finnishRecoverableErrorAtDoubleFontSize() = screen("fi", 2f, true)

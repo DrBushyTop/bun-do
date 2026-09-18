@@ -54,7 +54,12 @@ class ListsUiTest {
             }
         } }
         compose.onNodeWithTag("list-add-text").performScrollTo().performTextInput("Milk")
-        compose.onNodeWithTag("list-add").performScrollTo().performClick()
+        compose.onNodeWithTag("list-add").performScrollTo()
+        val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        compose.onNodeWithText(if (language == "fi") "Lisää" else "Add", useUnmergedTree = true)
+            .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertEquals(1, layouts.single().lineCount)
+        compose.onNodeWithTag("list-add").performClick()
         compose.onNodeWithTag("list-commit").assertIsEnabled().performClick()
         compose.runOnIdle {
             assertEquals(listOf("Keys", "Milk"), committed!!.items.map { it.title })

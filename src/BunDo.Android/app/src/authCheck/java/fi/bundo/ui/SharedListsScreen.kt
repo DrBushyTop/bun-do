@@ -191,7 +191,8 @@ internal fun ListPreview(json: String, enabled: Boolean, error: String?, pending
     BackHandler(enabled = enabled, onBack = onBack)
     var addition by remember { mutableStateOf("") }
     val chosen = value.copy(items = value.items.filterIndexed { index, _ -> selected[index] })
-    Column(Modifier.fillMaxSize().imePadding().testTag("list-preview")) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+    Column(Modifier.widthIn(max = 640.dp).fillMaxSize().imePadding().testTag("list-preview")) {
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack, enabled = enabled) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.back)) }
             Text(stringResource(if (mode == "save") R.string.lists_save else R.string.lists_preview), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
@@ -207,6 +208,13 @@ internal fun ListPreview(json: String, enabled: Boolean, error: String?, pending
             if (mode == "start") SettingToggleRow(stringResource(R.string.lists_keep_open), draft.optBoolean("standing"),
                 { onChange(draft.put("standing", it).toString()) }, enabled = enabled)
             value.items.forEachIndexed { index, item ->
+                fun move(to: Int) {
+                    val items = value.items.toMutableList()
+                    items.add(to, items.removeAt(index))
+                    val checks = selected.toMutableList()
+                    checks.add(to, checks.removeAt(index))
+                    update(value.copy(items = items), checks)
+                }
                 val toggleLabel = stringResource(R.string.checklist_toggle, item.title)
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                     Checkbox(selected[index], { update(checks = selected.toMutableList().also { list -> list[index] = it }) }, enabled = enabled, modifier = Modifier.semantics { contentDescription = toggleLabel })
@@ -216,11 +224,6 @@ internal fun ListPreview(json: String, enabled: Boolean, error: String?, pending
                         OutlinedTextField(item.notes.orEmpty(), { if (InboxLimits.length(it) <= 4000) update(value.copy(items = value.items.toMutableList().also { list -> list[index] = item.copy(notes = it) })) },
                             enabled = enabled, modifier = Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.lists_item_notes)) })
                         Row {
-                            fun move(to: Int) {
-                                val items = value.items.toMutableList(); items.add(to, items.removeAt(index))
-                                val checks = selected.toMutableList(); checks.add(to, checks.removeAt(index))
-                                update(value.copy(items = items), checks)
-                            }
                             IconButton(onClick = { move(index - 1) }, enabled = enabled && index > 0) { Icon(Icons.Outlined.KeyboardArrowUp, stringResource(R.string.lists_up, item.title)) }
                             IconButton(onClick = { move(index + 1) }, enabled = enabled && index < value.items.lastIndex) { Icon(Icons.Outlined.KeyboardArrowDown, stringResource(R.string.lists_down, item.title)) }
                         }
@@ -240,4 +243,5 @@ internal fun ListPreview(json: String, enabled: Boolean, error: String?, pending
         Button(onClick = { onCommit(chosen, mode, draft.optBoolean("standing"), draft.getString("version")) }, enabled = enabled && chosen.valid() && (mode != "save" || !pending),
             modifier = Modifier.fillMaxWidth().padding(16.dp).testTag("list-commit")) { Text(stringResource(if (mode == "save") R.string.lists_save else R.string.lists_start)) }
     }
+}
 }

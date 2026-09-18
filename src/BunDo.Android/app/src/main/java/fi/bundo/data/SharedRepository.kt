@@ -22,7 +22,7 @@ class SharedRepository(
         SharedTaskActions.ordered(rows, intents, state)
     }
     override val tasks = taskStates.map { rows -> rows.map(SharedProtocol::inbox) }
-    override val drafts = dao.drafts(scope).map { rows -> rows.filterNot { it.key.startsWith("checklist:") }.map { EditorDraft(it.key, it.title, it.description, it.savedAt, it.details) } }
+    override val drafts = dao.drafts(scope).map { rows -> rows.filterNot { it.key.startsWith("checklist:") || it.key.startsWith("lists:") }.map { EditorDraft(it.key, it.title, it.description, it.savedAt, it.details) } }
     internal val adventure = combine(dao.observeWorkspace(scope), dao.observeBase(scope), dao.observeAllIntents()) { state, base, intents ->
         state?.takeIf { it.blocked == null }?.adventure?.let { saved ->
             AdventureSnapshot.read(JSONObject(saved)).project(state, base.map { JSONObject(it.snapshot) }, intents.filter { it.scope == scope }.sortedBy { it.sequence.toULong() })
