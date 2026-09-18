@@ -41,8 +41,8 @@ internal fun SharedAdventureScreen(snapshot: AdventureSnapshot?, busy: Boolean, 
     LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(1000); now = Instant.now() } }
     var preview by remember(snapshot?.batchId) { mutableStateOf<AdventureChoice?>(null) }
     var edit by remember(snapshot?.active?.id, snapshot?.active?.version) { mutableStateOf(false) }
-    var leave by remember(snapshot?.active?.id) { mutableStateOf(false) }
-    var finish by remember(snapshot?.active?.id) { mutableStateOf(false) }
+    var leave by remember(snapshot?.active?.id, snapshot?.active?.version) { mutableStateOf(false) }
+    var finish by remember(snapshot?.active?.id, snapshot?.active?.version) { mutableStateOf(false) }
     val active = snapshot?.active
     val status = snapshot?.batchStatus(now)
     fun action(name: String) = JSONObject().put("action", name).put("adventureId", active!!.id).put("version", active.version)

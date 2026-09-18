@@ -219,7 +219,12 @@
     <string name="lists_saved_empty">Tallenna lista sen valikosta, niin voit käyttää samoja kohtia uudelleen.</string>
     <string name="lists_online">Yhteisten pohjien tallennus ja muokkaus vaatii yhteyden. Tallennetusta pohjasta voi aloittaa listan myös ilman yhteyttä.</string>
     <string name="lists_failed">Tallennettuja listoja ei voitu synkronoida. Luonnos säilyy. Tarkista yhteys ja yritä uudelleen.</string>
-    <string name="lists_changed">Joku muutti tallennettuja listoja. Luonnos säilyy. Palaa takaisin ja avaa päivitetty lista ennen tallennusta.</string>
+    <string name="lists_changed">Joku muutti tallennettuja listoja. Muokkauksesi säilyvät. Tarkista nykyinen tallennettu lista ennen tallentamista.</string>
+    <string name="lists_review">Tarkista tallennettu lista</string>
+    <string name="lists_review_hint">Tämä on nykyinen tallennettu lista. Muokkauksesi ovat yhä editorissa. Jatka omilla muokkauksillasi vain, jos haluat seuraavan tallennuksen korvaavan tämän sisällön.</string>
+    <string name="lists_review_missing">Tätä listaa ei ole enää tallennettu. Säilytä muokkauksesi uutena tallennettuna listana.</string>
+    <string name="lists_review_keep">Jatka omilla muokkauksilla</string>
+    <string name="lists_review_new">Säilytä uutena listana</string>
     <string name="lists_pending">Aiempi tallennus odottaa palvelimen vahvistusta. Yritä sitä uudelleen ennen uutta muutosta.</string>
     <string name="lists_retry_save">Yritä tallennusta uudelleen</string>
     <string name="lists_refresh">Päivitä tallennetut listat</string>

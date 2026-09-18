@@ -39,6 +39,8 @@ internal fun SharedListsScreen(repository: SharedRepository, data: AccountData, 
     var error by remember { mutableStateOf<String?>(null) }
     var pending by remember { mutableStateOf(false) }
     var preview by remember { mutableStateOf<String?>(null) }
+    var showPreview by remember { mutableStateOf(true) }
+    var discard by remember { mutableStateOf(false) }
     var loadingDraft by remember { mutableStateOf(true) }
     var starters by remember { mutableStateOf(false) }
     var deleted by remember { mutableStateOf<Pair<SavedHouseholdList, String>?>(null) }
@@ -68,6 +70,7 @@ internal fun SharedListsScreen(repository: SharedRepository, data: AccountData, 
     }
     fun prepare(value: SavedHouseholdList, mode: String, standing: Boolean = false) {
         starters = false
+        showPreview = true
         change(JSONObject().put("list", value.json()).put("mode", mode).put("standing", standing)
             .put("version", library?.getString("version") ?: "0")
             .put("selected", JSONArray(value.items.map { true })).toString())
@@ -83,8 +86,9 @@ internal fun SharedListsScreen(repository: SharedRepository, data: AccountData, 
         return
     }
     val currentPreview = preview
-    if (currentPreview != null) {
-        ListPreview(currentPreview, enabled && !busy, error, pending, { run { online(retry = true) } }, ::change, { change(null) }) { value, mode, standing, version ->
+    if (currentPreview != null && showPreview) {
+        ListPreview(currentPreview, enabled && !busy, error, pending, { run { online(retry = true) } }, ::change,
+            { showPreview = false; error = null }, workspace?.listLibrary) { value, mode, standing, version ->
             run {
                 repository.saveListDraft("preview", preview)
                 if (mode == "save") {
@@ -111,7 +115,14 @@ internal fun SharedListsScreen(repository: SharedRepository, data: AccountData, 
             Text(stringResource(R.string.lists_pending))
             OutlinedButton(onClick = { run { online(retry = true) } }, enabled = enabled && !busy) { Text(stringResource(R.string.lists_retry_save)) }
         }
-        Button(onClick = { starters = !starters }, enabled = enabled && !busy && !loadingDraft, modifier = Modifier.testTag("lists-new")) {
+        if (currentPreview != null) {
+            SettingsNavigationRow(stringResource(R.string.resume_draft), { showPreview = true },
+                Modifier.testTag("lists-resume"), enabled = !busy)
+            TextButton(onClick = { discard = true }, enabled = !busy && !pending, modifier = Modifier.testTag("lists-discard")) {
+                Text(stringResource(R.string.voice_discard_draft))
+            }
+        }
+        Button(onClick = { starters = !starters }, enabled = enabled && !busy && !loadingDraft && currentPreview == null, modifier = Modifier.testTag("lists-new")) {
             Text(stringResource(R.string.lists_new))
         }
         if (starters) {
@@ -141,9 +152,9 @@ internal fun SharedListsScreen(repository: SharedRepository, data: AccountData, 
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         DropdownMenuItem(text = { Text(stringResource(if (root.optBoolean("listPinned")) R.string.lists_unpin else R.string.lists_pin)) }, enabled = enabled,
                             onClick = { menu = false; onAction(SharedTaskAction("SetListPinned", root.toString())) })
-                        DropdownMenuItem(text = { Text(stringResource(R.string.lists_copy)) }, enabled = enabled,
+                        DropdownMenuItem(text = { Text(stringResource(R.string.lists_copy)) }, enabled = enabled && currentPreview == null,
                             onClick = { menu = false; prepare(SavedHouseholdList.fromTask(root, tasks), "start") })
-                        DropdownMenuItem(text = { Text(stringResource(R.string.lists_save)) }, enabled = enabled && !pending,
+                        DropdownMenuItem(text = { Text(stringResource(R.string.lists_save)) }, enabled = enabled && !pending && currentPreview == null,
                             onClick = { menu = false; prepare(SavedHouseholdList.fromTask(root, tasks), "save") })
                     }
                 }
@@ -158,11 +169,11 @@ internal fun SharedListsScreen(repository: SharedRepository, data: AccountData, 
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 SettingsNavigationRow(value.title, { prepare(value.copy(id = UUID.randomUUID().toString()), "start") }, Modifier.weight(1f),
                     value = stringResource(R.string.lists_pinned).takeIf { value.pinned },
-                    icon = if (value.pinned) Icons.Outlined.Star else null, enabled = enabled)
+                    icon = if (value.pinned) Icons.Outlined.Star else null, enabled = enabled && currentPreview == null)
                 Box {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, stringResource(R.string.lists_options, value.title)) }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        DropdownMenuItem(text = { Text(stringResource(R.string.lists_edit_saved)) }, enabled = enabled && !busy && !pending,
+                        DropdownMenuItem(text = { Text(stringResource(R.string.lists_edit_saved)) }, enabled = enabled && !busy && !pending && currentPreview == null,
                             onClick = { menu = false; prepare(value, "save") })
                         DropdownMenuItem(text = { Text(stringResource(if (value.pinned) R.string.lists_unpin else R.string.lists_pin)) }, enabled = enabled && !busy && !pending,
                             onClick = { menu = false; run { online(SharedLists.command(library, value.id, value.copy(pinned = !value.pinned))) } })
@@ -174,6 +185,13 @@ internal fun SharedListsScreen(repository: SharedRepository, data: AccountData, 
         }
         TextButton(onClick = { run { online() } }, enabled = enabled && !busy) { Text(stringResource(R.string.lists_refresh)) }
     }
+    if (discard) AlertDialog(onDismissRequest = { discard = false },
+        title = { Text(stringResource(R.string.voice_discard_draft)) },
+        text = { Text(stringResource(R.string.voice_discard_confirm)) },
+        confirmButton = { TextButton(onClick = { discard = false; change(null) }, modifier = Modifier.testTag("lists-confirm-discard")) {
+            Text(stringResource(R.string.voice_discard_draft))
+        } },
+        dismissButton = { TextButton(onClick = { discard = false }) { Text(stringResource(R.string.back)) } })
     deleted?.let { (value, version) -> AlertDialog(onDismissRequest = { deleted = null },
         title = { Text(stringResource(R.string.lists_delete_saved)) }, text = { Text(stringResource(R.string.lists_delete_confirm, value.title)) },
         confirmButton = { TextButton(onClick = { deleted = null; run { online(SharedLists.command(library, value.id, null).put("expectedVersion", version)) } }, enabled = enabled && !busy) { Text(stringResource(R.string.lists_delete_saved)) } },
@@ -182,11 +200,16 @@ internal fun SharedListsScreen(repository: SharedRepository, data: AccountData, 
 
 @Composable
 internal fun ListPreview(json: String, enabled: Boolean, error: String?, pending: Boolean, onRetry: () -> Unit, onChange: (String) -> Unit, onBack: () -> Unit,
+    latestLibrary: String? = null,
     onCommit: (SavedHouseholdList, String, Boolean, String) -> Unit) {
     val draft = JSONObject(json)
     val value = SavedHouseholdList.read(draft.getJSONObject("list"))
     val selected = draft.getJSONArray("selected").let { a -> (0 until a.length()).map(a::getBoolean) }
     val mode = draft.getString("mode")
+    val library = latestLibrary?.let(::JSONObject)
+    val latestVersion = library?.getString("version")
+    val stale = mode == "save" && latestVersion != null && latestVersion != draft.getString("version")
+    var review by remember(latestVersion) { mutableStateOf(false) }
     fun update(list: SavedHouseholdList = value, checks: List<Boolean> = selected) = onChange(draft.put("list", list.json()).put("selected", JSONArray(checks)).toString())
     BackHandler(enabled = enabled, onBack = onBack)
     var addition by remember { mutableStateOf("") }
@@ -198,7 +221,12 @@ internal fun ListPreview(json: String, enabled: Boolean, error: String?, pending
             Text(stringResource(if (mode == "save") R.string.lists_save else R.string.lists_preview), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (error != null) Text(stringResource(if (error == "LIST_CHANGED") R.string.lists_changed else R.string.lists_failed), color = MaterialTheme.colorScheme.error)
+            if (stale) {
+                Text(stringResource(R.string.lists_changed), color = MaterialTheme.colorScheme.error)
+                OutlinedButton(onClick = { review = true }, enabled = enabled && !pending, modifier = Modifier.testTag("list-review")) {
+                    Text(stringResource(R.string.lists_review))
+                }
+            } else if (error != null && error != "LIST_CHANGED") Text(stringResource(R.string.lists_failed), color = MaterialTheme.colorScheme.error)
             if (pending) OutlinedButton(onClick = onRetry, enabled = enabled) { Text(stringResource(R.string.lists_retry_save)) }
             Text(stringResource(if (mode == "save") R.string.lists_online else R.string.lists_copy_hint))
             OutlinedTextField(value.title, { if (InboxLimits.length(it) <= 160) update(value.copy(title = it)) }, enabled = enabled,
@@ -240,8 +268,35 @@ internal fun ListPreview(json: String, enabled: Boolean, error: String?, pending
             Text(stringResource(R.string.lists_limit, SharedChecklistActions.MAX_ITEMS), style = MaterialTheme.typography.bodySmall)
             Spacer(Modifier.height(12.dp))
         }
-        Button(onClick = { onCommit(chosen, mode, draft.optBoolean("standing"), draft.getString("version")) }, enabled = enabled && chosen.valid() && (mode != "save" || !pending),
+        Button(onClick = { onCommit(chosen, mode, draft.optBoolean("standing"), draft.getString("version")) }, enabled = enabled && chosen.valid() && !stale && (mode != "save" || !pending),
             modifier = Modifier.fillMaxWidth().padding(16.dp).testTag("list-commit")) { Text(stringResource(if (mode == "save") R.string.lists_save else R.string.lists_start)) }
     }
 }
+    if (review && stale) {
+        val lists = library!!.getJSONArray("lists")
+        val current = (0 until lists.length()).map { SavedHouseholdList.read(lists.getJSONObject(it)) }.find { it.id == value.id }
+        AlertDialog(onDismissRequest = { review = false },
+            title = { Text(stringResource(R.string.lists_review)) },
+            text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(stringResource(if (current == null) R.string.lists_review_missing else R.string.lists_review_hint))
+                if (current != null) {
+                    Text(current.title, style = MaterialTheme.typography.titleMedium)
+                    if (current.pinned) Text(stringResource(R.string.lists_pinned))
+                    current.notes?.let { Text(it) }
+                    current.items.forEach { item ->
+                        Text(item.title)
+                        item.notes?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                    }
+                }
+            } },
+            confirmButton = { TextButton(onClick = {
+                // Consent applies only to the content/version displayed in this review.
+                onChange(draft.put("version", latestVersion).put("list",
+                    (if (current == null) value.copy(id = UUID.randomUUID().toString()) else value).json()).toString())
+                review = false
+            }, enabled = enabled && !pending, modifier = Modifier.testTag("list-confirm-review")) {
+                Text(stringResource(if (current == null) R.string.lists_review_new else R.string.lists_review_keep))
+            } },
+            dismissButton = { TextButton(onClick = { review = false }) { Text(stringResource(R.string.back)) } })
+    }
 }

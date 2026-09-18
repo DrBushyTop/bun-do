@@ -22,6 +22,7 @@ import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
 import java.util.Locale
 import java.util.UUID
+import kotlinx.coroutines.runBlocking
 
 @RunWith(AndroidJUnit4::class)
 class ListsUiTest {
@@ -36,6 +37,68 @@ class ListsUiTest {
     }
     @Test fun previewPreservesNotesAndSelectionEnglish() = preview("en", 1f)
     @Test fun previewFinnishLargeTextKeepsAddAndSaveUsable() = preview("fi", 1.5f)
+    @Test fun conflictReviewKeepsEditsAndRequiresConsentToExactVersion() = conflictReview(false)
+    @Test fun deletedDefinitionIsSavedUnderANewIdentityAfterReview() = conflictReview(true)
+    private fun conflictReview(deleted: Boolean) {
+        val mine = SavedHouseholdList(UUID.randomUUID().toString(), "My edited name", "My notes",
+            listOf(HouseholdListItem("Keys", "Spare set"), HouseholdListItem("Milk", "Oat")))
+        var draft by mutableStateOf(JSONObject().put("list", mine.json()).put("mode", "save").put("version", "1")
+            .put("selected", JSONArray().put(true).put(false)).toString())
+        var latest by mutableStateOf(JSONObject().put("version", "2").put("lists",
+            JSONArray().also { if (!deleted) it.put(mine.copy(title = "Current shared name").json()) }).toString())
+        var committed: SavedHouseholdList? = null
+        var committedVersion: String? = null
+        compose.runOnUiThread { compose.activity.setContent { BunDoTheme("light") { Surface {
+            ListPreview(draft, true, "LIST_CHANGED", false, {}, { draft = it }, {}, latest) { value, _, _, version ->
+                committed = value; committedVersion = version
+            }
+        } } } }
+        compose.onNodeWithTag("list-commit").assertIsNotEnabled()
+        compose.onNodeWithTag("list-review").performScrollTo().performClick()
+        compose.onNodeWithTag("list-confirm-review").assertExists()
+        // Another refresh must invalidate the open review, not silently replace its consent.
+        compose.runOnIdle { latest = JSONObject(latest).put("version", "3").toString() }
+        compose.onNodeWithTag("list-confirm-review").assertDoesNotExist()
+        compose.onNodeWithTag("list-commit").assertIsNotEnabled()
+        compose.onNodeWithTag("list-review").performScrollTo().performClick()
+        compose.onNodeWithTag("list-confirm-review").performClick()
+        compose.onNodeWithTag("list-name").assertTextContains(mine.title)
+        compose.onNodeWithTag("list-commit").assertIsEnabled().performClick()
+        compose.runOnIdle {
+            assertEquals("3", committedVersion)
+            assertEquals(mine.title, committed!!.title)
+            assertEquals(mine.notes, committed!!.notes)
+            assertEquals(listOf(mine.items[0]), committed!!.items)
+            if (deleted) assertNotEquals(mine.id, committed!!.id) else assertEquals(mine.id, committed!!.id)
+        }
+    }
+    @Test fun backKeepsDraftUntilExplicitDiscard() = runBlocking {
+        val data = (compose.activity.application as BunDoApplication).accounts.active.value!!
+        val state = adventureWorkspace()
+        data.database.shared().saveWorkspace(state)
+        val repository = SharedRepository(data.database, data.lease, state.scope, state.registration)
+        val value = SavedHouseholdList(UUID.randomUUID().toString(), "My list", "Keep me", listOf(HouseholdListItem("Keys")))
+        val draft = JSONObject().put("list", value.json()).put("mode", "start").put("version", "0")
+            .put("selected", JSONArray().put(true)).toString()
+        repository.saveListDraft("preview", draft)
+        compose.runOnUiThread { compose.activity.setContent { BunDoTheme("light") { Surface {
+            SharedListsScreen(repository, data, state, emptyMap(), true, {}, {})
+        } } } }
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("list-preview").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitForIdle()
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.onNodeWithTag("lists-resume").performScrollTo().assertExists()
+        assertEquals(draft, repository.listDraft("preview"))
+        compose.onNodeWithTag("lists-new").assertIsNotEnabled()
+        compose.onNodeWithTag("lists-resume").performClick()
+        compose.onNodeWithTag("list-name").assertTextContains("My list")
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.onNodeWithTag("lists-discard").performScrollTo().performClick()
+        assertEquals(draft, repository.listDraft("preview"))
+        compose.onNodeWithTag("lists-confirm-discard").performClick()
+        compose.waitUntil(10_000) { runBlocking { repository.listDraft("preview") == null } }
+        compose.onNodeWithTag("lists-resume").assertDoesNotExist()
+    }
     private fun preview(language: String, scale: Float) {
         val list = SavedHouseholdList(UUID.randomUUID().toString(), "Cottage", "Weekend", listOf(HouseholdListItem("Keys", "Spare set")))
         var draft by mutableStateOf(JSONObject().put("list", list.json()).put("mode", "start").put("standing", false)

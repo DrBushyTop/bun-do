@@ -20,6 +20,10 @@ new list offline. Definition writes compare the library version and retain the
 exact request for ambiguous retries. A conflicting edit requires a fresh review,
 not an automatic overwrite. Deletion is immediate for a saved definition;
 old writes cannot recreate it using an obsolete version.
+Back keeps an unfinished preview available to resume. Discarding it requires
+confirmation. Conflict review shows the current shared content while keeping
+local edits. Continuing authorizes a subsequent save against that reviewed
+version. If the definition was deleted, the retained edits use a new identity.
 
 Creating a list records its root and item commands in one local transaction.
 The ordinary dependency journal retains the items if delivery stops after root
