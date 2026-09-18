@@ -59,7 +59,7 @@ public sealed class AdventureFunction(AccessTokens tokens, IServiceProvider serv
                 "ideas" => ["language"], "plan" => ["outcome", "minutes"], "beginCreation" => ["creationId", "version", "draft"],
                 "finishCreation" => ["creationId", "roots"], "cancelCreation" => ["creationId", "confirmed"],
                 "read" => [], "refresh" or "retry" => ["batchId"], "accept" => ["batchId", "proposalId"],
-                "edit" => ["adventureId", "version", "draft"], "leave" => ["adventureId", "version", "confirmed"],
+                "edit" => ["adventureId", "version", "draft"], "leave" or "finish" => ["adventureId", "version", "confirmed"],
                 "dismiss" => ["adventureId", "version"], _ => throw new JsonException(),
             };
             FoundryAdventureProvider.Fields(root, ["action", "workspaceId", "stateEpoch", "registrationId", ..fields]);
@@ -68,14 +68,14 @@ public sealed class AdventureFunction(AccessTokens tokens, IServiceProvider serv
                 batch = root.GetProperty("batchId").ValueKind == JsonValueKind.Null && action != "accept" ? null : Id(root, "batchId");
             if (action == "accept") proposal = Id(root, "proposalId");
             if (action is "beginCreation" or "finishCreation" or "cancelCreation") id = Id(root, "creationId");
-            if (action is "edit" or "leave" or "dismiss" or "beginCreation")
+            if (action is "edit" or "leave" or "finish" or "dismiss" or "beginCreation")
             {
                 if (action != "beginCreation") id = Id(root, "adventureId");
                 var text = root.GetProperty("version").GetString();
                 if (!ulong.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out version) ||
                     text != version.ToString(CultureInfo.InvariantCulture)) throw new JsonException();
             }
-            if (action is "leave" or "cancelCreation") confirmed = root.GetProperty("confirmed").GetBoolean();
+            if (action is "leave" or "finish" or "cancelCreation") confirmed = root.GetProperty("confirmed").GetBoolean();
             if (action == "ideas") language = root.GetProperty("language").GetString() ?? throw new JsonException();
             if (action == "plan") {
                 outcome = root.GetProperty("outcome").GetString();
@@ -117,7 +117,8 @@ public sealed class AdventureFunction(AccessTokens tokens, IServiceProvider serv
                 case "refresh": case "retry": await service.RefreshAsync(member, workspace, epoch, batch, action == "retry", ct); break;
                 case "accept": await service.AcceptAsync(member, workspace, epoch, batch!.Value, proposal, ct); break;
                 case "edit": await service.EditAsync(member, workspace, epoch, id, version, draft!, ct); break;
-                case "leave": case "dismiss": await service.CloseAsync(member, workspace, epoch, id, version, action == "leave", confirmed, ct); break;
+                case "finish" when !confirmed: return Failure("CONFIRMATION_REQUIRED", 409);
+                case "finish": case "leave": case "dismiss": await service.CloseAsync(member, workspace, epoch, id, version, action == "leave", confirmed, ct); break;
             }
             var snapshot = await service.ReadAsync(member, workspace, epoch, ct);
             Activity.Current?.SetTag("adventure.result", "ACCEPTED");

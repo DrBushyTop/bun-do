@@ -27,7 +27,7 @@ internal object SharedChecklistActions {
         if (tasks[intent.taskId]?.nullableString("parentId") == id) return listOf("subtree", "lifecycle")
         if (target.nullableString("parentId") != intent.taskId) return emptyList()
         return when (intent.kind) {
-            "SplitTask", "AddChildren" -> SharedTaskActions.groups + listOf("title", "description", "due")
+            "CreateTask", "SplitTask", "AddChildren" -> SharedTaskActions.groups + listOf("title", "description", "due")
             "DeleteTask", "RestoreTask" -> listOf("deletion", "claim")
             "CancelTask", "ReopenTask" -> listOf("lifecycle", "claim", "snooze")
             "SetSnooze" -> listOf("claim")
@@ -42,7 +42,7 @@ internal object SharedChecklistActions {
         val parent = task.nullableString("parentId")
         if (parent != null && (tasks[parent] == null || !tasks.getValue(parent).isNull("deletion"))) return "PARENT_UNAVAILABLE"
         if (intent.kind in listOf("ClaimTask", "CompleteTask") && snoozed(task, tasks)) return "TASK_SNOOZED"
-        if (task.optBoolean("isChecklist") && intent.kind in listOf("ClaimTask", "UnclaimTask", "CompleteTask")) return "CHECKLIST_ROOT"
+        if ((task.optBoolean("isChecklist") || task.optString("listKind") == "STANDING") && intent.kind in listOf("ClaimTask", "UnclaimTask", "CompleteTask")) return "CHECKLIST_ROOT"
         if (intent.kind in splitKinds) {
             val source = intent.taskAction?.let(::JSONObject)?.optJSONObject("sourceText")
             if (source != null && (task.getString("title") != source.getString("title") || task.nullableString("description") != source.nullableString("description"))) return "FIELD_CONFLICT"
@@ -80,7 +80,7 @@ internal object SharedChecklistActions {
             val items = payload.getJSONArray("items")
             val ids = childIds(intent, action.getString("registration"))
             for (index in ids.indices) {
-                val child = SharedProtocol.optimistic(intent.copy(taskId = ids[index], title = items.getString(index), description = null))
+                val child = SharedProtocol.optimistic(intent.copy(taskId = ids[index], title = items.getString(index), description = payload.optJSONArray("notes")?.optString(index)?.takeUnless { it == "null" }))
                     .put("parentId", task.getString("id"))
                 tasks[ids[index]] = child
             }
@@ -125,7 +125,7 @@ internal object SharedChecklistActions {
         val root = task.nullableString("parentId")?.let(tasks::get) ?: task.takeIf { it.optBoolean("isChecklist") } ?: return
         if (!root.isNull("deletion")) return
         val eligible = childIds(root).mapNotNull(tasks::get).filter { it.isNull("deletion") && it.optString("lifecycle", "OPEN") != "CANCELLED" }
-        val lifecycle = if (eligible.isEmpty()) "CANCELLED" else if (eligible.all { it.optString("lifecycle") == "COMPLETED" }) "COMPLETED" else "OPEN"
+        val lifecycle = if (root.optString("listKind") == "STANDING" && root.isNull("cancellationGroupId")) "OPEN" else if (eligible.isEmpty()) "CANCELLED" else if (eligible.all { it.optString("lifecycle") == "COMPLETED" }) "COMPLETED" else "OPEN"
         if (root.optString("lifecycle", "OPEN") != lifecycle) root.put("lifecycleAt", JSONObject.NULL)
         root.put("lifecycle", lifecycle).put("emptyChecklist", eligible.isEmpty() && root.isNull("cancellationGroupId"))
     }

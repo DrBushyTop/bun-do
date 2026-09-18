@@ -9,7 +9,7 @@ internal object SharedTaskActions {
     val cleanupKinds = setOf("RequestCleanup", "RequestSplit", "CancelCleanup", "ApplyCleanup")
     val repeatKinds = setOf("ConfigureRepeat", "StopRepeat")
     val kinds = cleanupKinds + repeatKinds + setOf("ClaimTask", "UnclaimTask", "CompleteTask", "ReopenTask", "CancelTask", "MoveTask", "DeleteTask", "RestoreTask",
-        "SplitTask", "AddChildren", "SetSnooze", "ClearSnooze")
+        "SplitTask", "AddChildren", "SetSnooze", "ClearSnooze", "SetListPinned")
     val groups = listOf("lifecycle", "claim", "hierarchy", "deletion", "orderIntent", "subtree", "snooze", "urgent", "recurrence")
     fun version(task: JSONObject, group: String): String =
         if (group == "recurrence") task.optJSONObject("repeat")?.decimal("version")?.toString() ?: "0"
@@ -21,6 +21,7 @@ internal object SharedTaskActions {
             if (kind in SharedChecklistActions.splitKinds) listOf("title", "description") else emptyList()
     fun writes(kind: String) = when (kind) {
         "CreateTask" -> groups + listOf("title", "description", "due")
+        "SetListPinned" -> listOf("hierarchy", "subtree")
         "ConfigureRepeat", "StopRepeat" -> listOf("recurrence")
         "RequestCleanup", "RequestSplit", "CancelCleanup" -> listOf("cleanup")
         "ApplyCleanup" -> listOf("cleanup", "title", "description", "due")
@@ -119,6 +120,7 @@ internal object SharedTaskActions {
             for (key in listOf("lifecycle", "claimantId", "lifecycleActorId", "lifecycleAt", "firstCompletion", "deletion", "snoozedUntil", "repeat"))
                 if (receipt.has(key)) task.put(key, receipt.get(key))
         } else when (intent.kind) {
+            "SetListPinned" -> task.put("listPinned", action.getJSONObject("payload").getBoolean("pinned"))
             "ConfigureRepeat", "StopRepeat" -> task.put("repeatPending", true)
             "RequestCleanup", "RequestSplit" -> task.put("cleanup", JSONObject().put("status", "PENDING")
                 .put("id", "pending:${intent.sequence}").put("mode", if (intent.kind == "RequestSplit") "SPLIT" else "CLEANUP"))

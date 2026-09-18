@@ -16,6 +16,7 @@ import java.util.concurrent.TimeUnit
 
 @RunWith(AndroidJUnit4::class)
 class OnlineVoiceTest {
+    @get:org.junit.Rule val preferences = IsolatedVoicePreferencesRule()
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
 

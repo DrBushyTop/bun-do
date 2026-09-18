@@ -86,6 +86,7 @@ internal object SharedTaskDetails {
             basis?.nullableString("urgentAfterSequence")?.let { after.put("urgent", it) }
         }
         if (create) {
+            if (value.has("listKind")) result.put("listKind", value.getString("listKind"))
             result.put("anonymousCapture", value.optBoolean("anonymousCapture"))
             if (value.has("originalCapture")) result.put("originalCapture", value.get("originalCapture"))
             if (expedited(value)) {
@@ -136,6 +137,7 @@ internal object SharedTaskDetails {
             }
         }
         if (intent.kind == "CreateTask") {
+            if (details.has("listKind")) payload.put("listKind", details.getString("listKind"))
             payload.put("anonymousCapture", details.optBoolean("anonymousCapture"))
             if (details.has("originalCapture")) payload.put("originalCapture", details.get("originalCapture"))
             if (details.has("placement")) payload.put("placement", details.get("placement"))
@@ -147,6 +149,7 @@ internal object SharedTaskDetails {
         val original = details?.optJSONObject("originalCapture")
         val captured = if (imported) original?.opt("capturedAt") ?: JSONObject.NULL else JSONObject(intent.captureContext).get("capturedInstant")
         if (imported) task.getJSONObject("capture").put("context", original?.opt("context") ?: JSONObject.NULL)
+        task.put("listKind", details?.opt("listKind") ?: JSONObject.NULL)
         task.put("due", details?.optJSONObject("due")?.let(::normalize) ?: JSONObject.NULL)
             .put("dueVersion", JSONObject().put("fieldVersion", "0").put("humanVersion", "0"))
             .put("urgent", details?.optBoolean("urgent") ?: false).put("urgencyVersion", "0")

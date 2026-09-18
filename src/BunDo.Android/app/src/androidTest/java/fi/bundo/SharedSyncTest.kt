@@ -82,7 +82,7 @@ class SharedSyncTest {
             assertEquals("Keep me", intent.description)
             assertEquals("Unfinished", db.shared().allDrafts().single().title)
             assertEquals(200L, db.recordings().all().single().expiresAt)
-            assertEquals(16, db.openHelper.readableDatabase.version)
+            assertEquals(17, db.openHelper.readableDatabase.version)
             assertTrue(db.recordings().all().single().keepAudio)
         }
     }

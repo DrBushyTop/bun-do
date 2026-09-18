@@ -76,11 +76,12 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
                     revision, operation.CaptureContext is { } capture
                         ? new(create.Title, create.Description, capture, acceptedAt) : null,
                     LifecycleVersion: revision, ClaimVersion: revision, HierarchyVersion: revision, OrderIntentVersion: revision,
-                    DueVersion: new(revision, revision), Urgent: create.Urgent, UrgencyVersion: revision);
+                    DueVersion: new(revision, revision), Urgent: create.Urgent, UrgencyVersion: revision, ListKind: create.ListKind);
                 if (create.AnonymousCapture) task = task with { Capture = new(create.Title, create.Description,
                     create.OriginalCapture?.Context ?? JsonSerializer.SerializeToElement<object?>(null), acceptedAt) };
                 if (TaskDates.TryNormalize(create.Due, out var due)) task = task with { Due = due };
-                if (!TaskDates.TryNormalize(create.Due, out _)) code = "INVALID_DUE";
+                if (create.ListKind is not null and not "FINITE" and not "STANDING") code = "INVALID_LIST";
+                else if (!TaskDates.TryNormalize(create.Due, out _)) code = "INVALID_DUE";
                 else if (state.TaskCount >= 1024) code = "TASK_LIMIT";
                 else if (state.Tasks.ContainsKey(create.TaskId))
                     code = "ENTITY_EXISTS";

@@ -7,7 +7,7 @@ namespace BunDo.Domain;
 
 public abstract record TaskCommand;
 public sealed record CreateTask(string TaskId, string Title, string? Description = null, TaskDue? Due = null,
-    bool Urgent = false, InitialPlacement? Placement = null, bool AnonymousCapture = false, ImportedCapture? OriginalCapture = null) : TaskCommand;
+    bool Urgent = false, InitialPlacement? Placement = null, bool AnonymousCapture = false, ImportedCapture? OriginalCapture = null, string? ListKind = null) : TaskCommand;
 public sealed record TextEdit(string? Value, ulong ExpectedHumanVersion);
 public sealed record EditTask(string TaskId, TextEdit? Title = null, TextEdit? Description = null,
     ulong? ExpectedDeletionVersion = null, DueEdit? Due = null, UrgencyEdit? Urgent = null) : TaskCommand;
@@ -18,6 +18,7 @@ public sealed record ClaimTask(string TaskId, TaskStateVersions Expected) : Task
 public sealed record UnclaimTask(string TaskId, TaskStateVersions Expected) : TaskTransition(TaskId, Expected);
 public sealed record CompleteTask(string TaskId, TaskStateVersions Expected, Guid? ConfirmedClaimantId = null)
     : TaskTransition(TaskId, Expected);
+public sealed record SetListPinned(string TaskId, TaskStateVersions Expected, bool Pinned) : TaskTransition(TaskId, Expected);
 public sealed record ReopenTask(string TaskId, TaskStateVersions Expected) : TaskTransition(TaskId, Expected);
 public sealed record CancelTask(string TaskId, TaskStateVersions Expected) : TaskTransition(TaskId, Expected);
 public sealed record DeleteTask(string TaskId, TaskStateVersions Expected) : TaskTransition(TaskId, Expected);
@@ -27,6 +28,7 @@ public sealed record ClearSnooze(string TaskId, TaskStateVersions Expected) : Ta
 public abstract record ChecklistCommand(string TaskId, TaskStateVersions Expected,
     string[] Items, ulong ExpectedTitleHumanVersion, ulong ExpectedDescriptionHumanVersion) : TaskTransition(TaskId, Expected)
 {
+    public string?[]? Notes { get; init; }
     public ulong? ExpectedTitleFieldVersion { get; init; }
     public ulong? ExpectedDescriptionFieldVersion { get; init; }
 }
@@ -92,6 +94,7 @@ public sealed class FrozenOperation
         Dependencies = dependencies.ToArray();
         var kind = command switch
         {
+            SetListPinned => "SetListPinned",
             ConfigureRepeat => "ConfigureRepeat",
             StopRepeat => "StopRepeat",
             RequestCleanup => "RequestCleanup",

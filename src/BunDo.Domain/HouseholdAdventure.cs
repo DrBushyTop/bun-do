@@ -72,7 +72,7 @@ public static class HouseholdAdventure
         if (board.Active is null) return ("ACCEPTED", board);
         if (board.Active.Id != id || board.Active.Version != expectedVersion) return ("ADVENTURE_CHANGED", board);
         if (leave && !confirmed) return ("CONFIRMATION_REQUIRED", board);
-        if (!leave && !Progress(board.Active.Draft, tasks).IsComplete) return ("ADVENTURE_NOT_COMPLETE", board);
+        if (!leave && !confirmed && !Progress(board.Active.Draft, tasks).IsComplete) return ("ADVENTURE_NOT_COMPLETE", board);
         return ("ACCEPTED", board with { Active = null });
     }
 

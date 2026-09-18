@@ -22,12 +22,16 @@ class WelcomeRoutingTest {
     @Test fun settingsOpensFamilySetupAndDismissalSurvivesRecreation() = runBlocking {
         val app = compose.activity.application as BunDoApplication
         compose.onNodeWithTag("settings").performClick()
+        compose.onNodeWithTag("account").performScrollTo().performClick()
         compose.onNodeWithTag("welcome-settings").performScrollTo().performClick()
         compose.onNodeWithTag("welcome-create").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("welcome-later").performScrollTo().performClick()
         app.welcome.awaitSaved()
         compose.activityRule.scenario.recreate()
         compose.onNodeWithTag("welcome-title").assertDoesNotExist()
+        // Dismissing setup returns to the settings page that opened it.
+        compose.onNodeWithTag("settings-language").assertExists()
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
         compose.onNodeWithTag("settings").assertExists()
         Unit
     }

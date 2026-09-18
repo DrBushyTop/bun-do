@@ -54,14 +54,15 @@ public static class ChecklistTasks
                 split.ExpectedDescriptionHumanVersion != task.DescriptionVersion.Human) return Fail("FIELD_CONFLICT");
             if (split.Items.Length == 0 || split.Items.Length + items.Length > MaximumChildren) return Fail("CHECKLIST_LIMIT");
             if (state.TaskCount + split.Items.Length > 1024) return Fail("TASK_LIMIT");
+            if (split.Notes is { } notes && (notes.Length != split.Items.Length || notes.Any(note => (note?.EnumerateRunes().Count() ?? 0) > 4000))) return Fail("INVALID_DESCRIPTION");
             if (split.Items.Any(title => string.IsNullOrWhiteSpace(title) || title.EnumerateRunes().Count() > 160))
                 return Fail("INVALID_TITLE");
             for (var index = 0; index < split.Items.Length; index++)
             {
                 var id = TaskIdentity.ForCreate(operation.DeviceId, operation.Sequence, index + 1);
                 if (state.Tasks.ContainsKey(id)) return Fail("ENTITY_EXISTS");
-                effects.Add(new(id, split.Items[index], null, new(revision, revision), new(revision, revision), revision,
-                    Capture: operation.CaptureContext is { } capture ? new(split.Items[index], null, capture, now) : null,
+                effects.Add(new(id, split.Items[index], split.Notes?[index], new(revision, revision), new(revision, revision), revision,
+                    Capture: operation.CaptureContext is { } capture ? new(split.Items[index], split.Notes?[index], capture, now) : null,
                     LifecycleVersion: revision, ClaimVersion: revision, HierarchyVersion: revision,
                     OrderIntentVersion: revision, ParentId: task.Id));
             }
@@ -74,6 +75,14 @@ public static class ChecklistTasks
             effects.Add(root);
             return new("ACCEPTED", root, effects.ToImmutableArray());
         }
+        if (command is SetListPinned pin)
+        {
+            if (task.Deletion is not null) return Fail("TASK_DELETED");
+            if (task.ParentId is not null || !task.IsChecklist && task.ListKind is null) return Fail("CHECKLIST_ROOT");
+            var pinned = task with { ListPinned = pin.Pinned, HierarchyVersion = revision };
+            return new("ACCEPTED", pinned, [pinned]);
+        }
+        if (task.ListKind == "STANDING" && command is CompleteTask) return Fail("CHECKLIST_ROOT");
         if (task.IsChecklist && command is ClaimTask or UnclaimTask or CompleteTask) return Fail("CHECKLIST_ROOT");
         if (task.IsChecklist && command is ReopenTask && task.CancellationGroupId is null) return Fail("CHECKLIST_DERIVED");
         if (task.IsChecklist && command is CancelTask && task.Lifecycle == "CANCELLED" && task.CancellationGroupId is not null)
@@ -130,7 +139,7 @@ public static class ChecklistTasks
             {
                 var eligible = (root.ChildOrder ?? []).Select(child => merged[child])
                     .Where(child => child.Deletion is null && child.Lifecycle != "CANCELLED").ToArray();
-                var lifecycle = eligible.Length == 0 ? "CANCELLED" :
+                var lifecycle = root.ListKind == "STANDING" && root.CancellationGroupId is null ? "OPEN" : eligible.Length == 0 ? "CANCELLED" :
                     eligible.All(child => child.Lifecycle == "COMPLETED") ? "COMPLETED" : "OPEN";
                 root = root with {
                     EmptyChecklist = eligible.Length == 0 && root.CancellationGroupId is null,

@@ -276,7 +276,9 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
         queueSideNavigation = { SharedHouseholdNavigation(if (destination in listOf("journey", "adventure", "creator")) "together" else destination, rail = true) { navigate(it) } },
         queueContent = if (destination != "queue") ({ onOpen ->
             val progress = current?.progress?.takeIf { current?.blocked == null && recovery == null }
-            if (destination == "creator") GuidedAdventureScreen(creation, adventure?.creation, adventureBusy, adventureFailed, byId,
+            if (destination == "lists") SharedListsScreen(repository, data, current, byId,
+                current != null && current?.blocked == null && recovery == null && !busy, onOpen, ::act)
+            else if (destination == "creator") GuidedAdventureScreen(creation, adventure?.creation, adventureBusy, adventureFailed, byId,
                 current != null && current?.blocked == null && recovery == null && adventure?.active == null,
                 { outcome, minutes -> guidedAction { token -> GuidedAdventure.plan(context, repository, token, outcome, minutes) } },
                 { draft -> guidedAction { token -> repository.approveGuidedCreation(draft); GuidedAdventure.resume(context, repository, token) } },

@@ -34,6 +34,7 @@ class AdventureUiTest {
     private var action: JSONObject? = null
     private var requestFailed by mutableStateOf(false)
     private var requestBusy by mutableStateOf(false)
+    private var refreshed by mutableStateOf<JSONObject?>(null)
     private fun screen(json: JSONObject? = adventureFixture(state, root), language: String = "en", scale: Float = 1f, busy: Boolean = false, failed: Boolean = false) {
         val config = Configuration(compose.activity.resources.configuration).apply { setLocale(Locale.forLanguageTag(language)); fontScale = scale }
         val translated = compose.activity.createConfigurationContext(config)
@@ -42,12 +43,39 @@ class AdventureUiTest {
                 val density = LocalDensity.current
                 CompositionLocalProvider(LocalDensity provides Density(density.density, scale)) {
                     BunDoTheme("light") { Surface { Box(Modifier.safeDrawingPadding()) {
-                        SharedAdventureScreen(json?.let { AdventureSnapshot.read(it).project(state, listOf(root), emptyList()) },
+                        SharedAdventureScreen((refreshed ?: json)?.let { AdventureSnapshot.read(it).project(state, listOf(root), emptyList()) },
                             busy || requestBusy, failed || requestFailed, true, mapOf(root.getString("id") to root), { action = it }, {}, {})
                     } } }
                 }
             }
         } }
+    }
+    @Test fun explicitFinishConfirmsWithoutCheckingTasks() {
+        screen()
+        compose.onNodeWithTag("adventure-finish").performScrollTo().performClick()
+        compose.onNodeWithTag("adventure-confirm-finish").performClick()
+        compose.runOnIdle {
+            assertEquals("finish", action!!.getString("action"))
+            assertTrue(action!!.getBoolean("confirmed"))
+            assertEquals("OPEN", root.getString("lifecycle"))
+        }
+    }
+    @Test fun updatedAdventureRequiresFreshFinishConfirmation() {
+        val original = adventureFixture(state, root)
+        screen(original)
+        compose.onNodeWithTag("adventure-finish").performScrollTo().performClick()
+        compose.onNodeWithTag("adventure-confirm-finish").assertExists()
+        compose.runOnIdle {
+            refreshed = JSONObject(original.toString()).also {
+                it.put("revision", "4")
+                it.getJSONObject("board").getJSONObject("active").put("version", "4")
+            }
+        }
+        compose.onNodeWithTag("adventure-confirm-finish").assertDoesNotExist()
+        assertNull(action)
+        compose.onNodeWithTag("adventure-finish").performScrollTo().performClick()
+        compose.onNodeWithTag("adventure-confirm-finish").performClick()
+        assertEquals("4", action!!.getString("version"))
     }
     @Test fun twoIllustratedProposalsRequireExplicitAcceptance() {
         val json = adventureFixture(state, root, active = false); screen(json)

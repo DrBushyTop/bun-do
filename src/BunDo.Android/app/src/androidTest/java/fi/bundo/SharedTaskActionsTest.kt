@@ -912,6 +912,99 @@ class SharedTaskActionsTest {
             .put("effectRevision", (request.workspace.revision.toULong() + 1u).toString()).put("task", task)
     }
 
+    @Test fun reusableListCopiesNotesAndOrderWithOfflineRestartAndFreshState() = runBlocking {
+        fixture { db, state, repository ->
+            val poll = repository.prepare(1000, 1)!!
+            repository.apply(poll, reply(poll, emptyList()))
+            val value = SavedHouseholdList(UUID.randomUUID().toString(), "Groceries", "Weekend",
+                listOf(HouseholdListItem("Milk, 1 litre", "Oat"), HouseholdListItem("Dough")))
+            val root = repository.startList(value, standing = true)
+            val pending = db.shared().intents(state.scope)
+            assertEquals(listOf("CreateTask", "SplitTask"), pending.map { it.kind })
+            assertEquals("STANDING", JSONObject(pending[0].details!!).getString("listKind"))
+            val restarted = SharedRepository(db, DataLease(), state.scope, state.registration)
+            var tasks = restarted.taskStates.first().associateBy { it.getString("id") }
+            val children = SharedChecklistActions.childIds(tasks.getValue(root))
+            assertEquals(listOf("Milk, 1 litre", "Dough"), children.map { tasks.getValue(it).getString("title") })
+            assertEquals("Oat", tasks.getValue(children[0]).getString("description"))
+            for (id in children) {
+                restarted.act("CompleteTask", tasks.getValue(id).toString())
+                tasks = restarted.taskStates.first().associateBy { it.getString("id") }
+            }
+            assertEquals("OPEN", tasks.getValue(root).getString("lifecycle"))
+            assertTrue(tasks.getValue(root).isNull("firstCompletion"))
+            val copied = SavedHouseholdList.fromTask(tasks.getValue(root), tasks)
+            val fresh = restarted.startList(copied, standing = false)
+            tasks = restarted.taskStates.first().associateBy { it.getString("id") }
+            val freshChildren = SharedChecklistActions.childIds(tasks.getValue(fresh))
+            assertEquals("Oat", tasks.getValue(freshChildren[0]).getString("description"))
+            freshChildren.forEach { id ->
+                assertEquals("OPEN", tasks.getValue(id).getString("lifecycle"))
+                assertTrue(tasks.getValue(id).isNull("claimantId")); assertTrue(tasks.getValue(id).isNull("due"))
+            }
+            children.forEach { assertEquals("COMPLETED", tasks.getValue(it).getString("lifecycle")) }
+            restarted.act("ReopenTask", tasks.getValue(children[0]).toString())
+            tasks = restarted.taskStates.first().associateBy { it.getString("id") }
+            assertEquals("Oat", tasks.getValue(children[0]).getString("description"))
+            val request = restarted.prepare(1001, 1)!!
+            assertEquals("STANDING", JSONObject(request.envelope!!).getJSONObject("payload").getString("listKind"))
+        }
+    }
+
+    @Test fun listSaveRetainsExactAmbiguousRequestAndResolvesDefinitiveConflict() = runBlocking {
+        fixture { _, state, repository ->
+            val value = SavedHouseholdList(UUID.randomUUID().toString(), "Packing", null, listOf(HouseholdListItem("Keys")))
+            val command = SharedLists.command(null, value.id, value)
+            var first: String? = null
+            assertTrue(runCatching { SharedLists.send(repository, "fixture", command) { _, _, action ->
+                first = action.toString(); throw java.io.IOException("Lost reply")
+            } }.isFailure)
+            assertEquals(first, repository.listDraft("pending"))
+            fun snapshot() = JSONObject().put("workspaceId", state.workspaceId).put("stateEpoch", state.epoch)
+                .put("library", JSONObject().put("version", "1").put("lists", JSONArray().put(value.json())))
+            SharedLists.send(repository, "fixture", retry = true) { _, _, action -> assertEquals(first, action.toString()); snapshot() }
+            assertNull(repository.listDraft("pending"))
+            val stale = SharedLists.command(null, value.id, value.copy(title = "Changed"))
+            assertTrue(runCatching { SharedLists.send(repository, "fixture", stale) { _, _, action ->
+                if (action.getString("action") == "save") throw SyncFailure("LIST_CHANGED") else snapshot()
+            } }.isFailure)
+            assertNull(repository.listDraft("pending"))
+            assertEquals("Packing", JSONObject(repository.workspace.first()!!.listLibrary!!).getJSONArray("lists").getJSONObject(0).getString("title"))
+        }
+    }
+
+    @Test fun listCacheIsMonotoneAndAccountBoundAndMigrationPreservesTasks() = runBlocking {
+        fixture { db, state, repository ->
+            val value = SavedHouseholdList(UUID.randomUUID().toString(), "Packing", null, listOf(HouseholdListItem("Keys")))
+            fun snapshot(version: String) = JSONObject().put("workspaceId", state.workspaceId).put("stateEpoch", state.epoch)
+                .put("library", JSONObject().put("version", version).put("lists", JSONArray().put(value.json())))
+            assertTrue(repository.applyListLibrary(state, snapshot("2")))
+            repository.applyListLibrary(state, snapshot("1"))
+            assertEquals("2", JSONObject(repository.workspace.first()!!.listLibrary!!).getString("version"))
+            assertTrue(runCatching { repository.applyListLibrary(state, snapshot("3").put("workspaceId", UUID.randomUUID().toString())) }.isFailure)
+            repository.saveListDraft("preview", value.json().toString())
+            val restarted = SharedRepository(db, DataLease(), state.scope, state.registration)
+            assertEquals(value.json().toString(), restarted.listDraft("preview"))
+            assertTrue(restarted.drafts.first().isEmpty())
+            val request = restarted.prepare(1000, 1)!!
+            restarted.block(request, "FORBIDDEN")
+            assertNull(restarted.workspace.first()!!.listLibrary)
+        }
+        val name = "list-migration-${UUID.randomUUID()}.db"
+        try {
+            migrations.createDatabase(name, 16).apply {
+                execSQL("INSERT INTO inbox_tasks VALUES ('kept','Milk','','Milk','',1,1)")
+                close()
+            }
+            migrations.runMigrationsAndValidate(name, 17, true, InboxDatabase.MIGRATION_16_17).apply {
+                query("SELECT title FROM inbox_tasks WHERE id='kept'").use { assertTrue(it.moveToFirst()); assertEquals("Milk", it.getString(0)) }
+                query("SELECT listLibrary FROM shared_workspaces").close()
+                close()
+            }
+        } finally { context.deleteDatabase(name) }
+        Unit
+    }
+
     private fun task(title: String): JSONObject = JSONObject()
         .put("id", UUID.randomUUID().toString()).put("title", title).put("description", JSONObject.NULL)
         .put("titleVersion", JSONObject().put("fieldVersion", "1").put("humanVersion", "1"))
