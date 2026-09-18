@@ -92,6 +92,48 @@ class SharedTaskUiTest {
         return data to state
     }
 
+    @Test fun compactToolbarKeepsSecondaryActionsOutOfTheQueueEnglish() = compactToolbar("en", "light", 1f)
+    @Test fun compactToolbarKeepsSecondaryActionsOutOfTheQueueFinnishLargeDark() = compactToolbar("fi", "dark", 1.5f)
+    private fun compactToolbar(language: String, appearance: String, scale: Float) {
+        val (data, state) = fixture(language, appearance, fontScale = scale)
+        compose.onNodeWithTag("task-audience").assertIsDisplayed()
+        compose.onNodeWithTag("queue-views").assertDoesNotExist()
+        compose.onNodeWithTag("shared-import").assertDoesNotExist()
+        compose.onNodeWithTag("shared-refresh").assertDoesNotExist()
+        compose.onNodeWithTag("shared-local").assertDoesNotExist()
+        val audience = compose.onNodeWithTag("task-audience").fetchSemanticsNode().boundsInRoot
+        val filter = compose.onNodeWithTag("queue-filter").fetchSemanticsNode().boundsInRoot
+        val tools = compose.onNodeWithTag("queue-tools").fetchSemanticsNode().boundsInRoot
+        assertTrue(audience.center.y >= filter.top && audience.center.y <= filter.bottom)
+        assertEquals(filter.center.y, tools.center.y, 2f)
+        screenshot("compact-$language-$appearance-$scale-queue.png")
+        compose.onNodeWithTag("queue-tools").performClick()
+        compose.onNodeWithTag("shared-import").assertIsDisplayed()
+        compose.onNodeWithTag("shared-refresh").assertIsDisplayed()
+        screenshot("compact-$language-$appearance-$scale-options.png")
+        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+        compose.onNodeWithTag("queue-filter").performClick()
+        compose.onNodeWithTag("task-history-view").assertExists()
+        compose.onNodeWithTag("filter-mine").assertExists()
+        screenshot("compact-$language-$appearance-$scale-filter.png")
+        compose.onNodeWithTag("filter-mine").performScrollTo().performClick()
+        compose.onNodeWithTag("queue-empty").assertExists()
+        compose.onNodeWithTag("capture").assertIsDisplayed()
+        compose.onNodeWithTag("voice").assertIsDisplayed()
+        screenshot("compact-$language-$appearance-$scale-empty.png")
+        compose.onNodeWithTag("task-audience").performClick()
+        compose.onNodeWithTag("audience-private").assertExists()
+        compose.onNodeWithTag("shared-local").assertExists()
+        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+        compose.onNodeWithTag("queue-filter").performClick()
+        compose.onNodeWithTag("filter-all").performScrollTo().performClick()
+        runBlocking { data.database.shared().clearProjection(state.scope) }
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("queue-empty").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("capture").assertIsDisplayed()
+        compose.onNodeWithTag("voice").assertIsDisplayed()
+        assertTrue(runBlocking { data.database.shared().intents(state.scope).isEmpty() })
+    }
+
     @Test fun tabHistorySurvivesSavedStateAndDirectHomeClearsIt() {
         val restoration = StateRestorationTester(compose)
         fixture("en", "light", fontScale = 1f, restoration = restoration)
@@ -192,7 +234,8 @@ class SharedTaskUiTest {
             compose.onNodeWithTag("voice").assertTextContains("Speak a task", substring = true)
             compose.onNodeWithTag("adventure-signpost").assertIsDisplayed()
             screenshot("walkthrough-en-garden.png")
-            compose.onNodeWithTag("queue-reorder").performClick()
+            compose.onNodeWithTag("queue-tools").performClick()
+        compose.onNodeWithTag("queue-reorder").performClick()
             compose.onNodeWithTag("household-world").assertDoesNotExist()
             compose.onNodeWithTag("adventure-signpost").assertIsDisplayed()
             compose.onNodeWithTag("reorder-done").performClick()
@@ -516,7 +559,7 @@ class SharedTaskUiTest {
         compose.waitUntil(10_000) { compose.onAllNodesWithTag("task-reopen").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("task-reopen").assertIsDisplayed()
         compose.onNodeWithTag("back").performClick()
-        compose.onNodeWithTag("queue-views").performClick()
+        compose.onNodeWithTag("queue-filter").performClick()
         compose.onNodeWithTag("task-history-view").performClick()
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().performClick()
         compose.onNodeWithTag("task-reopen").performClick()
@@ -565,7 +608,7 @@ class SharedTaskUiTest {
         compose.onNodeWithTag("edit").assertIsNotEnabled()
         compose.onNodeWithTag("back").performClick()
         compose.onNodeWithText("Vie paperit kierrätykseen").assertDoesNotExist()
-        compose.onNodeWithTag("queue-views").performClick()
+        compose.onNodeWithTag("queue-filter").performClick()
         compose.onNodeWithTag("task-deleted-view").performClick()
         compose.onNodeWithText("Vie paperit kierrätykseen").performScrollTo().assertIsDisplayed()
         screenshot("deletion-recovery-en.png")
@@ -594,6 +637,7 @@ class SharedTaskUiTest {
         compose.onNodeWithTag("queue-filter").performClick()
         compose.onNodeWithTag("filter-mine").performClick()
         compose.onNodeWithText("Järjestä hylly").assertDoesNotExist()
+        compose.onNodeWithTag("queue-tools").performClick()
         compose.onNodeWithTag("queue-reorder").performClick()
         compose.onNodeWithText("Järjestä hylly").assertExists()
         compose.onNodeWithTag("queue-filter").assertIsNotEnabled()
@@ -606,7 +650,8 @@ class SharedTaskUiTest {
         compose.onNodeWithTag("reorder-handle-${ids[0]}").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
         compose.onNodeWithTag("reorder-handle-${ids[0]}").performKeyInput { pressKey(Key.Escape) }
         compose.onNodeWithTag("reorder-done").assertDoesNotExist()
-        compose.waitUntil(5000) { compose.onAllNodes(hasTestTag("queue-reorder") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(5000) { compose.onAllNodes(hasTestTag("queue-tools") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("queue-tools").performClick()
         compose.onNodeWithTag("queue-reorder").performClick()
         compose.onNodeWithTag("reorder-done").assertExists()
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
@@ -638,6 +683,7 @@ class SharedTaskUiTest {
         val (data, state) = fixture("en", "light", fontScale = 1f)
         val repository = SharedRepository(data.database, data.lease, state.scope, data.registrationId!!)
         val ids = runBlocking { repository.taskStates.first().map { it.getString("id") } }
+        compose.onNodeWithTag("queue-tools").performClick()
         compose.onNodeWithTag("queue-reorder").performClick()
         val first = compose.onNodeWithTag("reorder-handle-${ids[0]}").fetchSemanticsNode().boundsInRoot.center
         val second = compose.onNodeWithTag("reorder-handle-${ids[1]}").fetchSemanticsNode().boundsInRoot.center
@@ -741,6 +787,7 @@ class SharedTaskUiTest {
             val (data, state) = fixture("en", "light", fontScale = 1.3f)
             val repository = SharedRepository(data.database, data.lease, state.scope, data.registrationId!!)
             val ids = runBlocking { repository.taskStates.first().map { it.getString("id") } }
+            compose.onNodeWithTag("queue-tools").performClick()
             compose.onNodeWithTag("queue-reorder").performSemanticsAction(SemanticsActions.OnClick) { it() }
             fun find(node: android.view.accessibility.AccessibilityNodeInfo?): android.view.accessibility.AccessibilityNodeInfo? {
                 if (node == null) return null

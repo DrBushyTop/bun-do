@@ -40,7 +40,12 @@ import org.json.JSONObject
 internal fun SharedQueue(
     rows: List<InboxTask>, ordered: List<JSONObject>, membership: JSONObject?, enabled: Boolean,
     onOpen: (String) -> Unit, onAction: (SharedTaskAction) -> Unit, onFullQueue: () -> Unit,
-    toolbar: @Composable () -> Unit,
+    audience: @Composable () -> Unit,
+    viewChoices: @Composable (() -> Unit) -> Unit,
+    moreActions: @Composable (() -> Unit) -> Unit,
+    viewLabel: String,
+    defaultView: Boolean,
+    personal: Boolean,
     notices: @Composable () -> Unit,
     onReorder: (Boolean) -> Unit = {},
 ) {
@@ -54,6 +59,7 @@ internal fun SharedQueue(
     val fullIds = full.map { it.getString("id") }
     var filter by rememberSaveable { mutableStateOf("all") }
     var menu by remember { mutableStateOf(false) }
+    var more by remember { mutableStateOf(false) }
     var reorder by rememberSaveable { mutableStateOf(false) }
     val reportReorder by rememberUpdatedState(onReorder)
     LaunchedEffect(reorder) { reportReorder(reorder) }
@@ -80,7 +86,7 @@ internal fun SharedQueue(
         val leaves = if (task.optBoolean("isChecklist")) fi.bundo.data.SharedChecklistActions.childIds(task)
             .mapNotNull(byId::get).filter { it.isNull("deletion") && it.optString("lifecycle", "OPEN") == "OPEN" }
             else listOf(task)
-        filter == "all" || leaves.any {
+        personal || filter == "all" || leaves.any {
             val claimant = taskClaimant(it, membership)
             filter == "unclaimed" && claimant == null || filter == "mine" && claimant != null && claimant == membership?.optString("me")
         }
@@ -111,46 +117,56 @@ internal fun SharedQueue(
     }) {
         // Outside the scrolling list so controls remain reachable during a long reorder.
         Column(Modifier.padding(horizontal = 16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(pluralStringResource(R.plurals.task_count, shown.size, shown.size),
-                    Modifier.weight(1f).semantics { heading() }, style = MaterialTheme.typography.labelLarge)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) { audience() }
                 Box {
-                    TextButton(onClick = { menu = true }, enabled = !reorder, modifier = Modifier.testTag("queue-filter")) {
-                        Text(stringResource(when (filter) { "mine" -> R.string.filter_mine; "unclaimed" -> R.string.filter_unclaimed; else -> R.string.filter_all }))
-                        Icon(Icons.Outlined.ArrowDropDown, null)
+                    IconButton(onClick = { more = false; menu = true }, enabled = !reorder, modifier = Modifier.testTag("queue-filter")) {
+                        Icon(painterResource(R.drawable.filter_tasks), stringResource(R.string.queue_filter))
                     }
                     DropdownMenu(menu, { menu = false }) {
-                        listOf("all" to R.string.filter_all, "unclaimed" to R.string.filter_unclaimed, "mine" to R.string.filter_mine).forEach { (value, label) ->
-                            DropdownMenuItem(text = { Text(stringResource(label)) }, modifier = Modifier.testTag("filter-$value"),
-                                onClick = { filter = value; menu = false })
+                        Text(stringResource(R.string.queue_status), Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
+                        viewChoices { menu = false }
+                        if (!personal) {
+                            HorizontalDivider()
+                            Text(stringResource(R.string.queue_assignment), Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
+                            listOf("all" to R.string.filter_all, "unclaimed" to R.string.filter_unclaimed, "mine" to R.string.filter_mine).forEach { (value, label) ->
+                                DropdownMenuItem(text = { Text(stringResource(label)) }, modifier = Modifier.testTag("filter-$value"),
+                                    trailingIcon = { if (filter == value) Icon(Icons.Outlined.Check, null) },
+                                    onClick = { filter = value; menu = false })
+                            }
                         }
                     }
                 }
-                if (!reorder) IconButton(onClick = { filter = "all"; onFullQueue(); reorder = true },
-                    enabled = enabled && full.size > 1, modifier = Modifier.testTag("queue-reorder")) {
-                    Icon(painterResource(R.drawable.reorder), stringResource(R.string.reorder_queue))
-                } else TextButton(onClick = ::finishMode, modifier = Modifier.testTag("reorder-done")) { Text(stringResource(R.string.reorder_done)) }
+                if (reorder) TextButton(onClick = ::finishMode, modifier = Modifier.testTag("reorder-done")) { Text(stringResource(R.string.reorder_done)) }
+                else Box {
+                    IconButton(onClick = { menu = false; more = true }, modifier = Modifier.testTag("queue-tools")) {
+                        Icon(Icons.Outlined.MoreVert, stringResource(R.string.queue_tools))
+                    }
+                    DropdownMenu(more, { more = false }) {
+                        if (enabled && full.size > 1) DropdownMenuItem(text = { Text(stringResource(R.string.reorder_queue)) },
+                            leadingIcon = { Icon(painterResource(R.drawable.reorder), null) }, modifier = Modifier.testTag("queue-reorder"),
+                            onClick = { more = false; filter = "all"; onFullQueue(); reorder = true })
+                        moreActions { more = false }
+                    }
+                }
             }
-            if (reorder) {
-                if (!compact) Text(stringResource(R.string.reorder_help), style = MaterialTheme.typography.bodySmall)
-                if (dragId != null) TextButton(onClick = ::cancelDrag, modifier = Modifier.testTag("reorder-cancel")) { Text(cancel) }
-            } else if (!compact) toolbar()
+            val assignment = if (personal || filter == "all") null else stringResource(if (filter == "mine") R.string.filter_mine else R.string.filter_unclaimed)
+            Text(listOfNotNull(viewLabel, assignment, pluralStringResource(R.plurals.task_count, shown.size, shown.size)).joinToString(" · "),
+                Modifier.padding(start = 12.dp, bottom = 8.dp).testTag("queue-summary").semantics { heading() },
+                style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (reorder && !compact) Text(stringResource(R.string.reorder_help), Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.bodySmall)
+            if (reorder && dragId != null) TextButton(onClick = ::cancelDrag, modifier = Modifier.testTag("reorder-cancel")) { Text(cancel) }
             if (announcement.isNotEmpty()) Text(announcement,
                 Modifier.semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodySmall)
         }
         LazyColumn(state = list, modifier = Modifier.weight(1f).testTag("queue"),
             contentPadding = PaddingValues(bottom = 24.dp)) {
-            if (compact && !reorder) item { toolbar() }
             if (compact && reorder) item {
                 Text(stringResource(R.string.reorder_help), Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodySmall)
             }
             item { notices() }
             if (shown.isEmpty()) item {
-                Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    TaskCue("")
-                    Text(stringResource(R.string.empty_title), style = MaterialTheme.typography.headlineSmall)
-                    Text(stringResource(R.string.empty_body))
-                }
+                QueueEmptyState(filtered = !defaultView || !personal && filter != "all")
             }
             itemsIndexed(shown, key = { _, it -> it.id }) { index, task ->
                 val state = checkNotNull(byId[task.id])

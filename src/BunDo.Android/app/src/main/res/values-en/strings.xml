@@ -3,9 +3,7 @@
     <string name="inbox">My queue</string>
     <string name="local_only">Only on this phone</string>
     <string name="local_explanation">This inbox is private to this phone. Open a household to import and share the tasks you choose.</string>
-    <string name="empty_title">What needs doing?</string>
-    <string name="empty_body">Write down one thing. Come back to it later, even without a connection.</string>
-    <string name="type_task">Type a task</string>
+    <string name="type_task">Write</string>
     <string name="resume_draft">Resume draft</string>
     <string name="draft_available">Saved draft</string>
     <string name="new_task">New task</string>
@@ -253,7 +251,6 @@
     <string name="adventure_finish_confirm">Finish this adventure now? Unfinished tasks and unchecked items will stay open. Nothing will be marked bought or completed.</string>
     <string name="lists_too_large">This copy has too much text. Select fewer items or shorten the notes.</string>
     <string name="visibility_only_me">Only me</string>
-    <string name="visibility_household">Household</string>
     <string name="visibility_share">Share with household</string>
     <string name="visibility_make_private">Make private</string>
     <string name="visibility_private_warning">Move this task and its checklist to Only me. Household members will no longer receive changes. This cannot erase what they have already seen or saved offline.</string>
@@ -269,4 +266,9 @@
     <string name="visibility_pending_title">Pending visibility changes</string>
     <string name="visibility_keep_private">Keep private</string>
     <string name="visibility_already_shared">This task has already been shared. You can make it private from the household task list.</string>
+    <string name="lists_completed">Completed</string>
+    <string name="lists_completed_empty">No completed lists.</string>
+    <string name="lists_loading">Loading saved lists…</string>
+    <string name="lists_refresh_failed">Could not refresh saved lists. Your saved content is still available. Try Refresh.</string>
+    <string name="lists_load_failed">Could not load saved lists. Check your connection and try Refresh.</string>
 </resources>

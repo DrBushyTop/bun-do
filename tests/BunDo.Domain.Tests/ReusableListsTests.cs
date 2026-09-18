@@ -24,7 +24,8 @@ public sealed class ReusableListsTests
     [Theory]
     [InlineData("STANDING", "OPEN", false)]
     [InlineData("FINITE", "COMPLETED", true)]
-    public void Standing_and_finite_lists_share_item_state_but_have_distinct_completion(string kind, string lifecycle, bool credit)
+    [InlineData(null, "COMPLETED", true)]
+    public void Standing_and_finite_lists_share_item_state_but_have_distinct_completion(string? kind, string lifecycle, bool credit)
     {
         var member = Guid.NewGuid(); var device = Guid.NewGuid(); var workspace = Guid.NewGuid(); var epoch = Guid.NewGuid();
         var store = new InMemoryWorkspaceStore(workspace, epoch, HouseholdMembership.Create(member), [new(device, member)]);

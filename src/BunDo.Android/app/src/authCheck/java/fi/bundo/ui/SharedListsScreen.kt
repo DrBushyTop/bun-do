@@ -12,16 +12,15 @@ import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import fi.bundo.BunDoApplication
 import fi.bundo.R
 import fi.bundo.data.*
 import kotlinx.coroutines.CancellationException
@@ -31,11 +30,15 @@ import org.json.JSONObject
 import java.util.UUID
 
 @Composable
-internal fun SharedListsScreen(repository: SharedRepository, data: AccountData, workspace: SharedWorkspace?, tasks: Map<String, JSONObject>,
-    enabled: Boolean, onOpen: (String) -> Unit, onAction: (SharedTaskAction) -> Unit) {
+internal fun SharedListsScreen(repository: SharedRepository, workspace: SharedWorkspace?, tasks: Map<String, JSONObject>,
+    enabled: Boolean, onOpen: (String) -> Unit, onAction: (SharedTaskAction) -> Unit,
+    sync: suspend (JSONObject?, Boolean) -> Unit) {
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
     var busy by remember { mutableStateOf(false) }
+    var refreshing by remember { mutableStateOf(false) }
+    var refreshFailed by remember { mutableStateOf(false) }
+    var showCompleted by rememberSaveable(repository.scope) { mutableStateOf(false) }
+    var views by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var pending by remember { mutableStateOf(false) }
     var preview by remember { mutableStateOf<String?>(null) }
@@ -57,8 +60,16 @@ internal fun SharedListsScreen(repository: SharedRepository, data: AccountData, 
             finally { pending = repository.listDraft("pending") != null; busy = false }
         }
     }
-    suspend fun online(command: JSONObject? = null, retry: Boolean = false) {
-        (context.applicationContext as BunDoApplication).withAccountToken(data) { token -> SharedLists.send(repository, token, command, retry) }
+    suspend fun online(command: JSONObject? = null, retry: Boolean = false) = sync(command, retry)
+    fun refresh() {
+        if (refreshing || busy) return
+        refreshing = true; refreshFailed = false
+        scope.launch {
+            try { online() }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { refreshFailed = true }
+            finally { refreshing = false }
+        }
     }
     fun change(value: String?) {
         preview = value
@@ -79,7 +90,7 @@ internal fun SharedListsScreen(repository: SharedRepository, data: AccountData, 
         preview = repository.listDraft("preview")
         pending = repository.listDraft("pending") != null
         loadingDraft = false
-        run { online() }
+        refresh()
     }
     if (workspace?.blocked != null) {
         Text(stringResource(R.string.adventure_unavailable), Modifier.padding(24.dp))
@@ -98,7 +109,6 @@ internal fun SharedListsScreen(repository: SharedRepository, data: AccountData, 
                 } else {
                     val id = repository.startList(value, standing)
                     preview = null
-                    SharedSyncWorker.request(context, data)
                     onOpen(id)
                 }
             }
@@ -109,7 +119,7 @@ internal fun SharedListsScreen(repository: SharedRepository, data: AccountData, 
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(stringResource(R.string.lists_title), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
         Text(stringResource(R.string.lists_intro), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (busy || loadingDraft) LinearProgressIndicator(Modifier.fillMaxWidth())
+        if (busy) LinearProgressIndicator(Modifier.fillMaxWidth().testTag("lists-action-progress"))
         if (error != null) Text(stringResource(if (error == "LIST_CHANGED") R.string.lists_changed else R.string.lists_failed), color = MaterialTheme.colorScheme.error)
         if (pending) {
             Text(stringResource(R.string.lists_pending))
@@ -134,10 +144,26 @@ internal fun SharedListsScreen(repository: SharedRepository, data: AccountData, 
                 SettingsNavigationRow(title, { prepare(SavedHouseholdList(UUID.randomUUID().toString(), if (index == 5) "" else title, null, items), "start", index == 0) })
             }
         }
-        val roots = tasks.values.filter { it.isNull("parentId") && it.isNull("deletion") && (it.optBoolean("isChecklist") || !it.isNull("listKind")) && it.optString("lifecycle") != "CANCELLED" }
-            .sortedWith(compareByDescending<JSONObject> { it.optBoolean("listPinned") }.thenBy { it.optString("lifecycle") == "COMPLETED" }.thenBy { it.getString("title") })
-        Text(stringResource(R.string.lists_yours), style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
-        if (roots.isEmpty()) Text(stringResource(R.string.lists_empty))
+        val lifecycle = if (showCompleted) "COMPLETED" else "OPEN"
+        val roots = tasks.values.filter {
+            it.isNull("parentId") && it.isNull("deletion") &&
+                (it.optBoolean("isChecklist") || !it.isNull("listKind")) && it.optString("lifecycle", "OPEN") == lifecycle
+        }
+            .sortedWith(compareByDescending<JSONObject> { it.optBoolean("listPinned") }.thenBy { it.getString("title") })
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.lists_yours), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f).semantics { heading() })
+            Box {
+                TextButton(onClick = { views = true }, modifier = Modifier.testTag("lists-view")) {
+                    Text(stringResource(if (showCompleted) R.string.lists_completed else R.string.queue_active))
+                    Icon(Icons.Outlined.KeyboardArrowDown, null)
+                }
+                DropdownMenu(views, { views = false }) {
+                    DropdownMenuItem(text = { Text(stringResource(R.string.queue_active)) }, modifier = Modifier.testTag("lists-active"), onClick = { showCompleted = false; views = false })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.lists_completed)) }, modifier = Modifier.testTag("lists-completed"), onClick = { showCompleted = true; views = false })
+                }
+            }
+        }
+        if (roots.isEmpty()) Text(stringResource(if (showCompleted) R.string.lists_completed_empty else R.string.lists_empty))
         roots.forEach { root ->
             var menu by remember(root.getString("id")) { mutableStateOf(false) }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -163,7 +189,11 @@ internal fun SharedListsScreen(repository: SharedRepository, data: AccountData, 
         }
         Text(stringResource(R.string.lists_saved), style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
         Text(stringResource(R.string.lists_online), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (saved.isEmpty()) Text(stringResource(R.string.lists_saved_empty))
+        if (refreshing && workspace?.listLibrary == null) Text(stringResource(R.string.lists_loading),
+            style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("lists-initial-loading"))
+        else if (saved.isEmpty() && workspace?.listLibrary != null) Text(stringResource(R.string.lists_saved_empty))
+        if (refreshFailed) Text(stringResource(if (workspace?.listLibrary == null) R.string.lists_load_failed else R.string.lists_refresh_failed), style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("lists-refresh-error"))
         saved.forEach { value ->
             var menu by remember(value.id) { mutableStateOf(false) }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -183,7 +213,7 @@ internal fun SharedListsScreen(repository: SharedRepository, data: AccountData, 
                 }
             }
         }
-        TextButton(onClick = { run { online() } }, enabled = enabled && !busy) { Text(stringResource(R.string.lists_refresh)) }
+        TextButton(onClick = ::refresh, enabled = enabled && !busy && !refreshing, modifier = Modifier.testTag("lists-refresh")) { Text(stringResource(R.string.lists_refresh)) }
     }
     if (discard) AlertDialog(onDismissRequest = { discard = false },
         title = { Text(stringResource(R.string.voice_discard_draft)) },

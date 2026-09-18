@@ -4,9 +4,7 @@
     <string name="inbox">Oma jono</string>
     <string name="local_only">Vain tällä puhelimella</string>
     <string name="local_explanation">Tämä lista on vain tällä puhelimella. Avaa kotitalous ja tuo sinne tehtävät, jotka haluat jakaa.</string>
-    <string name="empty_title">Mitä pitäisi tehdä?</string>
-    <string name="empty_body">Kirjoita yksi asia muistiin. Voit palata siihen myöhemmin, myös ilman verkkoyhteyttä.</string>
-    <string name="type_task">Kirjoita tehtävä</string>
+    <string name="type_task">Kirjoita</string>
     <string name="resume_draft">Jatka luonnosta</string>
     <string name="draft_available">Tallennettu luonnos</string>
     <string name="new_task">Uusi tehtävä</string>
@@ -254,7 +252,6 @@
     <string name="adventure_finish_confirm">Päätetäänkö seikkailu nyt? Keskeneräiset tehtävät ja kuittaamattomat kohdat jäävät avoimiksi. Mitään ei merkitä ostetuksi tai valmiiksi.</string>
     <string name="lists_too_large">Tässä kopiossa on liikaa tekstiä. Valitse vähemmän kohtia tai lyhennä lisätietoja.</string>
     <string name="visibility_only_me">Vain minä</string>
-    <string name="visibility_household">Kotitalous</string>
     <string name="visibility_share">Jaa kotitaloudelle</string>
     <string name="visibility_make_private">Muuta yksityiseksi</string>
     <string name="visibility_private_warning">Siirrä tehtävä ja sen lista Vain minä -näkymään. Kotitalouden jäsenet eivät enää saa muutoksia. Tämä ei poista tietoja, jotka he ovat jo nähneet tai tallentaneet offline-tilassa.</string>
@@ -270,4 +267,9 @@
     <string name="visibility_pending_title">Keskeneräiset näkyvyyden muutokset</string>
     <string name="visibility_keep_private">Pidä yksityisenä</string>
     <string name="visibility_already_shared">Tehtävä on jo jaettu. Voit muuttaa sen yksityiseksi kotitalouden tehtävistä.</string>
+    <string name="lists_completed">Valmiit</string>
+    <string name="lists_completed_empty">Ei valmiita listoja.</string>
+    <string name="lists_loading">Ladataan tallennettuja listoja…</string>
+    <string name="lists_refresh_failed">Tallennettuja listoja ei voitu päivittää. Aiemmin tallennettu sisältö on käytettävissä. Kokeile Päivitä-toimintoa.</string>
+    <string name="lists_load_failed">Tallennettuja listoja ei voitu ladata. Tarkista yhteys ja kokeile Päivitä-toimintoa.</string>
 </resources>

@@ -21,4 +21,10 @@
     <string name="visibility_open">Avoin</string>
     <string name="visibility_completed">Valmis</string>
     <string name="visibility_cancelled">Peruttu</string>
+    <string name="queue_filter">Suodata tehtäviä</string>
+    <string name="queue_status">Tila</string>
+    <string name="queue_assignment">Tekijä</string>
+    <string name="queue_active">Avoimet</string>
+    <string name="queue_empty">Ei avoimia tehtäviä.</string>
+    <string name="queue_empty_filtered">Ei tehtäviä näillä suodattimilla.</string>
 </resources>

@@ -110,7 +110,7 @@ class ReminderUiTest {
         compose.runOnUiThread { compose.activity.setContent { BunDoTheme("light") { SharedWorkspaceScreen(data, state, "light", {}, {}) } } }
         // Compose can be idle while Room is still loading the initial projection.
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Overdue milk").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithTag("queue-views").performClick()
+        compose.onNodeWithTag("queue-filter").performClick()
         compose.onNodeWithTag("task-due-view").performClick()
         compose.onNodeWithTag("queue").performScrollToNode(hasText("Overdue milk"))
         compose.onNodeWithText("Overdue milk").assertExists()

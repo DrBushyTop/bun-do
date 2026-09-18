@@ -143,7 +143,9 @@ class AdventureUiTest {
     }
     @Test fun queueIgnoresAStaleVisibleRowWhileItsCanonicalGenerationIsRemoved() {
         compose.runOnUiThread { compose.activity.setContent { BunDoTheme("light") {
-            SharedQueue(listOf(SharedProtocol.inbox(root)), emptyList(), null, false, {}, {}, {}, {}, {})
+            SharedQueue(listOf(SharedProtocol.inbox(root)), emptyList(), null, false, {}, {},
+                onFullQueue = {}, audience = {}, viewChoices = {}, moreActions = {},
+                viewLabel = "Active", defaultView = true, personal = false, notices = {})
         } } }
         compose.onAllNodesWithText("Shopping list").assertCountEquals(0)
     }

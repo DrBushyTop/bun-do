@@ -82,7 +82,7 @@ class ListsUiTest {
             .put("selected", JSONArray().put(true)).toString()
         repository.saveListDraft("preview", draft)
         compose.runOnUiThread { compose.activity.setContent { BunDoTheme("light") { Surface {
-            SharedListsScreen(repository, data, state, emptyMap(), true, {}, {})
+            SharedListsScreen(repository, state, emptyMap(), true, {}, {}) { _, _ -> }
         } } } }
         compose.waitUntil(10_000) { compose.onAllNodesWithTag("list-preview").fetchSemanticsNodes().isNotEmpty() }
         compose.waitForIdle()
@@ -99,6 +99,123 @@ class ListsUiTest {
         compose.waitUntil(10_000) { runBlocking { repository.listDraft("preview") == null } }
         compose.onNodeWithTag("lists-resume").assertDoesNotExist()
     }
+    @Test fun completedFiniteListsLeaveActiveListsButStandingAndSavedListsRemain() = runBlocking {
+        val data = (compose.activity.application as BunDoApplication).accounts.active.value!!
+        val saved = SavedHouseholdList(UUID.randomUUID().toString(), "Reusable shopping template", null, listOf(HouseholdListItem("Milk")))
+        val state = adventureWorkspace().copy(listLibrary = JSONObject().put("version", "1").put("lists", JSONArray().put(saved.json())).toString())
+        data.database.shared().saveWorkspace(state)
+        val repository = SharedRepository(data.database, data.lease, state.scope, state.registration)
+        fun root(title: String, lifecycle: String, kind: String?) = JSONObject().put("id", UUID.randomUUID().toString()).put("title", title)
+            .put("parentId", JSONObject.NULL).put("deletion", JSONObject.NULL).put("isChecklist", true)
+            .put("lifecycle", lifecycle).put("listKind", kind ?: JSONObject.NULL).put("childOrder", JSONArray())
+        val complete = root("Finished finite shopping list", "COMPLETED", null)
+        val standing = root("Ongoing groceries", "OPEN", "STANDING")
+        val active = root("Unfinished shopping list", "OPEN", null)
+        val doneItem = root("Bought milk", "COMPLETED", null).put("parentId", active.getString("id"))
+        val openItem = root("Find flour", "OPEN", null).put("parentId", active.getString("id"))
+        active.put("childOrder", JSONArray().put(doneItem.getString("id")).put(openItem.getString("id")))
+        val tasks = listOf(complete, standing, active, doneItem, openItem).associateBy { it.getString("id") }
+        compose.runOnUiThread { compose.activity.setContent { BunDoTheme("light") { Surface {
+            SharedListsScreen(repository, state, tasks, true, {}, {}) { _, _ -> }
+        } } } }
+        compose.onNodeWithText("Finished finite shopping list").assertDoesNotExist()
+        compose.onNodeWithText("Ongoing groceries").assertExists()
+        compose.onNodeWithText("Unfinished shopping list").assertExists()
+        compose.onNodeWithText(compose.activity.getString(R.string.checklist_progress, 1, 2), substring = true).assertExists()
+        screenshot("lists-active.png")
+        compose.onNodeWithText("Reusable shopping template").assertExists()
+        compose.onNodeWithTag("lists-view").performClick()
+        compose.onNodeWithTag("lists-completed").performClick()
+        compose.onNodeWithText("Finished finite shopping list").assertExists()
+        compose.onNodeWithText("Ongoing groceries").assertDoesNotExist()
+        screenshot("lists-completed.png")
+        compose.onNodeWithText("Reusable shopping template").assertExists()
+        Unit
+    }
+
+    @Test fun cachedListsStayUsableWhileRefreshIsPendingAndAfterRefreshFails() = runBlocking {
+        val data = (compose.activity.application as BunDoApplication).accounts.active.value!!
+        val saved = SavedHouseholdList(UUID.randomUUID().toString(), "Cached packing list", null, listOf(HouseholdListItem("Keys")))
+        val state = adventureWorkspace().copy(listLibrary = JSONObject().put("version", "1").put("lists", JSONArray().put(saved.json())).toString())
+        data.database.shared().saveWorkspace(state)
+        val repository = SharedRepository(data.database, data.lease, state.scope, state.registration)
+        val response = kotlinx.coroutines.CompletableDeferred<Unit>()
+        var calls = 0
+        compose.runOnUiThread { compose.activity.setContent { BunDoTheme("light") { Surface {
+            SharedListsScreen(repository, state, emptyMap(), true, {}, {}) { command, _ ->
+                assertNull(command); calls++
+                if (calls == 1) response.await()
+            }
+        } } } }
+        compose.waitUntil(5_000) { calls == 1 }
+        compose.onNodeWithTag("lists-action-progress").assertDoesNotExist()
+        compose.onNodeWithTag("lists-initial-loading").assertDoesNotExist()
+        compose.onNodeWithTag("lists-new").assertIsEnabled()
+        compose.onNodeWithText(saved.title).performScrollTo().performClick()
+        compose.onNodeWithTag("list-commit").assertIsEnabled()
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        response.completeExceptionally(java.io.IOException("Offline"))
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("lists-refresh-error").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText(saved.title).assertExists()
+        compose.onNodeWithTag("lists-refresh").performScrollTo().assertIsEnabled().performClick()
+        compose.waitUntil(5_000) { calls == 2 }
+        compose.onNodeWithTag("lists-refresh-error").assertDoesNotExist()
+        Unit
+    }
+
+    @Test fun firstSavedLibraryLoadDoesNotBlockNewLocalLists() = runBlocking {
+        val data = (compose.activity.application as BunDoApplication).accounts.active.value!!
+        val state = adventureWorkspace()
+        data.database.shared().saveWorkspace(state)
+        val repository = SharedRepository(data.database, data.lease, state.scope, state.registration)
+        val response = kotlinx.coroutines.CompletableDeferred<Unit>()
+        var started = false
+        compose.runOnUiThread { compose.activity.setContent { BunDoTheme("light") { Surface {
+            SharedListsScreen(repository, state, emptyMap(), true, {}, {}) { _, _ -> started = true; response.await() }
+        } } } }
+        compose.waitUntil(5_000) { started }
+        compose.onNodeWithTag("lists-initial-loading").assertExists()
+        compose.onNodeWithTag("lists-action-progress").assertDoesNotExist()
+        compose.onNodeWithTag("lists-new").assertIsEnabled().performClick()
+        response.complete(Unit)
+        Unit
+    }
+
+    @Test fun pendingSaveRemainsRetryableDuringBackgroundRefresh() = runBlocking {
+        val data = (compose.activity.application as BunDoApplication).accounts.active.value!!
+        val state = adventureWorkspace().copy(listLibrary = JSONObject().put("version", "1").put("lists", JSONArray()).toString())
+        data.database.shared().saveWorkspace(state)
+        val repository = SharedRepository(data.database, data.lease, state.scope, state.registration)
+        val pending = JSONObject().put("action", "save").put("command", JSONObject().put("operationId", UUID.randomUUID().toString())).toString()
+        repository.saveListDraft("pending", pending)
+        val response = kotlinx.coroutines.CompletableDeferred<Unit>()
+        var retryStarted = false
+        compose.runOnUiThread { compose.activity.setContent { BunDoTheme("light") { Surface {
+            SharedListsScreen(repository, state, emptyMap(), true, {}, {}) { command, retry ->
+                assertNull(command)
+                if (retry) {
+                    assertEquals(pending, repository.listDraft("pending"))
+                    retryStarted = true
+                    repository.saveListDraft("pending", null)
+                } else response.await()
+            }
+        } } } }
+        val retryLabel = compose.activity.getString(R.string.lists_retry_save)
+        compose.waitUntil(5_000) { compose.onAllNodesWithText(retryLabel).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText(retryLabel).assertIsEnabled().performClick()
+        compose.waitUntil(5_000) { retryStarted && compose.onAllNodesWithText(retryLabel).fetchSemanticsNodes().isEmpty() }
+        assertNull(repository.listDraft("pending"))
+        response.complete(Unit)
+        Unit
+    }
+
+    private fun screenshot(name: String) {
+        compose.waitForIdle()
+        val image = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+        java.io.File(compose.activity.filesDir, name).outputStream().use { image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        image.recycle()
+    }
+
     private fun preview(language: String, scale: Float) {
         val list = SavedHouseholdList(UUID.randomUUID().toString(), "Cottage", "Weekend", listOf(HouseholdListItem("Keys", "Spare set")))
         var draft by mutableStateOf(JSONObject().put("list", list.json()).put("mode", "start").put("standing", false)

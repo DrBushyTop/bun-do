@@ -120,6 +120,7 @@ class WorldSceneUiTest {
             compose.onNodeWithTag("signpost-progress", useUnmergedTree = true).assertTextEquals("0 / 1 main task")
             compose.onNodeWithTag("capture").assertIsDisplayed()
             screenshot("world-en-queue")
+            compose.onNodeWithTag("queue-tools").performClick()
             compose.onNodeWithTag("queue-reorder").performClick()
             compose.onNodeWithTag("household-world").assertDoesNotExist()
             compose.onNodeWithTag("adventure-signpost").assertIsDisplayed()
