@@ -67,6 +67,7 @@ class AdventureUiTest {
         compose.onNodeWithTag("adventure-confirm-finish").assertExists()
         compose.runOnIdle {
             refreshed = JSONObject(original.toString()).also {
+                it.put("revision", "4")
                 it.getJSONObject("board").getJSONObject("active").put("version", "4")
             }
         }
