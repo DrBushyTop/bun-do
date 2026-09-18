@@ -36,6 +36,5 @@
     <string name="progress_empty_period">Nothing completed yet in this period. Finish a task together and it will count after sync.</string>
     <string name="progress_how">How counts work</string>
     <string name="journey_how">How the journey moves forward</string>
-    <string name="checklist_line_hint">One step per line.</string>
     <string name="account_delete_confirm">Delete and sign out</string>
 </resources>

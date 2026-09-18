@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -49,6 +50,7 @@ internal fun HouseholdScene(scene: String, visible: Boolean, adventure: Adventur
     }
     val illustrated = visible && worldVisible()
     val paper = MaterialTheme.colorScheme.surface
+    var toolbarHeight by remember { mutableIntStateOf(0) }
     val context = LocalContext.current
     val mood = scene.takeIf { illustrated && it in listOf("rest", "paperwork", "joy") }
     val moodPainter = remember(mood, context) { mood?.let {
@@ -58,10 +60,13 @@ internal fun HouseholdScene(scene: String, visible: Boolean, adventure: Adventur
         if (illustrated) Image(moodPainter ?: painterResource(R.drawable.dojo_garden), null, contentScale = ContentScale.Crop, alignment = Alignment.Center,
             modifier = Modifier.matchParentSize().testTag("household-world").drawWithContent {
                 drawContent()
-                drawRect(Brush.verticalGradient(0f to paper.copy(alpha = .95f), .28f to Color.Transparent, .74f to Color.Transparent, 1f to paper))
+                drawRect(Brush.verticalGradient(.74f to Color.Transparent, 1f to paper))
+                // Protect the actual toolbar, not a fraction of the image height.
+                drawRect(Brush.verticalGradient(0f to paper, .65f to paper.copy(alpha = .96f), 1f to Color.Transparent,
+                    endY = toolbarHeight + 32.dp.toPx()))
             })
         Column(Modifier.fillMaxWidth()) {
-            topBar()
+            Box(Modifier.onSizeChanged { toolbarHeight = it.height }) { topBar() }
             if (illustrated) Spacer(Modifier.fillMaxWidth().height(112.dp).testTag("world-$scene"))
             AdventureSignpost(adventure, onAdventure, acknowledge, animated = illustrated)
         }
