@@ -4,6 +4,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -105,42 +107,52 @@ internal fun ChecklistEditor(draft: ChecklistDraft, busy: Boolean, failed: Boole
     val valid = SharedSplitPreview.valid(items)
     val splitRequest = request?.takeIf { it.optString("mode") == "SPLIT" }
     val pending = splitRequest?.optString("status") in listOf("PENDING", "RUNNING")
+    val density = androidx.compose.ui.platform.LocalDensity.current
     Dialog(onDismissRequest = { if (!busy) onClose(latest()) },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
-        Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-            Column {
+        CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides density) {
+        Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.TopCenter) {
+            Column(Modifier.widthIn(max = 640.dp).fillMaxSize()) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
                     verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    TextButton(enabled = !busy, onClick = { onClose(latest()) }) { Text(stringResource(R.string.back)) }
+                    IconButton(enabled = !busy, onClick = { onClose(latest()) }) {
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.back))
+                    }
                     Text(stringResource(if (rows == null) R.string.checklist_add else R.string.split_preview_title),
                         style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f).padding(horizontal = 8.dp))
-                    TextButton(enabled = valid && !busy, modifier = Modifier.testTag("checklist-save"),
-                        onClick = { onSave(latest()) }) { Text(stringResource(R.string.save)) }
                 }
                 Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(draft.title, style = MaterialTheme.typography.titleMedium)
             value.nullableString("sourceDescription")?.let { Text(it) }
             if (canGenerate || splitRequest != null) {
-                Text(stringResource(R.string.split_online_notice), style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.split_online_notice), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
                 OutlinedTextField(value = instructions, onValueChange = { if (InboxLimits.length(it) <= 2000) change { value -> value.put("instructions", it) } },
                     enabled = !busy && !pending, minLines = 2, modifier = Modifier.fillMaxWidth().testTag("split-instructions"),
                     label = { Text(stringResource(R.string.split_instructions)) })
-                OutlinedButton(enabled = !busy && !pending, onClick = { onDictate(latest()) }, modifier = Modifier.testTag("split-dictate")) {
-                    Text(stringResource(R.string.split_dictate))
+                val dictate: @Composable (Modifier) -> Unit = { buttonModifier ->
+                    OutlinedButton(enabled = !busy && !pending, onClick = { onDictate(latest()) }, modifier = buttonModifier.testTag("split-dictate")) {
+                        Text(stringResource(R.string.split_dictate), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    }
                 }
+                if (canGenerate || pending) ActionPair(Modifier.testTag("split-actions"), secondary = dictate, primary = { buttonModifier ->
+                    if (pending) OutlinedButton(enabled = !busy, onClick = { onCancel(latest()) }, modifier = buttonModifier.testTag("split-cancel")) {
+                        Text(stringResource(R.string.split_cancel), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    } else FilledTonalButton(enabled = !busy, onClick = { onGenerate(latest()) }, modifier = buttonModifier.testTag("split-generate")) {
+                        Text(stringResource(if (splitRequest?.optString("status") == "FAILED") R.string.split_retry else R.string.split_generate),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    }
+                }) else dictate(Modifier.heightIn(min = 48.dp))
                 if (pending) {
                     Text(stringResource(R.string.split_pending))
-                    TextButton(enabled = !busy, onClick = { onCancel(latest()) }, modifier = Modifier.testTag("split-cancel")) { Text(stringResource(R.string.split_cancel)) }
-                } else if (canGenerate) OutlinedButton(enabled = !busy, onClick = { onGenerate(latest()) }, modifier = Modifier.testTag("split-generate")) {
-                    Text(stringResource(if (splitRequest?.optString("status") == "FAILED") R.string.split_retry else R.string.split_generate))
                 }
                 if (splitRequest?.optString("status") == "FAILED") Text(stringResource(R.string.split_failed), color = MaterialTheme.colorScheme.error)
                 if (splitRequest?.optString("status") == "READY" && splitRequest.optString("id") != value.optString("proposalId"))
                     Button(enabled = !busy, onClick = onAdopt, modifier = Modifier.testTag("split-review")) { Text(stringResource(R.string.split_review)) }
             }
             if (rows == null) {
-                Text(stringResource(R.string.checklist_line_hint))
                 OutlinedTextField(value = text, onValueChange = { if (it.length <= 16000) text = it }, minLines = 4,
                     enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("checklist-draft"), label = { Text(stringResource(R.string.checklist_items)) })
             } else {
@@ -164,7 +176,12 @@ internal fun ChecklistEditor(draft: ChecklistDraft, busy: Boolean, failed: Boole
             if (!valid && (text.isNotBlank() || rows != null)) Text(stringResource(R.string.split_invalid), color = MaterialTheme.colorScheme.error)
             if (failed || writeFailed) Text(stringResource(R.string.checklist_save_failed), color = MaterialTheme.colorScheme.error)
                 }
+                HorizontalDivider()
+                Button(enabled = valid && !busy, modifier = Modifier.padding(16.dp).fillMaxWidth().heightIn(min = 48.dp).testTag("checklist-save"),
+                    onClick = { onSave(latest()) }) { Text(stringResource(R.string.save)) }
             }
+            }
+        }
         }
     }
 }

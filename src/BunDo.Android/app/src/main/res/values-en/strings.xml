@@ -16,8 +16,7 @@
     <string name="save">Save</string>
     <string name="back">Back</string>
     <string name="saving">Saving…</string>
-    <string name="draft_saved">Draft saved on this phone</string>
-    <string name="draft_hint">Back keeps your draft.</string>
+    <string name="draft_saved">Your draft stays on this phone when you go back.</string>
     <string name="title_required">Enter a task title before saving.</string>
     <string name="character_count">Characters: %1$d / %2$d</string>
     <string name="too_long">Text is too long. Character limit: %1$d. Your draft is kept.</string>

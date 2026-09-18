@@ -17,8 +17,7 @@
     <string name="save">Tallenna</string>
     <string name="back">Takaisin</string>
     <string name="saving">Tallennetaan…</string>
-    <string name="draft_saved">Luonnos tallennettu puhelimelle</string>
-    <string name="draft_hint">Takaisin säilyttää luonnoksen.</string>
+    <string name="draft_saved">Luonnos säilyy puhelimella, vaikka palaat takaisin.</string>
     <string name="title_required">Kirjoita tehtävän nimi ennen tallentamista.</string>
     <string name="character_count">Merkkejä: %1$d / %2$d</string>
     <string name="too_long">Teksti on liian pitkä. Merkkiraja: %1$d. Luonnos säilytetään.</string>

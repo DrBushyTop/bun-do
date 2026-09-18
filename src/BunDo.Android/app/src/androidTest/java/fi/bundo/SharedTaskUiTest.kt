@@ -75,7 +75,7 @@ class SharedTaskUiTest {
         val content: @Composable () -> Unit = {
                 CompositionLocalProvider(LocalContext provides translated, androidx.compose.ui.platform.LocalResources provides translated.resources, LocalConfiguration provides configuration,
                     LocalActivityResultRegistryOwner provides compose.activity) {
-                    fi.bundo.ui.HouseholdMotionProvider { BunDoTheme("light") {
+                    fi.bundo.ui.HouseholdMotionProvider { BunDoTheme(appearance) {
                         val density = LocalDensity.current
                         CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
                             SharedWorkspaceScreen(data, state, appearance, {}, {})
@@ -355,12 +355,88 @@ class SharedTaskUiTest {
         val (data, state) = fixture("en", "light")
         compose.onNodeWithTag("capture").performClick()
         compose.onNodeWithTag("title").performTextInput("Prepare kitchen")
-        compose.onNodeWithTag("editor-split").performScrollTo().performClick()
+        compose.onNodeWithTag("editor-split").assertIsDisplayed().performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithTag("split-instructions").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("split-instructions").performScrollTo().assertExists()
         val intents = runBlocking { data.database.shared().intents(state.scope) }
         assertEquals(1, intents.size); assertEquals("CreateTask", intents.single().kind)
         assertNotNull(runBlocking { data.database.shared().draft(state.scope, "checklist:${intents.single().taskId}") })
+    }
+
+    @Test fun captureActionsAndCompactStepsEnglish() = captureActions("en", 1f, "light")
+    @Test fun captureActionsAndCompactStepsFinnish() = captureActions("fi", 1f, "light")
+    @Test fun captureActionsAndCompactStepsFinnishLargeDark() = captureActions("fi", 2f, "dark")
+
+    private fun captureActions(language: String, scale: Float, appearance: String) {
+        val (data, state) = fixture(language, appearance, fontScale = scale)
+        val suffix = "$language-$appearance"
+        compose.onNodeWithText("Bun Do").assertIsDisplayed()
+        compose.onNodeWithTag("settings").assertIsDisplayed().assertHasClickAction()
+        val rootBounds = compose.onRoot().getUnclippedBoundsInRoot()
+        if (scale < 1.6f && (rootBounds.bottom - rootBounds.top).value >= 600f) {
+            compose.onNodeWithTag("household-world").assertIsDisplayed()
+            compose.onNode(hasTestTag("world-rest") or hasTestTag("world-paperwork") or hasTestTag("world-joy") or hasTestTag("world-dojo"))
+                .assertHeightIsEqualTo(androidx.compose.ui.unit.Dp(112f))
+        }
+        screenshot("capture-header-$suffix.png")
+        compose.onNodeWithTag("capture").performClick()
+        compose.onNodeWithTag("save").assertIsNotEnabled()
+        compose.onNodeWithTag("editor-split").assertIsNotEnabled()
+        compose.onNodeWithTag("title").performTextReplacement("Fast save")
+        hideKeyboard()
+        compose.onNodeWithTag("save").assertIsDisplayed()
+        compose.onNodeWithTag("editor-split").assertIsDisplayed()
+        assertActionPair("editor-actions", "editor-split", "save", scale)
+        screenshot("capture-editor-$suffix.png")
+        val saveBounds = compose.onNodeWithTag("save").getUnclippedBoundsInRoot()
+        compose.onNodeWithTag("placement-hint").performScrollTo()
+        assertEquals(saveBounds, compose.onNodeWithTag("save").getUnclippedBoundsInRoot())
+        compose.onNodeWithTag("save").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("title").fetchSemanticsNodes().isEmpty() }
+        assertEquals(listOf("CreateTask"), runBlocking { data.database.shared().intents(state.scope).map { it.kind } })
+        compose.onNodeWithTag("checklist-save").assertDoesNotExist()
+
+        // The confirmation must not intercept the next capture tap.
+        compose.onNodeWithTag("capture").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("title").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("title").performTextReplacement(if (language == "fi") "Korjaa pyörä" else "Fix the bike")
+        hideKeyboard()
+        compose.onNodeWithTag("editor-split").assertIsDisplayed().performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("checklist-save").fetchSemanticsNodes().isNotEmpty() }
+        assertEquals(listOf("CreateTask", "CreateTask"), runBlocking { data.database.shared().intents(state.scope).map { it.kind } })
+        compose.onNodeWithTag("checklist-save").assertIsNotEnabled()
+        compose.onNodeWithTag("split-actions").performScrollTo()
+        assertActionPair("split-actions", "split-dictate", "split-generate", scale)
+        compose.onAllNodesWithText(if (language == "fi") "Yksi vaihe riville" else "One step per line").assertCountEquals(1)
+        screenshot("capture-phases-$suffix.png")
+        val phaseSave = compose.onNodeWithTag("checklist-save").getUnclippedBoundsInRoot()
+        compose.onNodeWithTag("checklist-draft").performScrollTo()
+        assertEquals(phaseSave, compose.onNodeWithTag("checklist-save").getUnclippedBoundsInRoot())
+        compose.onNodeWithTag("checklist-draft").performTextReplacement("Check the tyres\nTighten the brakes")
+        // Keyboard appearance may move the footer; it must remain reachable above it.
+        compose.onNodeWithTag("checklist-save").assertIsDisplayed().performClick()
+        compose.waitUntil(10_000) { runBlocking { data.database.shared().intents(state.scope).any { it.kind == "SplitTask" } } }
+        assertEquals("Check the tyres\nTighten the brakes",
+            runBlocking { data.database.shared().intents(state.scope).single { it.kind == "SplitTask" }.description })
+    }
+
+    private fun assertActionPair(container: String, first: String, second: String, scale: Float) {
+        val bounds = compose.onNodeWithTag(container).getUnclippedBoundsInRoot()
+        val width = (bounds.right - bounds.left).value
+        val a = compose.onNodeWithTag(first).getUnclippedBoundsInRoot()
+        val b = compose.onNodeWithTag(second).getUnclippedBoundsInRoot()
+        if (width < 320f || width < 600f && scale > 1.3f) assertTrue(b.top >= a.bottom)
+        else { assertEquals(a.top, b.top); assertTrue(b.left > a.right); assertEquals(a.bottom - a.top, b.bottom - b.top) }
+    }
+
+    private fun hideKeyboard() {
+        compose.runOnUiThread {
+            val activity = compose.activity
+            activity.getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+                .hideSoftInputFromWindow(activity.window.decorView.windowToken, 0)
+        }
+        compose.waitForIdle()
+        android.os.SystemClock.sleep(300)
     }
 
     @Test fun cleanupPendingAndCancelStayUsableAtLargeFinnishText() {

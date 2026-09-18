@@ -36,6 +36,5 @@
     <string name="progress_empty_period">Tällä jaksolla ei ole vielä valmistuneita tehtäviä. Valmis tehtävä lasketaan mukaan synkronoinnin jälkeen.</string>
     <string name="progress_how">Näin tehtävät lasketaan</string>
     <string name="journey_how">Näin matka etenee</string>
-    <string name="checklist_line_hint">Yksi vaihe riville.</string>
     <string name="account_delete_confirm">Poista ja kirjaudu ulos</string>
 </resources>

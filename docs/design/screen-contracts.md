@@ -30,6 +30,15 @@ persistent Edit and Complete controls. Checklist completion remains derived from
 its children. Scheduling, repeats, AI and other management actions live in the
 options menu. Original text and attribution are its last entry.
 
+Typed capture has adjacent persistent "Save" and "Save and choose steps" buttons.
+Both commit the current task; only the latter opens phase selection. Phase
+editing groups dictation and suggestion buttons on one row where space allows,
+with Save fixed below its scroller. Large text stacks the action pairs rather
+than clipping their labels. Explain one-step-per-line input only once.
+
+Main-page scenes keep their full height. A toolbar-sized paper fade protects the
+wordmark, and Settings uses an opaque button background over the artwork.
+
 Creation and last-change attribution remain available with original text,
 with actor names and exact localized timestamps. Pending local modification times must not masquerade as
 server-accepted history. Keep this metadata quieter than the task actions.

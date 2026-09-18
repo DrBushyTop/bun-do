@@ -117,6 +117,10 @@ owns the approved task option A, taller faded task scenes, secondary action menu
 and multi-step AI revisions of capture drafts. The browser study in issue 70 is
 the selection reference, not shipped-app evidence.
 
+[Clarify capture actions, phase editing and header contrast](https://github.com/DrBushyTop/bun-do/issues/75)
+follows the owner's rc.9 screenshots with persistent save choices, compact phase
+controls and readable toolbar content over the existing scenes.
+
 ## AI usage policy after V2
 
 [Decide whether AI usage limits are needed after V2](https://github.com/DrBushyTop/bun-do/issues/37) is blocked by V2 completion and belongs to neither release parent. Start without product usage quotas, daily/monthly budgets or per-user fairness allowances. Observe actual usage before deciding whether limits are needed. Technical I/O, memory, output and timeout bounds, authentication and provider constraints remain. No token-limit implementation gates AI enablement.

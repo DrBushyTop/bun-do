@@ -154,6 +154,9 @@ Release review must use native emulator/device captures of the light-only V1 int
 ## Shell contracts
 
 The compact app bar keeps the approved rabbit beside the Bun Do wordmark.
+Over an illustrated scene, a paper fade protects the measured toolbar area;
+Settings has an opaque paper button with evergreen ink. Keep the scene's height
+and crop unchanged rather than making room by shrinking the illustration.
 Settings holds language, decorative motion and the account entry. Shared work
 uses Queue, Activity and Together destinations. Type and voice capture remain
 adjacent below the list. Type becomes Resume draft when a new-task draft exists.
@@ -185,6 +188,14 @@ Editors and settings scroll within a 640 dp maximum width. Screen gutters are
 16 dp below 600 dp and 24 dp otherwise. At 840 dp, a selected task may share the
 screen with a 360 dp queue. Large text wraps and scrolls; no fixed-height text
 containers substitute for that behavior.
+
+Typed capture keeps "Save" and "Save and choose steps" in a persistent action row
+below the fields, not in separate toolbar and inline locations. The second action
+saves the task before opening its phase editor. Phase editing also keeps Save
+outside the content scroller and groups dictation and AI suggestions together.
+Both action pairs use equal-width buttons on one row, stacking below 320 dp or
+below 600 dp when font scale exceeds 1.3. Show the one-step-per-line instruction
+once as the field label. Draft recovery uses one status message.
 
 ## Components
 

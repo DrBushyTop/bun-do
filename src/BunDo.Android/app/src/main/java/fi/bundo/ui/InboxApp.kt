@@ -41,6 +41,8 @@ import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -130,6 +132,8 @@ fun InboxApp(
     val queueScroll = rememberLazyListState()
     val queueState = rememberSaveableStateHolder()
     var taskFooterHeight by remember { mutableStateOf(0.dp) }
+    var queueFooterHeight by remember { mutableStateOf(0.dp) }
+    var editorFooterHeight by remember { mutableStateOf(0.dp) }
     val selected = state.tasks.find { it.id == selectedId }
     val editor = state.editor
     val back: () -> Unit = {
@@ -148,7 +152,13 @@ fun InboxApp(
         val sideNavigation = short && maxWidth >= 600.dp && queueSideNavigation != null && editor == null && !settings && selected == null
         val gutter = if (maxWidth < 600.dp) 16.dp else 24.dp
         Scaffold(
-            snackbarHost = { Box(Modifier.padding(bottom = if (selected != null && editor == null && !settings) taskFooterHeight else 0.dp)) { snackbarHost() } },
+            snackbarHost = { Box(Modifier.padding(bottom = when {
+                settings -> 0.dp
+                editor != null -> editorFooterHeight
+                selected != null -> maxOf(taskFooterHeight, if (wide && queueContent == null) queueFooterHeight else 0.dp)
+                queueContent == null -> queueFooterHeight
+                else -> 0.dp
+            })) { snackbarHost() } },
             bottomBar = { if (editor == null && !settings && selected == null && !sideNavigation) queueNavigation?.invoke() },
             topBar = {
                 val integrated = queueTopBar != null && editor == null && !settings && selected == null && queueContent == null
@@ -182,17 +192,12 @@ fun InboxApp(
                         }
                     },
                     actions = {
-                        if (editor != null) {
-                            TextButton(
-                                onClick = { model.closeEditor(commit = true) {
-                                    if (onTaskSaved != null) onTaskSaved(it, editor.key == InboxRepository.NEW_DRAFT)
-                                    else feedback = HouseholdFeedback(System.nanoTime(), "file")
-                                } },
-                                enabled = canEdit && !state.working && InboxLimits.valid(editor.title, editor.description),
-                                modifier = Modifier.testTag("save").padding(end = 8.dp).heightIn(min = 48.dp),
-                            ) { Text(stringResource(R.string.save)) }
-                        } else if (!settings) {
-                            IconButton(onClick = { settings = true }, enabled = !state.working, modifier = Modifier.testTag("settings")) {
+                        if (editor == null && !settings) {
+                            FilledIconButton(onClick = { settings = true }, enabled = !state.working,
+                                colors = IconButtonDefaults.filledIconButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.surface,
+                                    contentColor = MaterialTheme.colorScheme.primary),
+                                modifier = Modifier.padding(end = 8.dp).size(48.dp).testTag("settings")) {
                                 Icon(Icons.Outlined.Settings, stringResource(R.string.settings))
                             }
                         }
@@ -206,7 +211,12 @@ fun InboxApp(
                 if (sideNavigation) queueSideNavigation?.invoke()
                 Box(Modifier.weight(1f).fillMaxSize()) {
                 when {
-                    editor != null -> Editor(state, model, onSplit, Modifier.align(Alignment.TopCenter).widthIn(max = 640.dp).fillMaxWidth())
+                    editor != null -> Editor(state, model, onSplit, canEdit, onSave = {
+                        model.closeEditor(commit = true) {
+                            if (onTaskSaved != null) onTaskSaved(it, editor.key == InboxRepository.NEW_DRAFT)
+                            else feedback = HouseholdFeedback(System.nanoTime(), "file")
+                        }
+                    }, Modifier.align(Alignment.TopCenter).widthIn(max = 640.dp).fillMaxSize(), { editorFooterHeight = it })
                     settings && voiceSettings && voice != null -> VoiceSettings(voice,
                         onReview = { voiceAutoStart = false; showVoice = true },
                         modifier = Modifier.align(Alignment.TopCenter).widthIn(max = 640.dp).fillMaxWidth())
@@ -232,6 +242,7 @@ fun InboxApp(
                             summary = rowSummary,
                             customList = queueList?.let { content -> { open -> queueState.SaveableStateProvider("queue") { content(open) } } },
                             feedback = feedback,
+                            onFooterHeight = { queueFooterHeight = it },
                             modifier = if (wide && selected != null) Modifier.width(360.dp) else Modifier.weight(1f),
                         )
                         if (wide && selected != null) {
@@ -275,7 +286,9 @@ private fun Queue(
     modifier: Modifier,
     customList: (@Composable ((String) -> Unit) -> Unit)?,
     feedback: HouseholdFeedback?,
+    onFooterHeight: (androidx.compose.ui.unit.Dp) -> Unit,
 ) {
+    val density = LocalDensity.current
     val hasDraft = state.drafts.any {
         it.key == InboxRepository.NEW_DRAFT && (it.title.isNotEmpty() || it.description.isNotEmpty())
     }
@@ -359,7 +372,8 @@ private fun Queue(
                 }
             }
         }
-        Row(Modifier.padding(horizontal = gutter, vertical = if (compactNotice) 8.dp else gutter).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+        Row(Modifier.onSizeChanged { onFooterHeight(with(density) { it.height.toDp() }) }
+            .padding(horizontal = gutter, vertical = if (compactNotice) 8.dp else gutter).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ActionIllustration(feedback)
             OutlinedButton(
@@ -383,12 +397,15 @@ private fun Queue(
 }
 
 @Composable
-private fun Editor(state: InboxUiState, model: InboxViewModel, onSplit: (() -> Unit)?, modifier: Modifier) {
+private fun Editor(state: InboxUiState, model: InboxViewModel, onSplit: (() -> Unit)?, canEdit: Boolean,
+    onSave: () -> Unit, modifier: Modifier, onFooterHeight: (androidx.compose.ui.unit.Dp) -> Unit) {
     val draft = state.editor ?: return
     val focus = remember { FocusRequester() }
+    val density = LocalDensity.current
     LaunchedEffect(draft.key) { focus.requestFocus() }
+    Column(modifier) {
     Column(
-        modifier.verticalScroll(rememberScrollState()).padding(16.dp),
+        Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp).testTag("editor-content"),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         if (state.writeFailed) ErrorNotice(R.string.write_failed, model::retry)
@@ -414,19 +431,26 @@ private fun Editor(state: InboxUiState, model: InboxViewModel, onSplit: (() -> U
         )
         draft.details?.let { TaskDateFields(it, draft.key == fi.bundo.data.InboxRepository.NEW_DRAFT, !state.working, model::changeDetails) }
         if (draft.title.isBlank()) Text(stringResource(R.string.title_required), style = MaterialTheme.typography.bodyMedium)
-        if (onSplit != null) OutlinedButton(onClick = onSplit, enabled = !state.working && InboxLimits.valid(draft.title, draft.description),
-            modifier = Modifier.testTag("editor-split")) { Text(stringResource(R.string.split_save_first)) }
         Text(
             stringResource(if (state.draftSaved) R.string.draft_saved else R.string.saving),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.testTag(if (state.draftSaved) "draft-saved" else "draft-saving"),
         )
-        Text(
-            stringResource(R.string.draft_hint),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    }
+    HorizontalDivider()
+    val enabled = canEdit && !state.working && InboxLimits.valid(draft.title, draft.description)
+    val save: @Composable (Modifier) -> Unit = { buttonModifier ->
+        Button(onClick = onSave, enabled = enabled, modifier = buttonModifier.testTag("save")) { Text(stringResource(R.string.save)) }
+    }
+    val footerModifier = Modifier.onSizeChanged { onFooterHeight(with(density) { it.height.toDp() }) }.padding(16.dp)
+    if (onSplit != null) ActionPair(footerModifier.testTag("editor-actions"),
+        secondary = { buttonModifier ->
+            OutlinedButton(onClick = onSplit, enabled = enabled, modifier = buttonModifier.testTag("editor-split")) {
+                Text(stringResource(R.string.split_save_first), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            }
+        }, primary = save)
+    else save(footerModifier.fillMaxWidth().heightIn(min = 48.dp))
     }
 }
 
