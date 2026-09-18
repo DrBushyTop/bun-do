@@ -7,7 +7,7 @@ namespace BunDo.Functions.Households;
 
 public sealed record VisibilityRequest(Guid Id, Guid Source, Guid SourceEpoch, string TaskId,
     ulong ExpectedRevision, Guid Target, Guid TargetEpoch);
-public sealed record VisibilityJournal(VisibilityRequest Request, Guid Actor, VisibilityContent Content, string Status = "PENDING");
+public sealed record VisibilityJournal(VisibilityRequest Request, Guid Actor, VisibilityContent Content, string Status = "PENDING", VisibilityContent? Recovery = null);
 public sealed record VisibilityReply(string Code, Guid Id, string? TaskId = null);
 
 /// <summary>The owner's private journal survives a crash or household removal between partition commits.</summary>
@@ -32,7 +32,7 @@ public sealed class TaskVisibilityService(IHouseholdDocuments documents, TimePro
         if (journal is not null && (journal.Value.Actor != actor || journal.Value.Request != request))
             return new("REQUEST_ID_REUSED", request.Id);
         if (journal?.Value.Status == "CANCELLED") return new("CANCELLED", request.Id);
-        if (journal?.Value.Status == "COMPLETED") return new("ACCEPTED", request.Id, TaskIdentity.ForCreate(request.Id, 1));
+        if (journal?.Value.Status == "COMPLETED") return new("ACCEPTED", request.Id, TaskVisibility.ImportedId(request.Id, 1));
         if (journal?.Value.Status == "SOURCE_CHANGED") return new("SOURCE_CHANGED", request.Id);
         if (journal is null)
         {
@@ -43,7 +43,9 @@ public sealed class TaskVisibilityService(IHouseholdDocuments documents, TimePro
             var target = await Target(actor, request, ct);
             var content = TaskVisibility.Export(source.Value, request.TaskId);
             if (target.Value.TaskCount + content.Tasks.Length > 1024) return new("TASK_LIMIT", request.Id);
-            var proposed = new VisibilityJournal(request, actor, content);
+            if (await HasCollision(target, request.Id, content, ct)) return new("TARGET_CONFLICT", request.Id);
+            var proposed = new VisibilityJournal(request, actor, content,
+                Recovery: request.Source == personal ? TaskVisibility.Recovery(source.Value, request.TaskId) : null);
             await documents.WriteAsync(Partition(personal), JournalId(request.Id), null, proposed, ct);
             journal = (await documents.ReadAsync<VisibilityJournal>(Partition(personal), JournalId(request.Id), ct))!;
             if (journal.Value.Request != request || journal.Value.Actor != actor) return new("REQUEST_ID_REUSED", request.Id);
@@ -64,7 +66,8 @@ public sealed class TaskVisibilityService(IHouseholdDocuments documents, TimePro
             }
             var code = TaskVisibility.Validate(source.Value, actor, request.TaskId);
             if (code != "ACCEPTED") return new(code, request.Id);
-            await Target(actor, request, ct);
+            var destination = await Target(actor, request, ct);
+            if (await HasCollision(destination, request.Id, journal.Value.Content, ct)) return new("TARGET_CONFLICT", request.Id);
             var next = TaskVisibility.Retire(source.Value, actor, request.Id, request.TaskId, clock.GetUtcNow());
             if (!await documents.CommitWorkspaceAsync(source.Stored, next, ct))
             {
@@ -82,11 +85,12 @@ public sealed class TaskVisibilityService(IHouseholdDocuments documents, TimePro
                 if (imported.Value.Actor == actor && imported.Value.Stage == "CANCELLED") return await CancelAsync(actor, request.Id, ct);
                 if (imported.Value.Actor != actor || imported.Value.Stage != "IMPORTED") return new("REQUEST_ID_REUSED", request.Id);
                 await documents.WriteAsync(Partition(personal), JournalId(request.Id), journal.Version,
-                    journal.Value with { Status = "COMPLETED", Content = new([], null) }, ct);
-                return new("ACCEPTED", request.Id, TaskIdentity.ForCreate(request.Id, 1));
+                    journal.Value with { Status = "COMPLETED", Content = new([], null), Recovery = null }, ct);
+                return new("ACCEPTED", request.Id, TaskVisibility.ImportedId(request.Id, 1));
             }
             var target = await Target(actor, request, ct);
             if (target.Value.TaskCount + journal.Value.Content.Tasks.Length > 1024) return new("TASK_LIMIT", request.Id);
+            if (await HasCollision(target, request.Id, journal.Value.Content, ct)) return new("TARGET_CONFLICT", request.Id);
             var next = TaskVisibility.Import(target.Value, actor, request.Id, journal.Value.Content, clock.GetUtcNow());
             if (await documents.CommitWorkspaceAsync(target, next, ct)) continue;
         }
@@ -99,7 +103,7 @@ public sealed class TaskVisibilityService(IHouseholdDocuments documents, TimePro
         var journal = await documents.ReadAsync<VisibilityJournal>(Partition(personal), JournalId(id), ct);
         if (journal is null || journal.Value.Actor != actor || journal.Value.Request.Source != personal)
             return new("FORBIDDEN", id);
-        if (journal.Value.Status == "COMPLETED") return new("ACCEPTED", id, TaskIdentity.ForCreate(id, 1));
+        if (journal.Value.Status == "COMPLETED") return new("ACCEPTED", id, TaskVisibility.ImportedId(id, 1));
         if (journal.Value.Status is "CANCELLED" or "SOURCE_CHANGED") return new(journal.Value.Status, id);
         var request = journal.Value.Request;
         // Fence import with a receipt in the destination partition. No household content is read or edited.
@@ -134,25 +138,26 @@ public sealed class TaskVisibilityService(IHouseholdDocuments documents, TimePro
         }
         if (retired is not null)
         {
-            var restoreId = Guid.Parse(TaskIdentity.ForCreate(id, 200));
+            var recovery = journal.Value.Recovery ?? throw new SyncException("RECOVERY_MISSING");
+            var restoreId = Guid.Parse(TaskVisibility.ImportedId(id, 200));
             for (var attempt = 0; attempt < 8; attempt++)
             {
                 if (await documents.ReadAsync<VisibilityReceipt>(Partition(personal), ReceiptId(restoreId), ct) is not null) break;
                 var source = await ReadAsync(personal, ct);
                 if (source is null || source.Value.Membership.PersonalOwnerId != actor) return new("FORBIDDEN", id);
                 var existing = ImmutableDictionary<string, TaskSnapshot>.Empty;
-                foreach (var task in journal.Value.Content.Tasks)
+                foreach (var task in recovery.Tasks)
                     if ((await documents.ReadAsync<TaskSnapshot>(Partition(personal), WorkspaceCommit.TaskId(task.Id), ct))?.Value is { } value)
                         existing = existing.Add(task.Id, value);
-                var missing = journal.Value.Content.Tasks.Count(t => !existing.ContainsKey(t.Id));
+                var missing = recovery.Tasks.Count(t => !existing.ContainsKey(t.Id));
                 if (source.Value.TaskCount + missing > 1024) return new("TASK_LIMIT", id);
-                if (await documents.CommitWorkspaceAsync(source, TaskVisibility.Import(source.Value with { Tasks = existing }, actor, restoreId,
-                    journal.Value.Content, clock.GetUtcNow(), restoreOriginalIds: true), ct)) break;
+                if (await documents.CommitWorkspaceAsync(source, TaskVisibility.Restore(source.Value with { Tasks = existing }, actor, restoreId,
+                    recovery, clock.GetUtcNow()), ct)) break;
                 if (attempt == 7) return new("BUSY", id);
             }
         }
         await documents.WriteAsync(Partition(personal), JournalId(id), journal.Version,
-            journal.Value with { Status = "CANCELLED", Content = new([], null) }, ct);
+            journal.Value with { Status = "CANCELLED", Content = new([], null), Recovery = null }, ct);
         return new("CANCELLED", id);
     }
 
@@ -166,7 +171,7 @@ public sealed class TaskVisibilityService(IHouseholdDocuments documents, TimePro
         do
         {
             var page = await documents.ReadPageAsync<VisibilityJournal>(Partition(personal), "visibility:", continuation, 64, ct);
-            pending.AddRange(page.Items.Where(x => x.Value.Actor == actor && x.Value.Status == "PENDING").Select(x => x.Value));
+            pending.AddRange(page.Items.Where(x => x.Value.Actor == actor && x.Value.Status == "PENDING").Select(x => x.Value with { Recovery = null }));
             if (pending.Count >= 1) return pending.Take(1).ToArray();
             continuation = page.Continuation;
         } while (continuation is not null);
@@ -176,8 +181,21 @@ public sealed class TaskVisibilityService(IHouseholdDocuments documents, TimePro
     private async Task<VisibilityReply> Changed(Guid personal, StoredDocument<VisibilityJournal> journal, CancellationToken ct)
     {
         await documents.WriteAsync(Partition(personal), JournalId(journal.Value.Request.Id), journal.Version,
-            journal.Value with { Status = "SOURCE_CHANGED", Content = new([], null) }, ct);
+            journal.Value with { Status = "SOURCE_CHANGED", Content = new([], null), Recovery = null }, ct);
         return new("SOURCE_CHANGED", journal.Value.Request.Id);
+    }
+
+    private async Task<bool> HasCollision(StoredDocument<WorkspaceState> target, Guid transfer, VisibilityContent content, CancellationToken ct)
+    {
+        for (var i = 0; i < content.Tasks.Length; i++)
+        {
+            var id = TaskVisibility.ImportedId(transfer, i + 1);
+            if (target.Value.Tasks.ContainsKey(id) || await documents.ReadAsync<TaskSnapshot>(
+                Partition(target.Value.WorkspaceId), WorkspaceCommit.TaskId(id), ct) is not null) return true;
+        }
+        var repeatId = TaskVisibility.ImportedId(transfer, 100);
+        return content.Repeat is not null && (target.Value.Repeats?.ContainsKey(repeatId) == true ||
+            await documents.ReadAsync<RepeatSchedule>(Partition(target.Value.WorkspaceId), $"repeat:{repeatId}", ct) is not null);
     }
 
     private Task<StoredDocument<WorkspaceState>?> ReadAsync(Guid workspace, CancellationToken ct) =>

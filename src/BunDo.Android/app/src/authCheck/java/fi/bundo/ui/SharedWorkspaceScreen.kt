@@ -510,8 +510,7 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
                 val tasks = journal.getJSONObject("content").getJSONArray("tasks")
                 for (index in 0 until tasks.length()) {
                     val task = tasks.getJSONObject(index)
-                    Text(task.getString("title"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 12.dp))
-                    task.nullableString("description")?.let { Text(it) }
+                    VisibilityTaskSummary(task)
                 }
                 if (request.getString("source") == selected.workspaceId) TextButton(enabled = !busy, onClick = { run {
                     (context.applicationContext as BunDoApplication).withAccountToken(data) { token ->
@@ -544,8 +543,7 @@ fun SharedWorkspaceScreen(data: AccountData, selected: SharedWorkspace, appearan
             text = { Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
                 Text(if (preview.target.personal) stringResource(R.string.visibility_private_warning) else stringResource(R.string.visibility_share_warning, preview.target.name))
                 preview.tasks.filter { it.isNull("deletion") }.forEach { task ->
-                    Text(task.getString("title"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 12.dp))
-                    task.nullableString("description")?.let { Text(it) }
+                    VisibilityTaskSummary(task)
                 }
                 preview.tasks.first().optJSONObject("repeat")?.takeIf { it.optBoolean("active") }?.let { repeat ->
                     Text(stringResource(R.string.visibility_repeat_warning), Modifier.padding(top = 12.dp))

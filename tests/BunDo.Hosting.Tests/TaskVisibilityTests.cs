@@ -207,7 +207,7 @@ public sealed class TaskVisibilityTests : IDisposable
         var service = new TaskVisibilityService(documents);
         Assert.Equal("ACCEPTED", (await service.SendAsync(actor, request, default)).Code);
         Assert.Equal("ACCEPTED", (await service.CancelAsync(actor, request.Id, default)).Code);
-        Assert.Null((await Task(household, TaskIdentity.ForCreate(request.Id, 1))).Deletion);
+        Assert.Null((await Task(household, TaskVisibility.ImportedId(request.Id, 1))).Deletion);
     }
 
     [Fact]
@@ -253,6 +253,86 @@ public sealed class TaskVisibilityTests : IDisposable
         var plan = WorkspaceCommit.Plan(source, next);
         var retained = Assert.Single(plan.Writes, w => w.Id.StartsWith("completion:", StringComparison.Ordinal));
         Assert.Equal(credit, retained.Value); Assert.False(retained.CreateOnly);
+    }
+
+    [Fact]
+    public async Task Transfer_using_another_members_device_id_never_replaces_their_task()
+    {
+        await Setup();
+        await Mutate(household, s => s with { Membership = s.Membership with { Members = s.Membership.Members.Add(other, new(other, 1)) } });
+        var theirs = await Create(household, author: other);
+        var mine = await Create(Personal);
+        var request = (await Request(Personal, household, mine.Id)) with { Id = other };
+        var reply = await new TaskVisibilityService(documents).SendAsync(actor, request, default);
+        Assert.Equal("ACCEPTED", reply.Code);
+        Assert.NotEqual(theirs.Id, reply.TaskId);
+        Assert.Equal(theirs, await Task(household, theirs.Id));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Existing_destination_identity_is_rejected_before_source_retirement(bool repeatCollision)
+    {
+        await Setup(); var root = await Create(Personal);
+        if (repeatCollision)
+        {
+            await new SyncService(documents).SubmitAsync(actor, new(Personal, (await State(Personal)).StateEpoch,
+                device, 2, new ConfigureRepeat(root.Id, 0, ChecklistTasks.Versions(root), new("DAILY", null, "Europe/Helsinki"), "Repeat", null)), default);
+        }
+        var request = await Request(Personal, household, root.Id);
+        var partition = household.ToString("D");
+        if (repeatCollision)
+        {
+            var configured = await Task(Personal, root.Id);
+            var repeat = (await documents.ReadAsync<RepeatSchedule>(Personal.ToString("D"), $"repeat:{configured.Repeat!.Id}", default))!.Value;
+            Assert.True(await documents.WriteAsync(partition, $"repeat:{TaskVisibility.ImportedId(request.Id, 100)}", null, repeat, default));
+        }
+        else Assert.True(await documents.WriteAsync(partition, WorkspaceCommit.TaskId(TaskVisibility.ImportedId(request.Id, 1)), null, root, default));
+        Assert.Equal("TARGET_CONFLICT", (await new TaskVisibilityService(documents).SendAsync(actor, request, default)).Code);
+        Assert.Null((await Task(Personal, root.Id)).Deletion);
+    }
+
+    [Fact]
+    public async Task Keep_private_restores_original_capture_attribution_deleted_children_and_repeat()
+    {
+        await Setup(); var root = await Create(Personal); var epoch = (await State(Personal)).StateEpoch;
+        var sync = new SyncService(documents);
+        var edited = await sync.SubmitAsync(actor, new(Personal, epoch, device, 2,
+            new EditTask(root.Id, new("Revised private title", root.TitleVersion.Human))), default);
+        root = edited.Receipt!.Task!;
+        var split = await sync.SubmitAsync(actor, new(Personal, epoch, device, 3,
+            new SplitTask(root.Id, ChecklistTasks.Versions(root), ["Live", "Deleted"], root.TitleVersion.Human, root.DescriptionVersion.Human)), default);
+        var child = split.Receipt!.RelatedTasks!.Value.Last(t => t.ParentId == root.Id);
+        await sync.SubmitAsync(actor, new(Personal, epoch, device, 4, new DeleteTask(child.Id, ChecklistTasks.Versions(child))), default);
+        root = await Task(Personal, root.Id);
+        await sync.SubmitAsync(actor, new(Personal, epoch, device, 5,
+            new ConfigureRepeat(root.Id, 0, ChecklistTasks.Versions(root), new("DAILY", null, "Europe/Helsinki"), "Repeat", null)), default);
+        root = await Task(Personal, root.Id); child = await Task(Personal, child.Id);
+        var originalTime = DateTimeOffset.Parse("2025-01-02T03:04:05Z");
+        root = root with { Creation = new(actor, originalTime, originalTime),
+            Capture = new("Original private text", "Original private notes", JsonSerializer.SerializeToElement(new { source = "private-canary" }), originalTime) };
+        var storedRoot = (await documents.ReadAsync<TaskSnapshot>(Personal.ToString("D"), WorkspaceCommit.TaskId(root.Id), default))!;
+        Assert.True(await documents.WriteAsync(Personal.ToString("D"), WorkspaceCommit.TaskId(root.Id), storedRoot.Version, root, default));
+        var request = await Request(Personal, household, root.Id);
+        await Assert.ThrowsAsync<IOException>(() => new TaskVisibilityService(new FailImport(documents)).SendAsync(actor, request, default));
+        Assert.Equal("CANCELLED", (await new TaskVisibilityService(documents).CancelAsync(actor, request.Id, default)).Code);
+        var restored = await Task(Personal, root.Id); var restoredChild = await Task(Personal, child.Id);
+        Assert.Equal(root.Title, restored.Title); Assert.Equal(JsonSerializer.Serialize(root.Capture), JsonSerializer.Serialize(restored.Capture));
+        Assert.Equal(root.Creation, restored.Creation); Assert.Equal(root.LastChange, restored.LastChange);
+        Assert.Equal(root.ChildOrder, restored.ChildOrder); Assert.Equal(child.Deletion, restoredChild.Deletion);
+        Assert.Equal(child.Capture, restoredChild.Capture); Assert.Null(restoredChild.VisibilityTransferId);
+        Assert.Equal(root.Repeat!.Id, restored.Repeat!.Id); Assert.True(restored.Repeat.Active);
+    }
+
+    [Fact]
+    public void Imports_use_create_only_entities_in_the_partition_transaction()
+    {
+        var state = new WorkspaceState(household, Guid.NewGuid(), 0, ImmutableDictionary<Guid, DeviceRegistration>.Empty,
+            ImmutableDictionary<string, TaskSnapshot>.Empty, ImmutableDictionary<string, OperationReceipt>.Empty, [], HouseholdMembership.Create(actor));
+        var task = new TaskSnapshot("source", "Title", null, new(0, 0), new(0, 0));
+        var next = TaskVisibility.Import(state, actor, Guid.NewGuid(), new([task], null), DateTimeOffset.UtcNow);
+        Assert.All(WorkspaceCommit.Plan(state, next).Writes, write => Assert.True(write.CreateOnly));
     }
 
     private sealed class FailImport(IHouseholdDocuments inner) : IHouseholdDocuments

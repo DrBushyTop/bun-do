@@ -141,6 +141,7 @@ class PrivateTasksTest {
             .put("deletionVersion", "1").put("lifecycleVersion", "1").put("lifecycle", "OPEN")
             .put("claimVersion", "1").put("hierarchyVersion", "1").put("orderIntentVersion", "1")
             .put("parentId", JSONObject.NULL).put("creation", JSONObject().put("actorId", me))
+            .put("due", JSONObject().put("kind", "DATE_ONLY").put("localDate", "2026-10-15").put("zoneId", "Europe/Helsinki"))
         runBlocking {
             data.database.shared().saveBase(SharedBase(home.scope, id, root.toString()))
             data.database.shared().saveProjection(SharedProjection(home.scope, id, root.toString()))
@@ -156,6 +157,8 @@ class PrivateTasksTest {
         val label = if (language == "fi") "Muuta yksityiseksi" else "Make private"
         compose.waitUntil(5_000) { compose.onAllNodesWithText(label).fetchSemanticsNodes().size >= 2 }
         compose.onAllNodesWithText(label).filterToOne(hasClickAction()).assertIsDisplayed()
+        compose.onNodeWithText(if (language == "fi") "Avoin" else "Open").assertExists()
+        compose.onNode(hasText("Europe/Helsinki", substring = true) and hasAnyAncestor(isDialog())).assertExists()
         screenshot("$language-preview")
         compose.onNodeWithText(if (language == "fi") "Takaisin" else "Back").performClick()
         compose.onNodeWithTag("back").performClick()
@@ -167,6 +170,20 @@ class PrivateTasksTest {
         compose.waitUntil(5_000) { data.selectedWorkspace.value?.personal == true }
         compose.onNodeWithTag("save").assertIsDisplayed()
         screenshot("$language-capture")
+    }
+
+    @Test fun sharing_summary_shows_completed_and_cancelled_states_and_due_date() {
+        val due = JSONObject().put("kind", "DATE_TIME").put("localDate", "2026-10-15")
+            .put("localTime", "14:30").put("zoneId", "Europe/Helsinki")
+        compose.runOnUiThread { compose.activity.setContent {
+            BunDoTheme("light") { androidx.compose.foundation.layout.Column {
+                fi.bundo.ui.VisibilityTaskSummary(JSONObject().put("title", "Finished item").put("lifecycle", "COMPLETED").put("due", due))
+                fi.bundo.ui.VisibilityTaskSummary(JSONObject().put("title", "Cancelled item").put("lifecycle", "CANCELLED"))
+            } }
+        } }
+        compose.onNodeWithText(compose.activity.getString(R.string.visibility_completed)).assertIsDisplayed()
+        compose.onNodeWithText(compose.activity.getString(R.string.visibility_cancelled)).assertIsDisplayed()
+        compose.onNodeWithText("14:30", substring = true).assertIsDisplayed()
     }
 
     @Test fun migration_keeps_existing_household_audience_and_local_only_tasks() {

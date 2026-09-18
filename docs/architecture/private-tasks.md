@@ -62,7 +62,9 @@ before the source transaction retires the task and stops its recurrence. A
 second transaction imports the approved content under new task IDs. Each
 workspace records a durable transfer receipt in the same transaction as its
 effects. Retries check those receipts and never overwrite an already imported
-task. Completed private journals discard their temporary content.
+task. Destination entities use create-only writes, so even a conflicting request
+identity cannot replace another task or repeat. Completed private journals discard
+their temporary content.
 
 This is not an atomic cross-partition transaction. A connection failure can leave
 a pending move between the two commits. The private journal preserves the
@@ -74,7 +76,9 @@ confirmed.
 
 Only me exposes pending changes with their saved content and a retry action. For
 an unfinished share, Keep private first fences the destination against import,
-then restores the private content if source retirement already happened. If the
+then restores the private content if source retirement already happened. Recovery
+preserves original capture, attribution, deleted children and recurrence from a
+separate private snapshot. It does not reuse the sanitized publication snapshot. If the
 share already completed, cancellation reports that result instead of pretending
 to revoke household access. Pending recovery responses are bounded; finishing
 one batch makes later pending requests available.

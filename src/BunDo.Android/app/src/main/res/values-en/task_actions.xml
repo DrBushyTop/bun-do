@@ -18,4 +18,7 @@
     <string name="task_history_view">Completed and cancelled</string>
     <string name="task_claim_conflict">The person working on this task changed. Check its current state before trying again.</string>
     <string name="task_state_conflict">The task state or position changed. Your action was not repeated automatically.</string>
+    <string name="visibility_open">Open</string>
+    <string name="visibility_completed">Completed</string>
+    <string name="visibility_cancelled">Cancelled</string>
 </resources>

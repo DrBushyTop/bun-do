@@ -1,4 +1,6 @@
 using System.Collections.Immutable;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace BunDo.Domain;
 
@@ -9,6 +11,38 @@ public sealed record VisibilityContent(ImmutableArray<TaskSnapshot> Tasks, Repea
 /// <summary>Move a creator-owned root and its direct children. Content is copied, never private provenance.</summary>
 public static class TaskVisibility
 {
+    public static string ImportedId(Guid transfer, int ordinal)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(FormattableString.Invariant($"visibility/{transfer:D}/{ordinal}")));
+        return new Guid(bytes.AsSpan(0, 16), bigEndian: true).ToString("D");
+    }
+
+    public static VisibilityContent Recovery(WorkspaceState state, string rootId)
+    {
+        var root = state.Tasks[rootId];
+        return new(new[] { root }.Concat((root.ChildOrder ?? []).Select(id => state.Tasks[id])).ToImmutableArray(),
+            root.Repeat is { } link ? state.Repeats?.GetValueOrDefault(link.Id) : null);
+    }
+
+    public static WorkspaceState Restore(WorkspaceState state, Guid actor, Guid receipt, VisibilityContent recovery, DateTimeOffset now)
+    {
+        var revision = checked(state.Revision + 1);
+        var tasks = recovery.Tasks.Select(t => t with {
+            TitleVersion = new(revision, revision), DescriptionVersion = new(revision, revision), DueVersion = new(revision, revision),
+            LifecycleVersion = revision, DeletionVersion = revision, HierarchyVersion = revision, SubtreeVersion = revision,
+            ClaimVersion = revision, OrderIntentVersion = revision, SnoozeVersion = revision, UrgencyVersion = revision,
+            Repeat = t.Repeat is { } link ? link with { Version = revision } : null,
+        }).ToImmutableArray();
+        var repeat = recovery.Repeat is { } source ? source with { Version = revision } : null;
+        var order = RootOrdering.Current(state);
+        if (tasks[0].Lifecycle == "OPEN" && !order.Contains(tasks[0].Id)) order = order.Add(tasks[0].Id);
+        return state with { Revision = revision, RootOrder = order,
+            TaskCount = state.TaskCount + tasks.Count(t => !state.Tasks.ContainsKey(t.Id)),
+            Tasks = state.Tasks.SetItems(tasks.Select(t => KeyValuePair.Create(t.Id, t))),
+            VisibilityReceipts = [new(receipt, actor, "RESTORED")],
+            Changes = [new(revision, tasks, now, RootOrder: order, Repeats: repeat is null ? [] : [repeat])] };
+    }
+
     public static string Validate(WorkspaceState state, Guid actor, string rootId)
     {
         if (!state.Membership.CanRead(actor)) return "FORBIDDEN";
@@ -57,14 +91,14 @@ public static class TaskVisibility
             Changes = [new(revision, tasks, now, RootOrder: order, Repeats: stopped)] };
     }
 
-    public static WorkspaceState Import(WorkspaceState state, Guid actor, Guid transfer, VisibilityContent content, DateTimeOffset now, bool restoreOriginalIds = false)
+    public static WorkspaceState Import(WorkspaceState state, Guid actor, Guid transfer, VisibilityContent content, DateTimeOffset now)
     {
         var revision = checked(state.Revision + 1);
-        var ids = content.Tasks.Select((t, i) => (t.Id, NewId: restoreOriginalIds ? t.Id : TaskIdentity.ForCreate(transfer, (ulong)i + 1)))
+        var ids = content.Tasks.Select((t, i) => (t.Id, NewId: ImportedId(transfer, i + 1)))
             .ToDictionary(t => t.Id, t => t.NewId);
         var rootId = ids[content.Tasks[0].Id];
         var repeat = content.Repeat is { } source ? source with {
-            Id = TaskIdentity.ForCreate(transfer, 100), Version = revision, CurrentTaskId = rootId,
+            Id = ImportedId(transfer, 100), Version = revision, CurrentTaskId = rootId,
             OpenTaskId = source.OpenTaskId is null ? null : rootId, CreatorId = actor,
         } : null;
         var tasks = content.Tasks.Select(t => t with {
@@ -86,7 +120,7 @@ public static class TaskVisibility
         }).ToImmutableArray();
         var order = RootOrdering.Current(state);
         if (tasks[0].Lifecycle == "OPEN") order = order.Add(rootId);
-        return state with { Revision = revision, RootOrder = order, TaskCount = state.TaskCount + tasks.Count(t => !restoreOriginalIds || !state.Tasks.ContainsKey(t.Id)),
+        return state with { Revision = revision, RootOrder = order, TaskCount = state.TaskCount + tasks.Length,
             Tasks = state.Tasks.SetItems(tasks.Select(t => KeyValuePair.Create(t.Id, t))),
             VisibilityReceipts = [new(transfer, actor, "IMPORTED")],
             Changes = [new(revision, tasks, now, RootOrder: order, Repeats: repeat is null ? [] : [repeat])] };

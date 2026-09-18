@@ -29,8 +29,9 @@ public sealed record WorkspaceCommit(WorkspaceState Metadata, IReadOnlyList<Work
         var writes = new List<WorkspaceWrite> { new(GroupId(next.Revision), group, true) };
         foreach (var receipt in next.VisibilityReceipts ?? [])
             writes.Add(new($"visibility-receipt:{receipt.Id:D}", receipt, true));
-        foreach (var task in group.Tasks) writes.Add(new(TaskId(task.Id), task, false));
-        foreach (var repeat in group.Repeats ?? []) writes.Add(new($"repeat:{repeat.Id}", repeat, false));
+        var importing = next.VisibilityReceipts?.Any(r => r.Stage == "IMPORTED") == true;
+        foreach (var task in group.Tasks) writes.Add(new(TaskId(task.Id), task, importing));
+        foreach (var repeat in group.Repeats ?? []) writes.Add(new($"repeat:{repeat.Id}", repeat, importing));
         // Completion credit outlives task content and remains available to household statistics.
         foreach (var completion in (group.RetainedCompletions ?? []).GroupBy(c => c.RootId).Select(g => g.MinBy(c => c.AcceptedAt)!))
             // A task may return from Only me under a new ID with its original immutable credit.
