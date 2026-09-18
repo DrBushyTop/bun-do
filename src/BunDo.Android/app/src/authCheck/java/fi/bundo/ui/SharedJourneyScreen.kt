@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -31,35 +32,24 @@ import java.time.format.FormatStyle
 
 @Composable
 internal fun SharedJourneyScreen(progress: String?, busy: Boolean, failed: Boolean, allowed: Boolean,
-    onStart: () -> Unit, onRefresh: () -> Unit, onBack: () -> Unit) {
+    onRefresh: () -> Unit, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
     val snapshot = progress?.let(::JSONObject)
     val journey = snapshot?.let(JourneyProgress::read)
+    val refreshLabel = stringResource(R.string.refresh_journey)
+    RefreshPage(refreshLabel, busy, allowed, onRefresh, Modifier.testTag("journey-page")) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).testTag("journey-screen"),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
-            TextButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.journey_back)) }
-            Text(stringResource(R.string.journey_title), style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.semantics { heading() })
+            RefreshHeading(stringResource(R.string.journey_title), refreshLabel, allowed && !busy, onRefresh)
         }
         HouseholdWorld()
         Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            if (busy) LinearProgressIndicator(Modifier.fillMaxWidth().testTag("journey-busy"))
             if (failed) Text(stringResource(R.string.journey_failed), color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.testTag("journey-error"))
-            if (snapshot == null) {
-                Text(stringResource(R.string.journey_unavailable))
-                OutlinedButton(onClick = onRefresh, enabled = allowed && !busy, modifier = Modifier.heightIn(min = 48.dp).testTag("journey-refresh")) {
-                    Text(stringResource(R.string.household_refresh))
-                }
-            } else if (journey == null) {
-                Text(stringResource(R.string.journey_intro), style = MaterialTheme.typography.titleLarge)
-                Text(stringResource(R.string.journey_start_body))
-                Button(onClick = onStart, enabled = allowed && !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("journey-start")) {
-                    Text(stringResource(R.string.journey_start))
-                }
-                Text(stringResource(R.string.journey_start_hint), style = MaterialTheme.typography.bodySmall)
+            if (journey == null) {
+                Text(stringResource(R.string.journey_loading))
             } else {
                 Text(stringResource(routeName(journey.routeId)), style = MaterialTheme.typography.titleLarge)
                 Text(stringResource(R.string.journey_at, locationName(journey.locationId, journey.locationIndex)))
@@ -76,9 +66,6 @@ internal fun SharedJourneyScreen(progress: String?, busy: Boolean, failed: Boole
                     .withZone(ZoneId.of(snapshot.getJSONObject("statistics").getString("zoneId")))
                 Text(stringResource(R.string.progress_as_of, formatter.format(Instant.parse(snapshot.getString("asOf")))),
                     style = MaterialTheme.typography.bodySmall)
-                OutlinedButton(onClick = onRefresh, enabled = allowed && !busy, modifier = Modifier.heightIn(min = 48.dp).testTag("journey-refresh")) {
-                    Text(stringResource(R.string.household_refresh))
-                }
                 if (journey.completedRoutes.isNotEmpty()) {
                     HorizontalDivider()
                     Text(stringResource(R.string.journey_history), style = MaterialTheme.typography.titleMedium,
@@ -88,7 +75,25 @@ internal fun SharedJourneyScreen(progress: String?, busy: Boolean, failed: Boole
                     }
                 }
             }
+            if (failed) TextButton(onClick = onRefresh, enabled = allowed && !busy, modifier = Modifier.testTag("journey-retry")) {
+                Text(stringResource(R.string.adventure_retry))
+            }
         }
+    }
+    }
+}
+
+@Composable
+internal fun JourneyHomeProgress(journey: JourneyProgress, onOpen: () -> Unit) {
+    val description = pluralStringResource(R.plurals.journey_progress, journey.completionsPerLocation,
+        journey.locationCompletions, journey.completionsPerLocation)
+    TextButton(onClick = onOpen, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag("journey-home")) {
+        Icon(painterResource(R.drawable.bun_do), null, Modifier.size(24.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(locationName(journey.locationId, journey.locationIndex), Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
+        Text("${journey.locationCompletions} / ${journey.completionsPerLocation}",
+            Modifier.semantics { contentDescription = description },
+            style = MaterialTheme.typography.labelLarge)
     }
 }
 

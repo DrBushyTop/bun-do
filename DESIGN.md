@@ -313,3 +313,26 @@ Use the existing Material menu, icon button and typography styles. Show ordering
 help only during reorder mode. Empty queues use a short text message instead of
 another illustration, large heading and explanatory paragraph. The capture
 buttons retain their existing emphasis, with the shorter Write / Kirjoita label.
+
+## Household screens and background reads
+
+List starters use the existing colored icon rows, with a short purpose below
+each choice. Choosing a type is its own scrollable view rather than an expanded
+section mixed with active lists.
+
+Together leads with weekly or monthly completion bars, then streaks, milestones
+and consistent journey/adventure navigation rows. Bun's journey starts after
+household sync without a separate setup step. A compact home entry shows the
+current location and accepted progress; private tasks never advance it.
+
+Adventure, Lists, Together and Activity render cached content during background
+reads. Reopening a fresh adventure does not fetch again.
+While Adventure is visible, stale content refreshes quietly,
+including pending suggestions; returning from the background checks freshness.
+Pull-to-refresh requests a fresh read; an accessible named action and the page
+overflow offer the same operation. No permanent Refresh button or connectivity disclaimer belongs in
+the content. Show failures when they happen and retain cached work. Keep privacy
+and destructive-action explanations where they support a decision.
+
+Adventure and journey pages use Android system Back, not a text-only Back row.
+Explicit writes and generation requests retain their progress and retry states.

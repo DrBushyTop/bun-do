@@ -61,11 +61,14 @@ internal data class JourneyProgress(
 }
 
 internal object SharedJourney {
-    suspend fun refresh(context: Context, repository: SharedRepository, token: String, enable: Boolean) {
+    suspend fun refresh(context: Context, repository: SharedRepository, token: String, enable: Boolean,
+        sendRequest: suspend (String, SharedWorkspace, Boolean) -> JSONObject = JourneyEndpoint()::send) {
+        val state = repository.prepareAdventureRead() ?: throw SyncFailure("WORKSPACE_UNAVAILABLE")
+        if (state.personal) return
         val request = checkNotNull(repository.prepareJourney(SystemClock.elapsedRealtime(),
             Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT, 0))) { "Sync busy" }
         try {
-            check(repository.applyJourney(request, JourneyEndpoint().send(token, request.workspace, enable))) { "Session changed" }
+            check(repository.applyJourney(request, sendRequest(token, request.workspace, enable || request.workspace.progress?.let { JourneyProgress.read(JSONObject(it)) } == null))) { "Session changed" }
         } catch (failure: SyncFailure) {
             if (failure.code in listOf("FORBIDDEN", "REGISTRATION_RETIRED", "EPOCH_CHANGED"))
                 repository.block(request, failure.code)

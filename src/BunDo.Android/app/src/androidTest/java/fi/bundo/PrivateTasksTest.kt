@@ -195,8 +195,8 @@ class PrivateTasksTest {
                 execSQL("INSERT INTO shared_workspaces (scope,workspaceId,epoch,registration,name,selected,nextSequence,revision,acknowledged,workerUntil,workerBoot) VALUES ('scope','home','epoch','registration','Home',1,'1','0','0',0,0)")
                 close()
             }
-            migrations.runMigrationsAndValidate(name, 18, true, InboxDatabase.MIGRATION_17_18).apply {
-                query("SELECT personal,name FROM shared_workspaces").use { assertTrue(it.moveToFirst()); assertEquals(0, it.getInt(0)); assertEquals("Home", it.getString(1)) }
+            migrations.runMigrationsAndValidate(name, 19, true, InboxDatabase.MIGRATION_17_18, InboxDatabase.MIGRATION_18_19).apply {
+                query("SELECT personal,name,adventureFetchedAt FROM shared_workspaces").use { assertTrue(it.moveToFirst()); assertEquals(0, it.getInt(0)); assertEquals("Home", it.getString(1)); assertEquals(0L, it.getLong(2)) }
                 query("SELECT title FROM inbox_tasks WHERE id='kept'").use { assertTrue(it.moveToFirst()); assertEquals("Local task", it.getString(0)) }
                 close()
             }

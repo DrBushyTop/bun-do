@@ -1,6 +1,12 @@
 package fi.bundo.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -11,6 +17,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -25,30 +32,27 @@ import java.time.format.FormatStyle
 
 @Composable
 internal fun SharedProgressScreen(progress: String?, activity: Boolean, tasks: Map<String, JSONObject>, membership: JSONObject?,
-    onRefresh: () -> Unit, onOpen: (String) -> Unit, onJourney: (() -> Unit)? = null, onAdventure: (() -> Unit)? = null, onQueue: (() -> Unit)? = null) {
+    onRefresh: () -> Unit, onOpen: (String) -> Unit, onJourney: (() -> Unit)? = null, onAdventure: (() -> Unit)? = null, onQueue: (() -> Unit)? = null, refreshing: Boolean = false, failed: Boolean = false, allowed: Boolean = true) {
     if (activity) {
-        SharedActivityScreen(progress, tasks, membership, onRefresh, onOpen)
+        SharedActivityScreen(progress, tasks, membership, onRefresh, onOpen, refreshing, failed, allowed)
         return
     }
     val snapshot = progress?.let(::JSONObject)
     val locale = LocalConfiguration.current.locales[0]
+    val refreshLabel = stringResource(R.string.refresh_progress)
+    RefreshPage(refreshLabel, refreshing, allowed, onRefresh, Modifier.testTag("progress-page")) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(stringResource(R.string.progress_together),
-            style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
-        OutlinedButton(onClick = onRefresh, modifier = Modifier.testTag("progress-refresh")) { Text(stringResource(R.string.household_refresh)) }
-        if (onJourney != null) OutlinedButton(onClick = onJourney,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("journey-open")) { Text(stringResource(R.string.journey_open)) }
-        if (onAdventure != null) OutlinedButton(onClick = onAdventure,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("adventure-open")) { Text(stringResource(R.string.adventure_open)) }
+        RefreshHeading(stringResource(R.string.progress_together), refreshLabel, allowed && !refreshing, onRefresh)
+        if (failed) Text(stringResource(R.string.journey_failed), color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("progress-error"))
         if (snapshot == null) {
             Text(stringResource(R.string.progress_unavailable))
+            if (onAdventure != null) SettingsNavigationRow(stringResource(R.string.adventure_open), onAdventure,
+                Modifier.testTag("adventure-open"), icon = ImageVector.vectorResource(R.drawable.adventure_scroll))
             return@Column
         }
         val stats = snapshot.getJSONObject("statistics")
         val zone = ZoneId.of(stats.getString("zoneId"))
         val dateTime = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT).withLocale(locale).withZone(zone)
-        Text(stringResource(R.string.progress_as_of, dateTime.format(Instant.parse(snapshot.getString("asOf")))),
-            style = MaterialTheme.typography.bodySmall)
         run {
             var month by rememberSaveable { mutableStateOf(false) }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -71,16 +75,26 @@ internal fun SharedProgressScreen(progress: String?, activity: Boolean, tasks: M
                     Text(stringResource(R.string.inbox))
                 }
             }
-            else for (index in 0 until buckets.length()) {
-                val bucket = buckets.getJSONObject(index)
-                val label = if (month) stringResource(R.string.progress_period, date(bucket.getString("start")), date(bucket.getString("end")))
-                    else LocalDate.parse(bucket.getString("start")).dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, locale) +
-                        " " + date(bucket.getString("start"))
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(stringResource(R.string.progress_bucket, label, bucket.getInt("count")), style = MaterialTheme.typography.bodyMedium)
-                    LinearProgressIndicator(progress = { bucket.getInt("count").toFloat() / maximum },
-                        gapSize = 0.dp, drawStopIndicator = {},
-                        modifier = Modifier.fillMaxWidth().clearAndSetSemantics { })
+            else Row(Modifier.fillMaxWidth().testTag("progress-chart"), horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.Bottom) {
+                for (index in 0 until buckets.length()) {
+                    val bucket = buckets.getJSONObject(index)
+                    val count = bucket.getInt("count")
+                    val start = LocalDate.parse(bucket.getString("start"))
+                    val shortLabel = if (month) stringResource(R.string.progress_week_number, start.get(java.time.temporal.IsoFields.WEEK_OF_WEEK_BASED_YEAR))
+                        else start.dayOfWeek.getDisplayName(java.time.format.TextStyle.NARROW, locale)
+                    val spokenLabel = if (month) stringResource(R.string.progress_period, date(bucket.getString("start")), date(bucket.getString("end")))
+                        else start.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, locale) + " " + date(bucket.getString("start"))
+                    val description = stringResource(R.string.progress_bucket, spokenLabel, count)
+                    Column(Modifier.weight(1f).clearAndSetSemantics { contentDescription = description },
+                        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(count.toString(), style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Box(Modifier.height(144.dp).fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
+                            if (count > 0) Box(Modifier.fillMaxWidth(.7f).fillMaxHeight(count.toFloat() / maximum)
+                                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)))
+                        }
+                        Text(shortLabel, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                    }
                 }
             }
             HorizontalDivider()
@@ -91,11 +105,20 @@ internal fun SharedProgressScreen(progress: String?, activity: Boolean, tasks: M
                 modifier = Modifier.testTag("progress-lifetime").semantics { heading() })
             if (stats.getInt("reachedMilestone") > 0) Text(stringResource(R.string.progress_milestone, stats.getInt("reachedMilestone")))
             if (!stats.isNull("nextMilestone")) Text(stringResource(R.string.progress_next_milestone, stats.getInt("nextMilestone")))
+            if (!stats.isNull("nextMilestone")) LinearProgressIndicator(
+                progress = { stats.getInt("lifetimeCount").toFloat() / stats.getInt("nextMilestone") },
+                modifier = Modifier.fillMaxWidth().clearAndSetSemantics {}, gapSize = 0.dp, drawStopIndicator = {})
+            if (onJourney != null) SettingsNavigationRow(stringResource(R.string.journey_open), onJourney,
+                Modifier.testTag("journey-open"), icon = ImageVector.vectorResource(R.drawable.bun_do))
+            if (onAdventure != null) SettingsNavigationRow(stringResource(R.string.adventure_open), onAdventure,
+                Modifier.testTag("adventure-open"), icon = ImageVector.vectorResource(R.drawable.adventure_scroll))
             HelpDisclosure(stringResource(R.string.progress_how), Modifier.testTag("progress-details")) {
+                Text(stringResource(R.string.progress_as_of, dateTime.format(Instant.parse(snapshot.getString("asOf")))))
                 Text(stringResource(R.string.progress_streak_explanation))
                 Text(stringResource(R.string.progress_counting_explanation, zone.id), style = MaterialTheme.typography.bodyMedium)
             }
         }
+    }
     }
 }
 

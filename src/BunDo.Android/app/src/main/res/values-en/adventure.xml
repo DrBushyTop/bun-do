@@ -1,6 +1,5 @@
 <resources>
     <string name="adventure_title">Adventure</string>
-    <string name="adventure_back">Back</string>
     <string name="adventure_intro">Choose a little adventure from the tasks already in your family’s queue.</string>
     <string name="adventure_open">Our adventure</string>
     <string name="adventure_preview">Preview tasks</string>
@@ -20,7 +19,6 @@
     <string name="adventure_accept">Start our adventure</string>
     <string name="adventure_accept_hint">Starts for the whole family. Tasks stay as they are, without being claimed.</string>
     <string name="adventure_not_now">Back</string>
-    <string name="adventure_offline_hint">Task work continues offline. Changing the shared adventure needs a connection.</string>
     <string name="adventure_source_unavailable">Task unavailable. Remove it from the adventure or choose another.</string>
     <string name="adventure_task_done">Complete</string>
     <string name="adventure_estimate">Estimate: %1$d / 3 stars · about %2$d min</string>

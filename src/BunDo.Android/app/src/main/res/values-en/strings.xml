@@ -90,7 +90,7 @@
     <string name="repeat_weekly">Weekly</string>
     <string name="repeat_start">Set repeat</string>
     <string name="repeat_edit">Edit repeat</string>
-    <string name="repeat_explanation">Repeats need a connection. The next task appears after sync. Time zone: %1$s.</string>
+    <string name="repeat_explanation">The next task appears after sync. Time zone: %1$s.</string>
     <string name="repeat_title">Title for future tasks</string>
     <string name="repeat_description">Description for future tasks</string>
     <string name="repeat_edit_explanation">Changes apply to future tasks. Stopping keeps this task. Deleting stops the repeat, and Undo does not restart it.</string>
@@ -214,7 +214,6 @@
     <string name="lists_empty">Start with groceries, packing or a blank list. Existing checklists appear here too.</string>
     <string name="lists_saved">Saved for next time</string>
     <string name="lists_saved_empty">Save a list from its menu to use the same starting items again.</string>
-    <string name="lists_online">Saving and changing shared starting lists needs a connection. Cached lists can be started offline.</string>
     <string name="lists_failed">Could not sync saved lists. Your draft is kept. Check your connection and retry.</string>
     <string name="lists_changed">Someone changed the saved lists. Your edits are kept. Review the current saved list before saving.</string>
     <string name="lists_review">Review saved list</string>
@@ -271,4 +270,17 @@
     <string name="lists_loading">Loading saved lists…</string>
     <string name="lists_refresh_failed">Could not refresh saved lists. Your saved content is still available. Try Refresh.</string>
     <string name="lists_load_failed">Could not load saved lists. Check your connection and try Refresh.</string>
+    <string name="refresh_adventures">Refresh adventures</string>
+    <string name="refresh_progress">Refresh household statistics</string>
+    <string name="refresh_journey">Refresh shared journey</string>
+    <string name="journey_loading">Your journey starts automatically when the household syncs.</string>
+    <string name="progress_week_number">Wk %1$d</string>
+    <string name="refresh_activity">Refresh household activity</string>
+    <string name="lists_choose_type">What do you need a list for?</string>
+    <string name="lists_groceries_hint">One list, ready for every shop.</string>
+    <string name="lists_cottage_hint">Choose what this trip needs.</string>
+    <string name="lists_cleaning_hint">Start with the rooms that need attention.</string>
+    <string name="lists_hosting_hint">A short list before people arrive.</string>
+    <string name="lists_seasonal_hint">Choose the jobs that fit your home.</string>
+    <string name="lists_blank_hint">Name it and add your own items.</string>
 </resources>

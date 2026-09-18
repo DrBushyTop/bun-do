@@ -25,6 +25,65 @@ class SharedAdventureTest {
         try { db.shared().saveWorkspace(state); block(db, state, lease, SharedRepository(db, lease, state.scope, state.registration)) }
         finally { db.close(); context.deleteDatabase(name) }
     }
+    @Test fun recentAdventureVisitSurvivesReentryAndRepositoryRestartWithoutAnotherRead() = fixture { db, state, lease, repository ->
+        var reads = 0
+        val send: suspend (String, SharedWorkspace, JSONObject) -> JSONObject = { _, _, _ -> reads++; adventureFixture(state) }
+        SharedAdventure.send(context, repository, "token", JSONObject().put("action", "visit"), send)
+        val restarted = SharedRepository(db, lease, state.scope, state.registration)
+        SharedAdventure.send(context, restarted, "token", JSONObject().put("action", "visit"), send)
+        assertEquals(1, reads)
+    }
+
+    @Test fun staleForcedAndClockRollbackVisitsReadAgain() = fixture { db, state, _, repository ->
+        var reads = 0
+        val send: suspend (String, SharedWorkspace, JSONObject) -> JSONObject = { _, _, _ -> reads++; adventureFixture(state) }
+        SharedAdventure.send(context, repository, "token", JSONObject().put("action", "visit"), send)
+        val cached = repository.workspace.first()!!
+        assertTrue(SharedAdventure.fresh(cached, cached.adventureFetchedAt + 299_999))
+        assertFalse(SharedAdventure.fresh(cached, cached.adventureFetchedAt + 300_000))
+        assertFalse(SharedAdventure.fresh(cached, cached.adventureFetchedAt - 1))
+        db.shared().saveWorkspace(cached.copy(adventureFetchedAt = System.currentTimeMillis() - 300_001))
+        SharedAdventure.send(context, repository, "token", JSONObject().put("action", "visit"), send)
+        SharedAdventure.send(context, repository, "token", JSONObject().put("action", "visit").put("force", true), send)
+        assertEquals(3, reads)
+    }
+
+    @Test fun backgroundReadDoesNotReserveCommandWorkerAndFailureKeepsCache() = fixture { _, state, _, repository ->
+        val request = repository.prepareJourney(1, 1)!!
+        repository.applyAdventure(request, adventureFixture(state)); repository.release(request)
+        coroutineScope {
+            val entered = CompletableDeferred<Unit>(); val response = CompletableDeferred<Unit>()
+            val refresh = async {
+                runCatching { SharedAdventure.send(context, repository, "token", JSONObject().put("action", "visit").put("force", true)) { _, _, _ ->
+                    entered.complete(Unit); response.await(); throw java.io.IOException("Offline")
+                } }
+            }
+            entered.await()
+            val command = repository.prepareJourney(android.os.SystemClock.elapsedRealtime(),
+                android.provider.Settings.Global.getInt(context.contentResolver, android.provider.Settings.Global.BOOT_COUNT, 0))
+            assertNotNull(command)
+            response.complete(Unit)
+            assertTrue(refresh.await().isFailure)
+            assertNotNull(repository.adventure.first()!!.active)
+            repository.release(command!!)
+        }
+    }
+
+    @Test fun pendingAndExpiredSuggestionsUseShorterFreshnessAndBlockedCacheIsNeverFresh() {
+        val state = adventureWorkspace()
+        val now = System.currentTimeMillis()
+        val json = adventureFixture(state, active = false)
+        val batch = json.getJSONObject("board").getJSONObject("batch")
+        batch.put("status", "RUNNING").put("proposals", JSONObject.NULL)
+            .put("leaseUntil", Instant.ofEpochMilli(now + 60_000).toString())
+        val running = state.copy(adventure = json.toString(), adventureFetchedAt = now)
+        assertTrue(SharedAdventure.fresh(running, now + 4_999))
+        assertFalse(SharedAdventure.fresh(running, now + 5_000))
+        assertFalse(SharedAdventure.fresh(running.copy(blocked = "FORBIDDEN"), now))
+        batch.put("status", "EXPIRED").put("expiresAt", Instant.ofEpochMilli(now - 1).toString())
+        assertFalse(SharedAdventure.fresh(state.copy(adventure = json.toString(), adventureFetchedAt = now), now))
+    }
+
     @Test fun cacheSurvivesRestartWithoutSubmittingPendingTextOrAdvancingTaskCursor() = fixture { db, state, _, repository ->
         repository.copyText("Private pending text", "")
         val request = repository.prepareJourney(1000, 1)!!

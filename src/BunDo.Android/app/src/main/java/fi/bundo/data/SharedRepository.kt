@@ -568,7 +568,7 @@ class SharedRepository(
             check(parsed.workspaceId == state.workspaceId && parsed.epoch == state.epoch)
             val prior = state.adventure?.let { AdventureSnapshot.read(JSONObject(it)) }
             if (prior == null || parsed.revision > prior.revision || parsed.revision == prior.revision && sameJson(snapshot, JSONObject(state.adventure)))
-                dao.saveWorkspace(state.copy(adventure = snapshot.toString()))
+                dao.saveWorkspace(state.copy(adventure = snapshot.toString(), adventureFetchedAt = System.currentTimeMillis()))
             lease.check()
             true
         }

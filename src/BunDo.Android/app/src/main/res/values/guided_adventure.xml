@@ -18,7 +18,7 @@
     <string name="guided_discard">Hylkää luonnos</string>
     <string name="guided_outcome">Mitä haluaisit saada aikaan?</string>
     <string name="guided_time">Käytettävissä oleva aika, vapaaehtoinen</string>
-    <string name="guided_preview_hint">Bun ehdottaa luonnosta verkossa. Listalle ei lisätä mitään ennen hyväksyntääsi.</string>
+    <string name="guided_preview_hint">Bun ehdottaa luonnosta. Listalle ei lisätä mitään ennen hyväksyntääsi.</string>
     <string name="guided_plan">Esikatsele suunnitelma</string>
     <string name="guided_ended">Tämä aloitusyritys on päättynyt. Jo lisätyt tai synkronointia odottavat tehtävät jäävät listalle.</string>
     <string name="guided_acknowledge">Selvä</string>

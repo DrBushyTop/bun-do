@@ -117,13 +117,16 @@ class SharedSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
                 try { SharedVisibility.retry(data, token) }
                 catch (error: CancellationException) { throw error }
                 catch (_: Exception) { /* Saved visibility requests remain retryable. Ordinary tasks can still sync. */ }
-                for (scope in scopes.filter { it.blocked == null }) {
+                syncWorkspacePass(scopes.filter { it.blocked == null }, sync = { scope ->
                     val repository = SharedRepository(data.database, data.lease, scope.scope, data.registrationId)
                     val recovery = SharedSnapshotRecovery(data.database, data.lease, scope.scope)
-                    val finished = runScope(repository, recovery, checkNotNull(data.database.openHelper.writableDatabase.path), token)
-                    if (!finished) return@withAccountToken false
-                }
-                true
+                    runScope(repository, recovery, checkNotNull(data.database.openHelper.writableDatabase.path), token)
+                }, activateJourney = { scope ->
+                    val repository = SharedRepository(data.database, data.lease, scope.scope, data.registrationId)
+                    val current = repository.prepareAdventureRead()
+                    if (current != null && !current.personal && current.progress?.let { JourneyProgress.read(JSONObject(it)) } == null)
+                        SharedJourney.refresh(applicationContext, repository, token, false)
+                })
             }.let { if (it) Result.success() else Result.retry() }
         } catch (_: CancellationException) { Result.success() }
         catch (_: Exception) { Result.retry() }
@@ -173,4 +176,18 @@ class SharedSyncWorker(context: Context, params: WorkerParameters) : CoroutineWo
                     .setInputData(workDataOf("owner" to data.lease.owner, "generation" to data.lease.generation)).build())
         }
     }
+}
+
+internal suspend fun syncWorkspacePass(scopes: List<SharedWorkspace>, sync: suspend (SharedWorkspace) -> Boolean,
+    activateJourney: suspend (SharedWorkspace) -> Unit): Boolean {
+    var retryJourney = false
+    for (scope in scopes) {
+        if (!sync(scope)) return false
+        if (!scope.personal) {
+            try { activateJourney(scope) }
+            catch (error: CancellationException) { throw error }
+            catch (_: Exception) { retryJourney = true }
+        }
+    }
+    return !retryJourney
 }

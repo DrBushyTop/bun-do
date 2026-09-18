@@ -27,11 +27,12 @@ import fi.bundo.R
 internal fun SettingsNavigationRow(
     label: String, onClick: () -> Unit, modifier: Modifier = Modifier,
     value: String? = null, icon: ImageVector? = null, enabled: Boolean = true,
+    leading: (@Composable () -> Unit)? = null,
 ) {
     Row(modifier.fillMaxWidth().heightIn(min = 56.dp).alpha(if (enabled) 1f else 0.38f)
         .clickable(enabled = enabled, role = Role.Button, onClick = onClick).padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        if (icon != null) Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
+        if (leading != null) leading() else if (icon != null) Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(label, style = MaterialTheme.typography.bodyLarge)
             if (value != null) Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

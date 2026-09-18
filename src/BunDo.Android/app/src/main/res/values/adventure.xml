@@ -1,6 +1,5 @@
 <resources>
     <string name="adventure_title">Seikkailu</string>
-    <string name="adventure_back">Takaisin</string>
     <string name="adventure_intro">Valitkaa pieni yhteinen seikkailu jo olemassa olevista tehtävistä.</string>
     <string name="adventure_open">Yhteinen seikkailu</string>
     <string name="adventure_preview">Katso tehtävät</string>
@@ -20,7 +19,6 @@
     <string name="adventure_accept">Aloita yhteinen seikkailu</string>
     <string name="adventure_accept_hint">Aloittaa seikkailun koko perheelle. Tehtävät pysyvät ennallaan, eikä niitä varata kenellekään.</string>
     <string name="adventure_not_now">Takaisin</string>
-    <string name="adventure_offline_hint">Tehtäviä voi jatkaa ilman verkkoa. Seikkailun muuttaminen tarvitsee yhteyden.</string>
     <string name="adventure_source_unavailable">Tehtävä ei ole saatavilla. Poista seikkailun vaihe tai valitse toinen tehtävä.</string>
     <string name="adventure_task_done">Valmis</string>
     <string name="adventure_estimate">Arvio: %1$d / 3 tähteä · noin %2$d min</string>

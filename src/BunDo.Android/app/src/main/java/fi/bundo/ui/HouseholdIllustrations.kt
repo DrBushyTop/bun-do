@@ -95,8 +95,7 @@ internal fun taskCue(title: String): String {
 internal val LocalTaskArtwork = staticCompositionLocalOf<suspend (String) -> android.graphics.Bitmap?> { { null } }
 
 @Composable
-internal fun TaskCue(title: String) {
-    val cue = taskCue(title)
+internal fun TaskCue(title: String, cue: String = taskCue(title), icon: androidx.compose.ui.graphics.vector.ImageVector? = null) {
     val colors = MaterialTheme.colorScheme
     val (background, ink) = when (cue) {
         "bike", "storage" -> colors.tertiaryContainer to colors.onTertiaryContainer
@@ -104,7 +103,7 @@ internal fun TaskCue(title: String) {
         else -> colors.primaryContainer to colors.onPrimaryContainer
     }
     Surface(color = background, shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)) {
-        Icon(painterResource(when (cue) {
+        Icon(if (icon != null) androidx.compose.ui.graphics.vector.rememberVectorPainter(icon) else painterResource(when (cue) {
             "bike" -> R.drawable.cue_bike
             "pet" -> R.drawable.cue_pet
             "shop" -> R.drawable.cue_shop

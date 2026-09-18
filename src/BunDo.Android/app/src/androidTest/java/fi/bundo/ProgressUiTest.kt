@@ -87,6 +87,8 @@ class ProgressUiTest {
     @Test fun englishChartShowsSameTotalsAndStaticMilestonesAcrossPeriodChanges() {
         screen("en", 1f)
         compose.onNodeWithText("3 tasks completed").assertExists()
+        compose.onNodeWithTag("progress-chart").assertExists()
+        compose.onNodeWithTag("progress-refresh").assertDoesNotExist()
         screenshot("progress-en-week")
         compose.onNodeWithTag("progress-month").performClick()
         compose.onNodeWithText("8 tasks completed").assertExists()
@@ -98,6 +100,7 @@ class ProgressUiTest {
     @Test fun finnishDoubleFontExplainsAcceptanceAndAllCountsHaveText() {
         screen("fi", 2f)
         compose.onNodeWithText("3 tehtävää hoidettu").assertExists()
+        screenshot("progress-fi-large-chart")
         compose.onNodeWithTag("progress-streak").performScrollTo().assertTextEquals("2 viikon putki")
         compose.onNodeWithTag("progress-lifetime").performScrollTo().assertTextEquals("25 asiaa hoidettu yhdessä")
         compose.onNodeWithTag("progress-details").performScrollTo().performClick()
@@ -142,7 +145,8 @@ class ProgressUiTest {
     }
     @Test fun activityLargeTextAndDarkThemeKeepEventsNavigable() {
         screen("fi", 2f, activity = true, many = true, theme = "dark")
-        compose.onNodeWithTag("progress-refresh").performClick()
+        compose.onNodeWithTag("page-options").performClick()
+        compose.onNodeWithTag("page-refresh").performClick()
         assertTrue(refreshed)
         screenshot("activity-fi-large-dark")
         compose.onNodeWithTag("activity-details-$task-6").performScrollTo().performClick()
@@ -152,7 +156,8 @@ class ProgressUiTest {
     }
     @Test fun emptyActivityHasRefreshAndNoFabricatedEvents() {
         screen("en", 1f, activity = true, empty = true)
-        compose.onNodeWithTag("progress-refresh").performClick()
+        compose.onNodeWithTag("page-options").performClick()
+        compose.onNodeWithTag("page-refresh").performClick()
         assertTrue(refreshed)
         compose.onNodeWithTag("activity-row-$task").assertDoesNotExist()
         screenshot("activity-en-empty")
@@ -160,7 +165,8 @@ class ProgressUiTest {
     @Test fun missingActivitySnapshotCanRefresh() {
         screen("en", 1f, activity = true, available = false)
         compose.onNodeWithText("Sync to see shared activity and completions.").assertIsDisplayed()
-        compose.onNodeWithTag("progress-refresh").performClick()
+        compose.onNodeWithTag("page-options").performClick()
+        compose.onNodeWithTag("page-refresh").performClick()
         assertTrue(refreshed)
     }
     @Test fun zeroCompletionsAreNormalAndDoNotShowAnUnearnedMilestone() {
@@ -173,7 +179,8 @@ class ProgressUiTest {
     @Test fun missingSnapshotOffersRefreshRatherThanInventingZeroCounts() {
         screen("en", 1f, available = false)
         compose.onNodeWithText("Sync to see shared activity and completions.").assertExists()
-        compose.onNodeWithTag("progress-refresh").assertHasClickAction()
+        compose.onNodeWithTag("page-options").performClick()
+        compose.onNodeWithTag("page-refresh").assertHasClickAction()
         compose.onNodeWithTag("progress-period-count").assertDoesNotExist()
     }
     private fun screenshot(name: String) {

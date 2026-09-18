@@ -27,7 +27,7 @@ import java.time.format.FormatStyle
 
 @Composable
 internal fun SharedActivityScreen(progress: String?, tasks: Map<String, JSONObject>, membership: JSONObject?,
-    onRefresh: () -> Unit, onOpen: (String) -> Unit) {
+    onRefresh: () -> Unit, onOpen: (String) -> Unit, refreshing: Boolean = false, failed: Boolean = false, allowed: Boolean = true) {
     val snapshot = remember(progress) { progress?.let(::JSONObject) }
     val locale = LocalConfiguration.current.locales[0]
     val zone = snapshot?.getJSONObject("statistics")?.getString("zoneId")?.let(ZoneId::of)
@@ -35,16 +35,13 @@ internal fun SharedActivityScreen(progress: String?, tasks: Map<String, JSONObje
     val time = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale).withZone(zone)
     val fullDate = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT).withLocale(locale).withZone(zone)
     val events = snapshot?.getJSONArray("activity")
+    val refreshLabel = stringResource(R.string.refresh_activity)
+    RefreshPage(refreshLabel, refreshing, allowed, onRefresh, Modifier.testTag("activity-page")) {
     LazyColumn(Modifier.fillMaxSize().testTag("activity-feed"),
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)) {
         item {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.progress_activity), Modifier.weight(1f).semantics { heading() },
-                    style = MaterialTheme.typography.headlineSmall)
-                IconButton(onClick = onRefresh, modifier = Modifier.testTag("progress-refresh")) {
-                    Icon(Icons.Outlined.Refresh, stringResource(R.string.household_refresh))
-                }
-            }
+            RefreshHeading(stringResource(R.string.progress_activity), refreshLabel, allowed && !refreshing, onRefresh)
+            if (failed) Text(stringResource(R.string.journey_failed), color = MaterialTheme.colorScheme.error)
         }
         if (snapshot == null) {
             item { Text(stringResource(R.string.progress_unavailable), Modifier.padding(vertical = 12.dp)) }
@@ -77,6 +74,7 @@ internal fun SharedActivityScreen(progress: String?, tasks: Map<String, JSONObje
                 }
             }
         }
+    }
     }
 }
 

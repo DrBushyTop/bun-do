@@ -91,7 +91,7 @@
     <string name="repeat_weekly">Viikoittain</string>
     <string name="repeat_start">Aseta toisto</string>
     <string name="repeat_edit">Muokkaa toistoa</string>
-    <string name="repeat_explanation">Toisto vaatii verkkoyhteyden. Seuraava tehtävä ilmestyy synkronoinnin jälkeen. Aikavyöhyke: %1$s.</string>
+    <string name="repeat_explanation">Seuraava tehtävä ilmestyy synkronoinnin jälkeen. Aikavyöhyke: %1$s.</string>
     <string name="repeat_title">Seuraavien tehtävien otsikko</string>
     <string name="repeat_description">Seuraavien tehtävien kuvaus</string>
     <string name="repeat_edit_explanation">Muutokset koskevat seuraavia tehtäviä. Pysäyttäminen säilyttää nykyisen tehtävän. Poistaminen pysäyttää toiston, eikä Kumoa käynnistä sitä uudelleen.</string>
@@ -215,7 +215,6 @@
     <string name="lists_empty">Aloita ostoksista, pakkauksesta tai tyhjästä listasta. Myös nykyiset tehtävälistat näkyvät täällä.</string>
     <string name="lists_saved">Tallessa seuraavaa kertaa varten</string>
     <string name="lists_saved_empty">Tallenna lista sen valikosta, niin voit käyttää samoja kohtia uudelleen.</string>
-    <string name="lists_online">Yhteisten pohjien tallennus ja muokkaus vaatii yhteyden. Tallennetusta pohjasta voi aloittaa listan myös ilman yhteyttä.</string>
     <string name="lists_failed">Tallennettuja listoja ei voitu synkronoida. Luonnos säilyy. Tarkista yhteys ja yritä uudelleen.</string>
     <string name="lists_changed">Joku muutti tallennettuja listoja. Muokkauksesi säilyvät. Tarkista nykyinen tallennettu lista ennen tallentamista.</string>
     <string name="lists_review">Tarkista tallennettu lista</string>
@@ -272,4 +271,17 @@
     <string name="lists_loading">Ladataan tallennettuja listoja…</string>
     <string name="lists_refresh_failed">Tallennettuja listoja ei voitu päivittää. Aiemmin tallennettu sisältö on käytettävissä. Kokeile Päivitä-toimintoa.</string>
     <string name="lists_load_failed">Tallennettuja listoja ei voitu ladata. Tarkista yhteys ja kokeile Päivitä-toimintoa.</string>
+    <string name="refresh_adventures">Päivitä seikkailut</string>
+    <string name="refresh_progress">Päivitä yhteiset tilastot</string>
+    <string name="refresh_journey">Päivitä yhteinen matka</string>
+    <string name="journey_loading">Matka alkaa automaattisesti, kun kotitalouden tiedot synkronoituvat.</string>
+    <string name="progress_week_number">Vko %1$d</string>
+    <string name="refresh_activity">Päivitä tapahtumat</string>
+    <string name="lists_choose_type">Mihin tarvitset listan?</string>
+    <string name="lists_groceries_hint">Sama lista seuraavallekin kauppareissulle.</string>
+    <string name="lists_cottage_hint">Valitse tämän matkan tavarat.</string>
+    <string name="lists_cleaning_hint">Aloita huomiota kaipaavista huoneista.</string>
+    <string name="lists_hosting_hint">Valmistelut ennen vieraiden saapumista.</string>
+    <string name="lists_seasonal_hint">Valitse omaan kotiisi sopivat työt.</string>
+    <string name="lists_blank_hint">Nimeä lista ja lisää omat kohdat.</string>
 </resources>
