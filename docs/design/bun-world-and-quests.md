@@ -98,7 +98,10 @@ Generation must not affect normal task work.
 
 Accepted adventures never expire or regenerate in the background. Refreshing
 the suggestion set changes neither an accepted adventure nor its source tasks.
-An accepted adventure remains until completed and dismissed or explicitly left.
+An accepted adventure remains until completed and dismissed, explicitly finished,
+or explicitly left. Either member can confirm finishing with unfinished tasks or
+unchecked list items. Those tasks and items stay unchanged and earn no completion
+credit from this action. Missing ingredients never block an explicit finish.
 Coordinate concurrent requests so two devices cannot publish competing sets.
 
 ## Help me plan an adventure

@@ -41,7 +41,7 @@ public static class OperationEnvelope
             switch (root.GetProperty("command").GetString())
             {
                 case "CreateTask":
-                    Fields(payload, ["taskId", "title", "description"], ["due", "urgent", "placement", "anonymousCapture", "originalCapture"]);
+                    Fields(payload, ["taskId", "title", "description"], ["due", "urgent", "placement", "anonymousCapture", "originalCapture", "listKind"]);
                     Fields(observed, []);
                     command = new CreateTask(Uuid(payload.GetProperty("taskId")).ToString("D"),
                         Text(payload.GetProperty("title")), NullableText(payload.GetProperty("description")),
@@ -50,6 +50,7 @@ public static class OperationEnvelope
                         payload.TryGetProperty("placement", out var placement) && placement.ValueKind != JsonValueKind.Null ? Placement(placement) : null,
                         payload.TryGetProperty("anonymousCapture", out var anonymous) && anonymous.GetBoolean(),
                         payload.TryGetProperty("originalCapture", out var original) ? ImportCapture(original) : null);
+                    command = (CreateTask)command with { ListKind = payload.TryGetProperty("listKind", out var listKind) ? Text(listKind) : null };
                     break;
                 case "EditTask":
                     Fields(payload, ["taskId"], ["title", "description", "due", "urgent"]);
@@ -107,6 +108,7 @@ public static class OperationEnvelope
                     if (!dependencies.Contains(rejected)) throw new EnvelopeException("INVALID_DEPENDENCY");
                     command = new DiscardBlockedIntent(rejected);
                     break;
+                case "SetListPinned":
                 case "ClaimTask":
                 case "UnclaimTask":
                 case "CompleteTask":
@@ -120,8 +122,8 @@ public static class OperationEnvelope
                 case "AddChildren":
                     var kind = root.GetProperty("command").GetString();
                     var checklist = kind is "SplitTask" or "AddChildren";
-                    Fields(payload, kind == "CompleteTask" ? ["taskId", "confirmedClaimantId"] :
-                        kind == "SetSnooze" ? ["taskId", "until"] : checklist ? ["taskId", "items"] : ["taskId"]);
+                    Fields(payload, kind == "SetListPinned" ? ["taskId", "pinned"] : kind == "CompleteTask" ? ["taskId", "confirmedClaimantId"] :
+                        kind == "SetSnooze" ? ["taskId", "until"] : checklist ? ["taskId", "items"] : ["taskId"], checklist ? ["notes"] : []);
                     Fields(observed, checklist ? ["lifecycle", "claim", "hierarchy", "deletion", "title", "description"] :
                         ["lifecycle", "claim", "hierarchy", "deletion"], ["subtree", "snooze"]);
                     var taskId = Uuid(payload.GetProperty("taskId")).ToString("D");
@@ -130,6 +132,7 @@ public static class OperationEnvelope
                         observed.TryGetProperty("subtree", out _) ? ExactVersion(observed, "subtree") : 0,
                         observed.TryGetProperty("snooze", out _) ? ExactVersion(observed, "snooze") : 0);
                     command = kind switch {
+                        "SetListPinned" => new SetListPinned(taskId, expected, payload.GetProperty("pinned").GetBoolean()),
                         "ClaimTask" => new ClaimTask(taskId, expected),
                         "UnclaimTask" => new UnclaimTask(taskId, expected),
                         "CompleteTask" => new CompleteTask(taskId, expected,
@@ -159,7 +162,7 @@ public static class OperationEnvelope
             if (command is ChecklistCommand listCommand)
             {
                 ulong? Field(string group) => observed.GetProperty(group).TryGetProperty("fieldVersion", out var field) ? Decimal(field) : null;
-                command = listCommand with { ExpectedTitleFieldVersion = Field("title"), ExpectedDescriptionFieldVersion = Field("description") };
+                command = listCommand with { Notes = payload.TryGetProperty("notes", out var notes) ? notes.EnumerateArray().Select(NullableText).ToArray() : null, ExpectedTitleFieldVersion = Field("title"), ExpectedDescriptionFieldVersion = Field("description") };
             }
             return new(workspace, epoch, device, sequence, command, 1, 1, bytes.ToArray(), dependencies)
                 { CaptureContext = root.GetProperty("occurredAtContext").Clone() };

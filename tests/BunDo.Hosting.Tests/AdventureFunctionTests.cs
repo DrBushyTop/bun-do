@@ -173,6 +173,22 @@ public sealed class AdventureFunctionTests : IDisposable
         Assert.Equal("ADVENTURE_IDEAS", trace.GetTagItem("ai.mode"));
         Assert.DoesNotContain("Private", JsonSerializer.Serialize(trace.TagObjects.ToDictionary(t => t.Key, t => t.Value)));
     }
+    [Fact]
+    public async Task List_library_authenticates_and_rejects_missing_value_or_duplicate_fields_before_writing()
+    {
+        var documents = Storage(); using var services = Services(documents);
+        var function = new ListLibraryFunction(Validator, services);
+        Assert.Equal(401, Assert.IsType<ObjectResult>(await function.Run(Request(Body(), null).Request)).StatusCode);
+        var read = Request(Body(), Token());
+        var result = Assert.IsType<ContentResult>(await function.Run(read.Request));
+        Assert.Equal(200, result.StatusCode); Assert.Equal("no-store", read.Response.Headers.CacheControl);
+        Assert.Contains("\"lists\":[]", result.Content);
+        var missing = Body("save").Replace("}", ",\"command\":{\"operationId\":\"" + Guid.NewGuid() + "\",\"expectedVersion\":\"0\",\"id\":\"" + Guid.NewGuid() + "\"}}");
+        Assert.Equal(400, Assert.IsType<ObjectResult>(await function.Run(Request(missing, Token()).Request)).StatusCode);
+        Assert.Equal(400, Assert.IsType<ObjectResult>(await function.Run(Request(Body().Replace("}", ",\"action\":\"read\"}"), Token()).Request)).StatusCode);
+        Assert.Equal(0, documents.Writes);
+    }
+
     private sealed class Ideas : IAdventureIdeasProvider {
         public Task<string[]> SuggestAsync(IReadOnlyList<AdventureIdeaInput> tasks, string language, CancellationToken ct) =>
             Task.FromResult(new[] { "Private corner idea", "Private balcony idea", "Private workspace idea" });

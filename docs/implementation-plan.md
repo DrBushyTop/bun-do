@@ -121,6 +121,12 @@ the selection reference, not shipped-app evidence.
 follows the owner's rc.9 screenshots with persistent save choices, compact phase
 controls and readable toolbar content over the existing scenes.
 
+[Reusable household lists](https://github.com/DrBushyTop/bun-do/issues/76)
+adds the selected Lists destination, shared saved content, offline fresh copies,
+standing groceries and explicit permissive adventure finishing. Its
+[behavioral contract](architecture/reusable-lists.md) separates reusable content
+from task progress and records the initial connectivity boundary.
+
 ## AI usage policy after V2
 
 [Decide whether AI usage limits are needed after V2](https://github.com/DrBushyTop/bun-do/issues/37) is blocked by V2 completion and belongs to neither release parent. Start without product usage quotas, daily/monthly budgets or per-user fairness allowances. Observe actual usage before deciding whether limits are needed. Technical I/O, memory, output and timeout bounds, authentication and provider constraints remain. No token-limit implementation gates AI enablement.

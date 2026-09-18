@@ -49,6 +49,16 @@ class AdventureUiTest {
             }
         } }
     }
+    @Test fun explicitFinishConfirmsWithoutCheckingTasks() {
+        screen()
+        compose.onNodeWithTag("adventure-finish").performScrollTo().performClick()
+        compose.onNodeWithTag("adventure-confirm-finish").performClick()
+        compose.runOnIdle {
+            assertEquals("finish", action!!.getString("action"))
+            assertTrue(action!!.getBoolean("confirmed"))
+            assertEquals("OPEN", root.getString("lifecycle"))
+        }
+    }
     @Test fun twoIllustratedProposalsRequireExplicitAcceptance() {
         val json = adventureFixture(state, root, active = false); screen(json)
         val choice = json.getJSONObject("board").getJSONObject("batch").getJSONArray("proposals").getJSONObject(0).getString("id")

@@ -137,7 +137,7 @@ internal object SharedAdventure {
                 try {
                     val result = sendRequest(token, request.workspace, action)
                     check(repository.applyAdventure(request, result))
-                    if (action.getString("action") in listOf("leave", "dismiss")) {
+                    if (action.getString("action") in listOf("leave", "dismiss", "finish")) {
                         val closed = AdventureSnapshot.read(result)
                         if (closed.active == null) check(repository.applyAdventure(request,
                             sendRequest(token, request.workspace, JSONObject().put("action", "refresh").put("batchId", closed.batchId ?: JSONObject.NULL))))
@@ -156,9 +156,9 @@ internal object SharedAdventure {
     }
 }
 
-internal class AdventureEndpoint {
+internal class AdventureEndpoint(private val route: String = "adventure") {
     suspend fun send(token: String, state: SharedWorkspace, action: JSONObject): JSONObject = withContext(Dispatchers.IO) {
-        val connection = URL("${BuildConfig.IDENTITY_API_BASE}/adventure").openConnection() as HttpURLConnection
+        val connection = URL("${BuildConfig.IDENTITY_API_BASE}/$route").openConnection() as HttpURLConnection
         try {
             connection.instanceFollowRedirects = false; connection.connectTimeout = 15_000; connection.readTimeout = 110_000
             connection.requestMethod = "POST"
@@ -166,7 +166,7 @@ internal class AdventureEndpoint {
             connection.doOutput = true
             val body = JSONObject(action.toString()).put("workspaceId", state.workspaceId).put("stateEpoch", state.epoch)
                 .put("registrationId", state.registration).toString().toByteArray(Charsets.UTF_8)
-            require(body.size <= 16 * 1024); connection.outputStream.use { it.write(body) }
+            require(body.size <= if (route == "lists") 64 * 1024 else 16 * 1024); connection.outputStream.use { it.write(body) }
             val status = connection.responseCode
             val response = (if (status == 200) connection.inputStream else connection.errorStream)?.use { stream ->
                 val bytes = ByteArray(4 * 1024 * 1024 + 1); var count = 0

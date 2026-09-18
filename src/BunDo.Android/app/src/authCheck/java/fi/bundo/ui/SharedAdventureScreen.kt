@@ -42,6 +42,7 @@ internal fun SharedAdventureScreen(snapshot: AdventureSnapshot?, busy: Boolean, 
     var preview by remember(snapshot?.batchId) { mutableStateOf<AdventureChoice?>(null) }
     var edit by remember(snapshot?.active?.id, snapshot?.active?.version) { mutableStateOf(false) }
     var leave by remember(snapshot?.active?.id) { mutableStateOf(false) }
+    var finish by remember(snapshot?.active?.id) { mutableStateOf(false) }
     val active = snapshot?.active
     val status = snapshot?.batchStatus(now)
     fun action(name: String) = JSONObject().put("action", name).put("adventureId", active!!.id).put("version", active.version)
@@ -68,6 +69,7 @@ internal fun SharedAdventureScreen(snapshot: AdventureSnapshot?, busy: Boolean, 
             OutlinedButton(onClick = { edit = true }, enabled = allowed && !busy, modifier = Modifier.testTag("adventure-edit")) { Text(stringResource(R.string.adventure_edit)) }
             if (snapshot.complete) Button(onClick = { onAction(action("dismiss")) }, enabled = allowed && !busy,
                 modifier = Modifier.testTag("adventure-dismiss")) { Text(stringResource(R.string.adventure_dismiss)) }
+            if (!snapshot.complete) Button(onClick = { finish = true }, enabled = allowed && !busy, modifier = Modifier.testTag("adventure-finish")) { Text(stringResource(R.string.adventure_finish)) }
             TextButton(onClick = { leave = true }, enabled = allowed && !busy, modifier = Modifier.testTag("adventure-leave")) { Text(stringResource(R.string.adventure_leave)) }
         } else if (snapshot?.creation != null) {
             Text(stringResource(R.string.guided_pending))
@@ -124,6 +126,11 @@ internal fun SharedAdventureScreen(snapshot: AdventureSnapshot?, busy: Boolean, 
     if (edit && active != null) AdventureEditor(active, tasks, !busy && allowed, busy, failed, { edit = false }) { draft ->
         onAction(action("edit").put("draft", draft.json()))
     }
+    if (finish && active != null) AlertDialog(onDismissRequest = { finish = false },
+        title = { Text(stringResource(R.string.adventure_finish)) }, text = { Text(stringResource(R.string.adventure_finish_confirm)) },
+        confirmButton = { TextButton(onClick = { onAction(action("finish").put("confirmed", true)); finish = false }, enabled = !busy && allowed,
+            modifier = Modifier.testTag("adventure-confirm-finish")) { Text(stringResource(R.string.adventure_finish)) } },
+        dismissButton = { TextButton(onClick = { finish = false }) { Text(stringResource(R.string.adventure_not_now)) } })
     if (leave && active != null) AlertDialog(onDismissRequest = { leave = false },
         title = { Text(stringResource(R.string.adventure_leave)) }, text = { Text(stringResource(R.string.adventure_leave_confirm)) },
         confirmButton = { TextButton(onClick = { onAction(action("leave").put("confirmed", true)); leave = false }, enabled = !busy && allowed,

@@ -62,3 +62,6 @@ cloud path is a separate v1 slice, not part of the offline capture completion.
 V1 includes typed capture, MAI online transcription with Parakeet fallback, original text, cleanup and manual/AI checklist split, shared claims/completion/order, description, due/snooze, delete/restore, simple daily/weekly repeats, reminders, activity, first-completion counts, lifetime milestones and a weekly streak. Keep Finnish/English, accessibility, account-safe persistence and the full retained recovery slice.
 
 V2 owns deeper subtasks/dependencies, notes/areas, AI clarify, advanced scheduling and offline predictions, exact historical metrics, FCM, explicit AI queue placement/recurrence extraction, optional model escalation and expanded workspace operations. No V2 work blocks v1. AI product-limit policy is outside both releases and begins only after V2. Technical bounds and authentication remain.
+
+[Reusable household lists](reusable-lists.md) defines saved starting content,
+standing lists, fresh copies and permissive adventure finishing.

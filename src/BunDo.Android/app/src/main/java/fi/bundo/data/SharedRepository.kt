@@ -86,6 +86,7 @@ class SharedRepository(
             }
             if (kind in SharedTaskActions.cleanupKinds) payload.put("requestId", task.optJSONObject("cleanup")?.opt("id") ?: JSONObject.NULL)
             if (kind == "RequestSplit") payload.put("instructions", instructions ?: JSONObject.NULL)
+            if (kind == "SetListPinned") payload.put("pinned", !task.optBoolean("listPinned"))
             if (kind == "CompleteTask") payload.put("confirmedClaimantId", confirmedClaimant ?: JSONObject.NULL)
             if (kind == "MoveTask") payload.put("expectedParentId", task.opt("parentId") ?: JSONObject.NULL)
                 .put("afterTaskId", after ?: JSONObject.NULL).put("beforeTaskId", before ?: JSONObject.NULL)
@@ -414,6 +415,59 @@ class SharedRepository(
         return id
     }
 
+    /** Both commands enter the durable journal together, so a crash cannot lose the selected items. */
+    internal suspend fun startList(value: SavedHouseholdList, standing: Boolean): String = lease.access {
+        require(value.valid())
+        database.withTransaction {
+            check(current().blocked == null && dao.recoveryState(scope) == null)
+            val id = commitInTransaction(EditorDraft(InboxRepository.NEW_DRAFT, value.title, value.notes.orEmpty(),
+                details = JSONObject().put("listKind", if (standing) "STANDING" else "FINITE").toString()), removeDraft = false)
+            val state = current()
+            val tasks = projected(state)
+            val task = checkNotNull(tasks[id])
+            val payload = JSONObject().put("taskId", id).put("items", JSONArray(value.items.map { it.title }))
+                .put("notes", JSONArray(value.items.map { it.notes ?: JSONObject.NULL }))
+            val action = SharedTaskActions.capture("SplitTask", task, dao.intents(scope).filter { SharedTaskActions.pending(it, state.revision) },
+                payload, JSONObject(checkNotNull(state.membership)).getString("me"), tasks, registration)
+            val sequence = state.nextSequence.toULong()
+            check(sequence < ULong.MAX_VALUE)
+            dao.saveIntent(SharedIntent(scope, sequence.toString(), id, "SplitTask", value.title,
+                value.items.joinToString("\n") { it.title }, false, false, "0", "0", "0", null, SharedProtocol.context(), taskAction = action))
+            val next = state.copy(nextSequence = (sequence + 1u).toString(), journalVersion = state.journalVersion + 1)
+            dao.saveWorkspace(next)
+            rebuild(next)
+            dao.deleteDraft(scope, "lists:preview")
+            lease.check()
+            id
+        }
+    }
+
+    internal suspend fun listDraft(key: String): String? = lease.access { dao.draft(scope, "lists:$key")?.description }
+    internal suspend fun saveListDraft(key: String, json: String?) = lease.access {
+        check(current().blocked == null)
+        if (json == null) dao.deleteDraft(scope, "lists:$key")
+        else dao.saveDraft(SharedDraft(scope, "lists:$key", "", json, System.currentTimeMillis()))
+    }
+    internal suspend fun applyListLibrary(workspace: SharedWorkspace, snapshot: JSONObject): Boolean = lease.access {
+        database.withTransaction {
+            val state = current()
+            if (state.blocked != null || dao.recoveryState(scope) != null) return@withTransaction false
+            check(workspace.scope == state.scope && workspace.epoch == state.epoch && workspace.registration == state.registration)
+            check(snapshot.getString("workspaceId") == state.workspaceId && snapshot.getString("stateEpoch") == state.epoch)
+            val library = snapshot.getJSONObject("library")
+            val version = library.decimal("version")
+            val values = library.getJSONArray("lists")
+            require(values.length() <= 32)
+            val parsed = (0 until values.length()).map { SavedHouseholdList.read(values.getJSONObject(it)) }
+            require(parsed.all { it.valid() } && parsed.map { it.id }.distinct().size == parsed.size)
+            val prior = state.listLibrary?.let(::JSONObject)
+            if (prior == null || version > prior.decimal("version") || version == prior.decimal("version") && sameJson(prior, library))
+                dao.saveWorkspace(state.copy(listLibrary = library.toString()))
+            lease.check()
+            true
+        }
+    }
+
     /** Imports copy selected text into new commands; never copy old envelopes, IDs or sequences. */
     suspend fun copyText(title: String, description: String, capturedAt: Long? = null, captureContext: String? = null): String =
         commit(EditorDraft(InboxRepository.NEW_DRAFT, title, description, details = JSONObject()
@@ -606,7 +660,7 @@ class SharedRepository(
             if (!artwork && state.worker != request.worker) return@withTransaction
             if (state.scope != request.workspace.scope || state.epoch != request.workspace.epoch ||
                 state.workspaceId != request.workspace.workspaceId || state.registration != request.workspace.registration) return@withTransaction
-            dao.saveWorkspace(state.copy(blocked = reason, worker = null, progress = null, adventure = null, adventureBow = null, adventureSeal = null, adventureCreation = null))
+            dao.saveWorkspace(state.copy(blocked = reason, worker = null, listLibrary = null, progress = null, adventure = null, adventureBow = null, adventureSeal = null, adventureCreation = null))
             for (intent in dao.intents(scope)) {
                 val quarantine = intent.status in listOf("PENDING", "SUBMITTED") ||
                     intent.status == "ACCEPTED" && intent.receipt?.let { JSONObject(it).decimal("effectRevision") > state.revision.toULong() } == true

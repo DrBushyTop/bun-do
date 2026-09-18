@@ -162,6 +162,7 @@ internal object SharedProtocol {
         }
         for (group in SharedTaskActions.groups - "deletion")
             require(SharedTaskActions.version(task, group).toULong() <= revision)
+        require(task.isNull("listKind") || task.getString("listKind") in listOf("STANDING", "FINITE") && task.isNull("parentId"))
         require(task.optString("lifecycle", "OPEN") in listOf("OPEN", "COMPLETED", "CANCELLED"))
         task.nullableString("parentId")?.let {
             require(UUID.fromString(it).toString() == it && it != task.getString("id") && !task.optBoolean("isChecklist"))
