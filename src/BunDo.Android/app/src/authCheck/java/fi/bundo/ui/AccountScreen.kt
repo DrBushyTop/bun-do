@@ -206,15 +206,28 @@ fun AccountScreen(accounts: AccountStore, model: SignInModel, onHouseholds: () -
                     }
                 }
                 else -> {
-                    Text(selectedWorkspace?.name ?: stringResource(if (signedIn) R.string.account_signed_in else R.string.account_anonymous),
+                    Text(if (selectedWorkspace?.personal == true) stringResource(R.string.visibility_only_me) else selectedWorkspace?.name ?: stringResource(if (signedIn) R.string.account_signed_in else R.string.account_anonymous),
                         style = MaterialTheme.typography.headlineSmall)
                     if (signedIn && model.choices.isNotEmpty()) Text(stringResource(R.string.identity_selected,
                         if (current!!.identity!!.subject == "alice") "Alice" else "Bob"))
                     val membership = selectedWorkspace?.membership?.let { org.json.JSONObject(it) }
-                    if (signedIn && membership != null && membership.optString("me").isNotBlank() && membership.optString("ownerId") == membership.optString("me"))
+                    if (signedIn && selectedWorkspace?.personal != true && membership != null && membership.optString("me").isNotBlank() && membership.optString("ownerId") == membership.optString("me"))
                         Button(onClick = onHouseholds, enabled = !model.busy, modifier = Modifier.fillMaxWidth().testTag("account-invite")) {
                             Text(stringResource(R.string.welcome_invite))
                         }
+                    if (signedIn) SettingsNavigationRow(stringResource(R.string.visibility_only_me), {
+                        val owner = current!!
+                        scope.launch {
+                            working = true
+                            try {
+                                val personal = owner.personalWorkspace()
+                                owner.selectHousehold(personal.workspaceId, personal.epoch, personal.name, true)
+                                onClose()
+                            } catch (error: kotlinx.coroutines.CancellationException) { throw error }
+                            catch (_: Exception) { failure = true }
+                            finally { working = false }
+                        }
+                    }, Modifier.testTag("account-private-tasks"), enabled = !working && !model.busy)
                     if (signedIn) SettingsNavigationRow(stringResource(R.string.family_members_invites), onHouseholds,
                         Modifier.testTag("account-households"), icon = Icons.Outlined.Home, enabled = !model.busy)
                     if (onSetup != null) SettingsNavigationRow(stringResource(R.string.welcome_setup), onSetup,

@@ -147,6 +147,7 @@ public sealed partial class AdventureService(IHouseholdDocuments documents, IAdv
             if (registrationActive is not null && !await registrationActive(ct)) throw new SyncException("REGISTRATION_RETIRED");
             var state = await documents.ReadAsync<WorkspaceState>(partition, "state", ct);
             if (state is null || !state.Value.Membership.CanRead(member)) throw new SyncException("FORBIDDEN");
+            if (state.Value.Membership.PersonalOwnerId is not null) throw new SyncException("PERSONAL_WORKSPACE");
             if (state.Value.StateEpoch != epoch) throw new SyncException("EPOCH_CHANGED");
             return state;
         }

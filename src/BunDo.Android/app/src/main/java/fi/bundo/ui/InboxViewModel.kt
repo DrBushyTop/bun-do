@@ -130,7 +130,7 @@ class InboxViewModel(private val repository: TaskEditorRepository, private val s
         state.value.editor?.let(::persist)
     }
 
-    fun closeEditor(commit: Boolean, onSaved: ((String) -> Unit)? = null) {
+    fun closeEditor(commit: Boolean, onClosed: (() -> Unit)? = null, onSaved: ((String) -> Unit)? = null) {
         val draft = state.value.editor ?: return
         if (state.value.working || (commit && (!InboxLimits.valid(draft.title, draft.description) || !fi.bundo.data.SharedTaskDetails.valid(draft.details)))) return
         mutableState.update { it.copy(working = true, writeFailed = false) }
@@ -143,8 +143,9 @@ class InboxViewModel(private val repository: TaskEditorRepository, private val s
                 it.copy(editor = null, working = false, draftSaved = true, writeFailed = false, savedPlacement = placement)
             }
             if (id != null) onSaved?.invoke(id)
+            onClosed?.invoke()
         }, failed = {
-            retryWrite = { closeEditor(commit, onSaved) }
+            retryWrite = { closeEditor(commit, onClosed, onSaved) }
             mutableState.update { it.copy(working = false, writeFailed = true, draftSaved = false) }
         }))
     }

@@ -14,7 +14,7 @@ public sealed record HouseholdView(Guid Id, Guid StateEpoch,
     [property: JsonNumberHandling(JsonNumberHandling.WriteAsString)] ulong Revision,
     [property: JsonNumberHandling(JsonNumberHandling.WriteAsString)] ulong MembershipVersion,
     Guid Me, bool Owner, bool Active, MemberView[] Members, InvitationView[] Invitations,
-    string Name, DateTimeOffset? DeletedAt);
+    string Name, DateTimeOffset? DeletedAt, bool Personal = false);
 public sealed record HouseholdReply(string Code, HouseholdView? Household = null, string? InvitationLink = null);
 
 public sealed class HouseholdService(IHouseholdDocuments documents, TimeProvider? timeProvider = null, string invitationUrl = "bundo://join")
@@ -29,7 +29,7 @@ public sealed class HouseholdService(IHouseholdDocuments documents, TimeProvider
         foreach (var workspace in directory?.Value.Workspaces ?? [])
         {
             var view = await GetAsync(actor, workspace, cancellationToken);
-            if (view is not null) views.Add(view);
+            if (view is not null && !view.Personal) views.Add(view);
         }
         return views.ToArray();
     }
@@ -41,8 +41,9 @@ public sealed class HouseholdService(IHouseholdDocuments documents, TimeProvider
     }
 
     public async Task<HouseholdReply> CreateAsync(Guid actor, Guid workspace, CancellationToken cancellationToken,
-        string name = "Household", string displayName = "")
+        string name = "Household", string displayName = "", bool personal = false)
     {
+        if (!personal && workspace.ToString("D").StartsWith("50455253", StringComparison.Ordinal)) return new("INVALID_REQUEST");
         name = name.Trim();
         if (actor == Guid.Empty || workspace == Guid.Empty || name.Length is < 1 or > 80 || name.Any(char.IsControl))
             return new("INVALID_REQUEST");
@@ -54,13 +55,34 @@ public sealed class HouseholdService(IHouseholdDocuments documents, TimeProvider
             var state = new WorkspaceState(workspace, Guid.NewGuid(), 0,
                 ImmutableDictionary<Guid, DeviceRegistration>.Empty,
                 ImmutableDictionary<string, TaskSnapshot>.Empty,
-                ImmutableDictionary<string, OperationReceipt>.Empty, [], HouseholdMembership.Create(actor, displayName: displayName), name,
+                ImmutableDictionary<string, OperationReceipt>.Empty, [], HouseholdMembership.Create(actor, displayName: displayName) with { PersonalOwnerId = personal ? actor : null }, name,
                 Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
             await documents.WriteAsync(Partition(workspace), "state", null, state, cancellationToken);
             current = await documents.ReadAsync<WorkspaceState>(Partition(workspace), "state", cancellationToken);
         }
-        return current?.Value.Membership.OwnerId == actor && current.Value.Membership.CanRead(actor)
+        return current?.Value.Membership.OwnerId == actor && current.Value.Membership.CanRead(actor) &&
+            (current.Value.Membership.PersonalOwnerId is not null) == personal
             ? new("ACCEPTED", View(current.Value, actor)) : new("FORBIDDEN");
+    }
+
+    public async Task<HouseholdReply> PersonalAsync(Guid actor, CancellationToken ct)
+    {
+        var reply = await CreateAsync(actor, PersonalId(actor), ct, "Only me", personal: true);
+        var stored = await documents.ReadAsync<WorkspaceState>(Partition(PersonalId(actor)), "state", ct);
+        if (reply.Code == "ACCEPTED" && stored?.Value.Revision == 0)
+        {
+            await documents.CommitWorkspaceAsync(stored, stored.Value with { Revision = 1, Changes = [new(1, [])] }, ct);
+            return new("ACCEPTED", await GetAsync(actor, PersonalId(actor), ct));
+        }
+        return reply;
+    }
+
+    public static Guid PersonalId(Guid actor)
+    {
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes($"bundo-personal:{actor:D}"));
+        // Reserve a namespace that ordinary household creation cannot occupy.
+        hash[0] = 0x53; hash[1] = 0x52; hash[2] = 0x45; hash[3] = 0x50;
+        return new(hash.AsSpan(0, 16));
     }
 
     public async Task<HouseholdReply> IssueAsync(Guid actor, Guid workspace, Guid epoch, CancellationToken cancellationToken)
@@ -148,7 +170,7 @@ public sealed class HouseholdService(IHouseholdDocuments documents, TimeProvider
         return new(state.WorkspaceId, state.StateEpoch, state.Revision, membership.Version, actor, owner, active,
             active ? membership.Members.Values.Where(x => x.Active)
                 .Select(x => new MemberView(x.Id, x.Version, x.Id == membership.OwnerId, x.DisplayName)).ToArray() : [], invitations,
-            active ? state.Name : "", null);
+            active ? state.Name : "", null, membership.PersonalOwnerId is not null);
     }
 
     private static string Hash(string secret) => Convert.ToHexString(SHA256.HashData(Encoding.ASCII.GetBytes(secret)));

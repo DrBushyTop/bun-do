@@ -224,6 +224,8 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
                 else if (operation.Command is not (RequestCleanup or RequestSplit or CancelCleanup) && effect with { Cleanup = before.Cleanup } != before)
                     effects = effects.SetItem(effect.Id, effect with { LastChange = new(authenticatedMemberId, acceptedAt, "HUMAN") });
             }
+            if (state.Membership.PersonalOwnerId is not null)
+                effects = effects.ToImmutableDictionary(pair => pair.Key, pair => pair.Value with { FirstCompletion = null });
             if (task is not null && effects.TryGetValue(task.Id, out var finalTask)) task = finalTask;
             foreach (var effect in effects.Values.Where(value => value.ParentId is null))
             {
@@ -239,7 +241,7 @@ public sealed class WorkspaceServer(IWorkspaceStore store, TimeProvider? timePro
                 TaskCount = state.TaskCount + effects.Keys.Count(id => !state.Tasks.ContainsKey(id)),
                 Tasks = state.Tasks.SetItems(effects),
                 Repeats = repeats,
-                RecentActivity = code == "ACCEPTED" && task is not null && effects.Count > 0
+                RecentActivity = state.Membership.PersonalOwnerId is null && code == "ACCEPTED" && task is not null && effects.Count > 0
                     ? HouseholdProgress.Record(state.RecentActivity, revision, task.Id, authenticatedMemberId,
                         operation.Command.GetType().Name, acceptedAt) : state.RecentActivity,
                 Receipts = state.Receipts.Add(operation.OperationId, receipt),

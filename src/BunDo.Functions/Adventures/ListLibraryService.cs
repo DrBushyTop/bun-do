@@ -16,6 +16,7 @@ public sealed class ListLibraryService(IHouseholdDocuments documents, Func<Cance
             var stored = await documents.ReadAsync<WorkspaceState>(workspace.ToString("D"), "state", ct);
             if (stored is null || !stored.Value.Membership.CanRead(member)) throw new SyncException("FORBIDDEN");
             var state = stored.Value;
+            if (state.Membership.PersonalOwnerId is not null) throw new SyncException("PERSONAL_WORKSPACE");
             if (state.StateEpoch != epoch) throw new SyncException("EPOCH_CHANGED");
             var library = state.ListLibrary ?? new(Lists: []);
             if (command is null) return new(workspace, epoch, library);

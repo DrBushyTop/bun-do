@@ -27,11 +27,14 @@ public sealed record WorkspaceCommit(WorkspaceState Metadata, IReadOnlyList<Work
         if (deletes.Distinct().Count() != deletes.Count || deletes.Any(x => x == "state"))
             throw new ArgumentException("Invalid maintenance deletion set.");
         var writes = new List<WorkspaceWrite> { new(GroupId(next.Revision), group, true) };
+        foreach (var receipt in next.VisibilityReceipts ?? [])
+            writes.Add(new($"visibility-receipt:{receipt.Id:D}", receipt, true));
         foreach (var task in group.Tasks) writes.Add(new(TaskId(task.Id), task, false));
         foreach (var repeat in group.Repeats ?? []) writes.Add(new($"repeat:{repeat.Id}", repeat, false));
         // Completion credit outlives task content and remains available to household statistics.
-        foreach (var completion in group.RetainedCompletions ?? [])
-            writes.Add(new($"completion:{completion.RootId}", completion, true));
+        foreach (var completion in (group.RetainedCompletions ?? []).GroupBy(c => c.RootId).Select(g => g.MinBy(c => c.AcceptedAt)!))
+            // A task may return from Only me under a new ID with its original immutable credit.
+            writes.Add(new($"completion:{completion.RootId}", completion, false));
         foreach (var receipt in next.Receipts.Values.Where(x => x.EffectRevision == next.Revision))
             writes.Add(new(ReceiptId(receipt.OperationId), receipt, true));
         foreach (var device in next.Devices.Values)
@@ -39,7 +42,7 @@ public sealed record WorkspaceCommit(WorkspaceState Metadata, IReadOnlyList<Work
                 writes.Add(new(DeviceId(device.DeviceId), device, false));
         // Existing pre-sync records remain readable. New history and entities never accumulate in metadata.
         var metadata = next with { Changes = current.Changes, Tasks = current.Tasks,
-            Devices = current.Devices, Receipts = current.Receipts, Repeats = current.Repeats };
+            Devices = current.Devices, Receipts = current.Receipts, Repeats = current.Repeats, VisibilityReceipts = null };
         var bytes = JsonSerializer.SerializeToUtf8Bytes(metadata).Length +
             writes.Sum(x => JsonSerializer.SerializeToUtf8Bytes(x.Value, x.Value.GetType()).Length + 512) + 512;
         bytes += deletes.Sum(x => System.Text.Encoding.UTF8.GetByteCount(x) + 512);

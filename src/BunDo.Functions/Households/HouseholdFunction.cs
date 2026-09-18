@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using BunDo.Domain;
+using BunDo.Functions.Sync;
 using BunDo.Functions.Identity;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -48,9 +49,9 @@ public sealed class HouseholdFunction(AccessTokens tokens, IServiceProvider serv
         catch (JsonException) { return new BadRequestResult(); }
         var action = body.Action;
         if (body.RegistrationId == Guid.Empty ||
-            action is not ("list" or "create" or "get" or "invite" or "redeem" or "approve" or "cancel" or "remove" or "leave" or "transfer" or "delete") ||
-            action != "list" && body.WorkspaceId == Guid.Empty ||
-            action is not ("list" or "create" or "get") && body.StateEpoch == Guid.Empty ||
+            action is not ("list" or "personal" or "visibilityPending" or "visibilityCancel" or "visibility" or "create" or "get" or "invite" or "redeem" or "approve" or "cancel" or "remove" or "leave" or "transfer" or "delete") ||
+            action is not ("list" or "personal" or "visibilityPending" or "visibilityCancel") && body.WorkspaceId == Guid.Empty ||
+            action is not ("list" or "personal" or "visibilityPending" or "visibilityCancel" or "visibility" or "create" or "get") && body.StateEpoch == Guid.Empty ||
             action is ("redeem" or "approve" or "cancel") && body.InvitationId == Guid.Empty ||
             action is ("remove" or "transfer") && body.MemberId == Guid.Empty)
             return new BadRequestResult();
@@ -64,6 +65,19 @@ public sealed class HouseholdFunction(AccessTokens tokens, IServiceProvider serv
             var actor = HouseholdIdentity.Member(authentication.Identity!);
             if (action == "list")
                 return new OkObjectResult(new { households = await households.ListAsync(actor, ct) });
+            if (action == "personal") return new OkObjectResult(await households.PersonalAsync(actor, ct));
+            if (action is "visibility" or "visibilityPending" or "visibilityCancel")
+            {
+                var documents = services.GetService<IHouseholdDocuments>();
+                if (documents is null) return new StatusCodeResult(503);
+                var visibility = new TaskVisibilityService(documents);
+                if (action == "visibilityCancel") return new OkObjectResult(await visibility.CancelAsync(actor, body.TransferId, ct));
+                if (action == "visibilityPending") return new OkObjectResult(new { pending = await visibility.PendingAsync(actor, ct) });
+                var result = await visibility.SendAsync(actor, new(body.TransferId, body.WorkspaceId, body.StateEpoch,
+                    body.TaskId ?? "", body.ExpectedRevision, body.TargetWorkspaceId, body.TargetEpoch), ct);
+                Activity.Current?.SetTag("visibility.result", result.Code);
+                return new OkObjectResult(result);
+            }
             var workspace = body.WorkspaceId;
             if (workspace == Guid.Empty) return new BadRequestResult();
             HouseholdReply reply;
@@ -100,9 +114,12 @@ public sealed class HouseholdFunction(AccessTokens tokens, IServiceProvider serv
             return new ObjectResult(reply) { StatusCode = reply.Code switch {
                 "ACCEPTED" => 200, "FORBIDDEN" => 403, "REDEMPTION_LIMIT" => 429, "BUSY" => 503, _ => 409 } };
         }
+        catch (SyncException error) { return new ObjectResult(new { code = error.Code }) { StatusCode = 409 }; }
+        catch (WorkspaceCommitTooLargeException) { return new ObjectResult(new { code = "STORAGE_FULL" }) { StatusCode = 409 }; }
         catch (HouseholdStorageFullException) { return new ObjectResult(new { code = "STORAGE_FULL" }) { StatusCode = 409 }; }
     }
 }
 
 public sealed record HouseholdRequest(string? Action, Guid RegistrationId, Guid WorkspaceId, Guid StateEpoch,
-    Guid InvitationId, Guid MemberId, [property: JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)] ulong ExpectedVersion, string? Secret, string? ConfirmationCode, string? Name, string? DisplayName);
+    Guid InvitationId, Guid MemberId, [property: JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)] ulong ExpectedVersion, string? Secret, string? ConfirmationCode, string? Name, string? DisplayName, Guid TransferId = default, string? TaskId = null, Guid TargetWorkspaceId = default, Guid TargetEpoch = default,
+    [property: JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)] ulong ExpectedRevision = 0);

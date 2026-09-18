@@ -23,6 +23,7 @@ internal sealed class CanonicalCompletions(IHouseholdDocuments documents)
         for (var attempt = 0; attempt < 3; attempt++)
         {
             var before = await State();
+            if (before.Value.Membership.PersonalOwnerId is not null) return new(before, []);
             var credits = before.Value.Tasks.Values.Where(t => t.FirstCompletion != null).Select(t => t.FirstCompletion!).ToList();
             string? continuation = null;
             do

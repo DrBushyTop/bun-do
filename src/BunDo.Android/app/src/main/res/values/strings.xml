@@ -253,4 +253,21 @@
     <string name="adventure_finish">Päätä seikkailu</string>
     <string name="adventure_finish_confirm">Päätetäänkö seikkailu nyt? Keskeneräiset tehtävät ja kuittaamattomat kohdat jäävät avoimiksi. Mitään ei merkitä ostetuksi tai valmiiksi.</string>
     <string name="lists_too_large">Tässä kopiossa on liikaa tekstiä. Valitse vähemmän kohtia tai lyhennä lisätietoja.</string>
+    <string name="visibility_only_me">Vain minä</string>
+    <string name="visibility_household">Kotitalous</string>
+    <string name="visibility_share">Jaa kotitaloudelle</string>
+    <string name="visibility_make_private">Muuta yksityiseksi</string>
+    <string name="visibility_private_warning">Siirrä tehtävä ja sen lista Vain minä -näkymään. Kotitalouden jäsenet eivät enää saa muutoksia. Tämä ei poista tietoja, jotka he ovat jo nähneet tai tallentaneet offline-tilassa.</string>
+    <string name="visibility_share_warning">Jaa tämä sisältö kotitaloudelle %1$s. Tallenteet, alkuperäinen teksti ja yksityinen muokkaushistoria jäävät yksityisiksi. Poistettuja listan kohtia ei jaeta.</string>
+    <string name="visibility_repeat_warning">Tulevat toistot siirtyvät tehtävän mukana. Niissä käytetään tätä tallennettua nimeä ja kuvausta:</string>
+    <string name="visibility_adventure">Poista tehtävä ensin käynnissä olevasta seikkailusta ja yritä uudelleen.</string>
+    <string name="visibility_creator">Voit muuttaa vain itse luomiesi tehtävien ja listan kohtien näkyvyyttä.</string>
+    <string name="visibility_sync_first">Tallenna tai hylkää keskeneräiset muutokset, päivitä tehtävät ja avaa esikatselu uudelleen. Mitään uutta ei ole jaettu.</string>
+    <string name="visibility_repeat_moved">Muuta nykyisen toiston näkyvyyttä vanhan esiintymän sijaan.</string>
+    <string name="visibility_pending">Näkyvyyden muutosta ei ole vahvistettu. Tallennettua pyyntöä yritetään uudelleen, kun yhteys toimii. Tarkista tulos päivittämällä tehtävät.</string>
+    <string name="visibility_no_household">Valitse kotitalous tai liity sellaiseen tilin asetuksissa ennen jakamista.</string>
+    <string name="visibility_draft_conflict">Toisessa näkymässä on jo keskeneräinen tehtävä. Luonnoksesi on tallennettu tänne. Viimeistele toinen luonnos ennen tämän siirtämistä.</string>
+    <string name="visibility_pending_title">Keskeneräiset näkyvyyden muutokset</string>
+    <string name="visibility_keep_private">Pidä yksityisenä</string>
+    <string name="visibility_already_shared">Tehtävä on jo jaettu. Voit muuttaa sen yksityiseksi kotitalouden tehtävistä.</string>
 </resources>

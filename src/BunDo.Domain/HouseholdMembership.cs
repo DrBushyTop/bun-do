@@ -17,7 +17,7 @@ public sealed record HouseholdMembership(
     ImmutableDictionary<Guid, HouseholdMember> Members,
     ImmutableDictionary<Guid, HouseholdInvitation> Invitations,
     ImmutableDictionary<Guid, ImmutableArray<DateTimeOffset>> RedemptionAttempts,
-    DateTimeOffset? DeletedAt = null)
+    DateTimeOffset? DeletedAt = null, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] Guid? PersonalOwnerId = null)
 {
     public static HouseholdMembership Create(Guid ownerId, ulong version = 0, string displayName = "")
     {
@@ -29,7 +29,7 @@ public sealed record HouseholdMembership(
     }
 
     public bool CanRead(Guid memberId) =>
-        DeletedAt is null && Members.TryGetValue(memberId, out var member) && member.Active;
+        (PersonalOwnerId is null || PersonalOwnerId == memberId) && DeletedAt is null && Members.TryGetValue(memberId, out var member) && member.Active;
 }
 
 public abstract record MembershipCommand;
@@ -56,6 +56,7 @@ public static class MembershipPolicy
     public static MembershipDecision Apply(HouseholdMembership state, Guid actor, MembershipCommand command,
         DateTimeOffset now, ulong revision)
     {
+        if (state.PersonalOwnerId is not null) return new("PERSONAL_WORKSPACE", state);
         if (actor == Guid.Empty) return new("FORBIDDEN", state);
         if (command is RedeemHouseholdInvitation redeem)
             return Redeem(state, actor, redeem, now, revision);

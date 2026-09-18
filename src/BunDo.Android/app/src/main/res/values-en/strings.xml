@@ -252,4 +252,21 @@
     <string name="adventure_finish">Finish adventure</string>
     <string name="adventure_finish_confirm">Finish this adventure now? Unfinished tasks and unchecked items will stay open. Nothing will be marked bought or completed.</string>
     <string name="lists_too_large">This copy has too much text. Select fewer items or shorten the notes.</string>
+    <string name="visibility_only_me">Only me</string>
+    <string name="visibility_household">Household</string>
+    <string name="visibility_share">Share with household</string>
+    <string name="visibility_make_private">Make private</string>
+    <string name="visibility_private_warning">Move this task and its checklist to Only me. Household members will no longer receive changes. This cannot erase what they have already seen or saved offline.</string>
+    <string name="visibility_share_warning">Share this content with %1$s. Recordings, original capture and private edit history stay private. Deleted checklist items are not shared.</string>
+    <string name="visibility_repeat_warning">Future repeats move with this task, using this saved title and description:</string>
+    <string name="visibility_adventure">Remove this task from the active adventure first, then try again.</string>
+    <string name="visibility_creator">You can only change visibility for tasks and checklist items you created.</string>
+    <string name="visibility_sync_first">Save or discard unfinished edits, refresh tasks, then open this preview again. Nothing new has been shared.</string>
+    <string name="visibility_repeat_moved">Change visibility on the current repeat instead of an older occurrence.</string>
+    <string name="visibility_pending">The visibility change has not been confirmed. Your saved request will retry when connected. Refresh tasks to check its result.</string>
+    <string name="visibility_no_household">Choose or join a household in account settings before sharing.</string>
+    <string name="visibility_draft_conflict">The other audience already has an unfinished capture. Your draft is saved here. Finish the other draft before moving this one.</string>
+    <string name="visibility_pending_title">Pending visibility changes</string>
+    <string name="visibility_keep_private">Keep private</string>
+    <string name="visibility_already_shared">This task has already been shared. You can make it private from the household task list.</string>
 </resources>

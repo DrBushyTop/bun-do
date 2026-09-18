@@ -63,13 +63,13 @@ class AccountData internal constructor(
                 database.shared().selected(registrationId.orEmpty()).collect { value ->
                     lease.check()
                     selectedWorkspaceValue.value = value
-                    selectedHouseholdValue.value = value?.workspaceId
+                    selectedHouseholdValue.value = value?.takeUnless { it.personal }?.workspaceId
                 }
             } catch (error: kotlinx.coroutines.CancellationException) { throw error }
             catch (_: Exception) { /* The editor owns the recoverable database-read error state. */ }
         }
     }
-    suspend fun selectHousehold(id: String?, epoch: String? = null, name: String = "") = lease.access {
+    suspend fun selectHousehold(id: String?, epoch: String? = null, name: String = "", personal: Boolean = false) = lease.access {
         database.withTransaction {
             database.shared().clearSelection()
             if (id != null) {
@@ -78,14 +78,42 @@ class AccountData internal constructor(
                 val key = "$id/$stateEpoch/$registration"
                 val previous = database.shared().workspace(key)
                 database.shared().quarantineOtherRegistrations(registration, id, stateEpoch)
-                database.shared().saveWorkspace(previous?.copy(name = name, selected = true)
-                    ?: SharedWorkspace(key, id, stateEpoch, registration, name, selected = true))
+                database.shared().saveWorkspace(previous?.copy(name = name, selected = true, personal = personal)
+                    ?: SharedWorkspace(key, id, stateEpoch, registration, name, selected = true, personal = personal))
             }
             lease.check()
         }
-        selectedHouseholdValue.value = id
+        selectedHouseholdValue.value = if (personal) null else id
         SharedSyncWorker.request(context, this@AccountData)
     }
+    internal suspend fun personalWorkspace(): SharedWorkspace {
+        lease.access { database.shared().workspaces(checkNotNull(registrationId)).firstOrNull { it.personal && it.blocked == null } }?.let { return it }
+        val app = context.applicationContext as fi.bundo.BunDoApplication
+        val home = app.withAccountToken(this) { token ->
+            fi.bundo.household.HouseholdEndpoint().send(token, checkNotNull(registrationId), JSONObject().put("action", "personal")).getJSONObject("household")
+        }
+        return lease.access {
+            database.withTransaction {
+                val id = home.getString("id"); val epoch = home.getString("stateEpoch")
+                val key = "$id/$epoch/$registrationId"
+                val row = database.shared().workspace(key) ?: SharedWorkspace(key, id, epoch, checkNotNull(registrationId), "Only me", personal = true)
+                database.shared().saveWorkspace(row)
+                row
+            }
+        }
+    }
+
+    internal suspend fun moveCaptureDraft(source: String, target: SharedWorkspace) = lease.access {
+        database.withTransaction {
+            val draft = checkNotNull(database.shared().draft(source, InboxRepository.NEW_DRAFT))
+            // Never overwrite another unfinished capture when switching its audience.
+            val existing = database.shared().draft(target.scope, InboxRepository.NEW_DRAFT)
+            check(existing == null || existing.title.isBlank() && existing.description.isBlank())
+            database.shared().saveDraft(draft.copy(scope = target.scope, basis = null))
+            database.shared().deleteDraft(source, InboxRepository.NEW_DRAFT)
+        }
+    }
+
     private var controller: VoiceController? = null
     val voice: VoiceController get() = controller ?: VoiceController(context, recordings,
         online = if (identity == null) null else { audio ->

@@ -14,6 +14,7 @@ public sealed class JourneyService(IHouseholdDocuments documents, TimeProvider? 
         {
             var snapshot = await new CanonicalCompletions(documents).ReadAsync(member, workspace, epoch, ct);
             var state = snapshot.State.Value;
+            if (state.Membership.PersonalOwnerId is not null) throw new SyncException("PERSONAL_WORKSPACE");
             if (state.Journey is not null) return;
             var revision = checked(state.Revision + 1);
             var now = clock.GetUtcNow();

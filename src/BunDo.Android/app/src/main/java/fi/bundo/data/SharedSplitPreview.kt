@@ -15,6 +15,7 @@ internal object SharedSplitPreview {
         items.map { it.lowercase(java.util.Locale.ROOT) }.distinct().size == items.size
 
     fun recovery(draft: SharedDraft, workspace: String?): List<RecoveryText> {
+        if (draft.key.startsWith("visibility:")) return emptyList()
         val source = "shared-draft:${draft.scope}:${draft.key}"
         val records = mutableListOf<RecoveryText>()
         if (draft.title.isNotBlank() || draft.description.isNotBlank())
